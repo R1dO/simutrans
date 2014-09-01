@@ -593,7 +593,7 @@ CXXFLAGS += $(CFLAGS)
 
 BUILDDIR ?= build/$(CFG)
 PROGDIR  ?= $(BUILDDIR)
-PROG     ?= $(PROGNAME)
+PROG     ?= sim
 
 
 include common.mk
