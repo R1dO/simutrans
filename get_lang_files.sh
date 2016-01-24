@@ -48,4 +48,5 @@ rm -f ce.tab
 # Remove check test
 #rm xx.tab
 #rm -rf xx
+dos2unix */*.txt
 cd ../..
