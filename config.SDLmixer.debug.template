@@ -88,5 +88,5 @@ FLAGS = -DREVISION=$(REVISION)
 PROGDIR  = $(shell pwd)/simutrans
 MAKEOBJ_PROGDIR = ${PROGDIR}
 NETTOOL_PROGDIR = ${PROGDIR}
-PROGNAME = sim.D${REVISION}.${BACKEND}
-REVISION = "7746"
+PROGNAME = sim-debug.${REVISION}.${BACKEND}
+REVISION = $(shell git log --format=format:%h -n 1)
