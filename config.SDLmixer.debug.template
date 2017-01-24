@@ -85,6 +85,8 @@ FLAGS = -DREVISION=$(REVISION)
 # MAKEOBJ_PROGDIR = $(shell pwd)
 # NETTOOL_PROGDIR = $(shell pwd)
 # PROGDIR  = $(shell pwd)
-#PROGDIR  = /opt/local/simutrans/bin
+PROGDIR  = $(shell pwd)/simutrans
+MAKEOBJ_PROGDIR = ${PROGDIR}
+NETTOOL_PROGDIR = ${PROGDIR}
 PROGNAME = sim.D${REVISION}.${BACKEND}
 REVISION = "7746"
