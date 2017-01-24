@@ -33,7 +33,7 @@ OPTIMISE = 1 # Add umpteen optimisation flags
 
 #WIN32_CONSOLE = 1 # adds a console for windows debugging
 
-#MULTI_THREAD = 1 # Enable multithreading
+MULTI_THREAD = 1 # Enable multithreading
 
 # Define these as empty strings, if you don't have the respective config program
 #ALLEGRO_CONFIG = allegro-config
@@ -41,7 +41,7 @@ OPTIMISE = 1 # Add umpteen optimisation flags
 #SDL_CONFIG     = sdl-config
 #SDL2_CONFIG    = sdl2-config
 
-#VERBOSE = 1
+VERBOSE = 1
 
 # The following useful conditional compilation flags exist
 #
@@ -85,6 +85,6 @@ FLAGS = -DREVISION=$(REVISION)
 # MAKEOBJ_PROGDIR = $(shell pwd)
 # NETTOOL_PROGDIR = $(shell pwd)
 # PROGDIR  = $(shell pwd)
-PROGDIR  = /opt/usr/share/games/simutrans_master
-PROGNAME = "sim-SDLmixer_t"$(REVISION)
-REVISION = "7311"
+#PROGDIR  = /opt/local/simutrans/bin
+PROGNAME = sim.D${REVISION}.${BACKEND}
+REVISION = "7746"

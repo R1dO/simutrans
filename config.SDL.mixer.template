@@ -33,7 +33,7 @@ OPTIMISE = 1 # Add umpteen optimisation flags
 
 #WIN32_CONSOLE = 1 # adds a console for windows debugging
 
-#MULTI_THREAD = 1 # Enable multithreading
+MULTI_THREAD = 1 # Enable multithreading
 
 # Define these as empty strings, if you don't have the respective config program
 #ALLEGRO_CONFIG = allegro-config
@@ -85,6 +85,6 @@ FLAGS = -DREVISION=$(REVISION)
 # MAKEOBJ_PROGDIR = $(shell pwd)
 # NETTOOL_PROGDIR = $(shell pwd)
 # PROGDIR  = $(shell pwd)
-PROGDIR  = /opt/usr/share/games/simutrans_master
-PROGNAME = "sim-SDLmixer_t"$(REVISION)
-REVISION = "7303"
+#PROGDIR  = /opt/local/simutrans/bin
+PROGNAME = sim.R${REVISION}.${BACKEND}
+REVISION = "7746"
