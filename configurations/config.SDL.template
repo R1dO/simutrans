@@ -48,6 +48,7 @@ MULTI_THREAD = 1 # Enable multithreading
 # Needed to compile:
 # USE_C: no assembler for copying (required for not using GCC on x86)
 # SIM_BIG_ENDIAN: MUST be set for PPC/Motorola byte order! (old mac, amiga)
+# NO_INTPTR_T: must be set if intptr_t is not available
 #
 # Changing appearance:
 # USE_SOFTPOINTER: emulate mouse pointer (set automatically in Makefile)
@@ -70,14 +71,14 @@ MULTI_THREAD = 1 # Enable multithreading
 #
 # In order to use the flags, add a line like this: (-Dxxx)
 # FLAGS = -DUSE_C
-FLAGS = -DREVISION=$(REVISION)
+FLAGS = -DREVISION="${REVISION}"
 
 # Output directories:
 #
 # use this put objects file in same directory, where the sources are (not recommended):
 # ... otherwise defaults to 'build/default')
 #
-# BUILDDIR = $(shell pwd)
+BUILDDIR = build/SDL.play
 #
 # use this to specifiy the target directory for the executable:
 # .. otherwise defaults to BUILDDIR
@@ -88,5 +89,5 @@ FLAGS = -DREVISION=$(REVISION)
 PROGDIR  = $(shell pwd)/simutrans
 MAKEOBJ_PROGDIR = ${PROGDIR}
 NETTOOL_PROGDIR = ${PROGDIR}
-PROGNAME = sim.${REVISION}.${BACKEND}
 REVISION = $(shell git log --format=format:%h -n 1)
+PROG = sim.${REVISION}.${BACKEND}

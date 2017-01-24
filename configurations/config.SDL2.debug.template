@@ -23,8 +23,8 @@ OSTYPE = linux
 #OSTYPE = mingw
 #OSTYPE = mac
 
-#DEBUG = 3    # Level 1-3, higher number means more debug-friendly, see Makefile
-OPTIMISE = 1 # Add umpteen optimisation flags
+DEBUG = 3    # Level 1-3, higher number means more debug-friendly, see Makefile
+#OPTIMISE = 1 # Add umpteen optimisation flags
 #PROFILE = 1  # Enable profiling
 #PROFILE = 2  # Enable profiling with optimisation flags, can be used with `OPTIMISE = 1'
 
@@ -41,7 +41,7 @@ MULTI_THREAD = 1 # Enable multithreading
 #SDL_CONFIG     = sdl-config
 #SDL2_CONFIG    = sdl2-config
 
-#VERBOSE = 1
+VERBOSE = 1
 
 # The following useful conditional compilation flags exist
 #
@@ -71,17 +71,23 @@ MULTI_THREAD = 1 # Enable multithreading
 #
 # In order to use the flags, add a line like this: (-Dxxx)
 # FLAGS = -DUSE_C
+FLAGS = -DREVISION="${REVISION}"
 
 # Output directories:
 #
 # use this put objects file in same directory, where the sources are (not recommended):
 # ... otherwise defaults to 'build/default')
 #
-BUILDDIR = build/play
+BUILDDIR = debug/SDL2.play
 #
 # use this to specifiy the target directory for the executable:
 # .. otherwise defaults to BUILDDIR
 #
 # MAKEOBJ_PROGDIR = $(shell pwd)
 # NETTOOL_PROGDIR = $(shell pwd)
-PROGDIR  = simutrans
+# PROGDIR  = $(shell pwd)
+PROGDIR  = $(shell pwd)/simutrans
+MAKEOBJ_PROGDIR = ${PROGDIR}
+NETTOOL_PROGDIR = ${PROGDIR}
+REVISION = $(shell git log --format=format:%h -n 1)
+PROG = sim-debug.${REVISION}.${BACKEND}

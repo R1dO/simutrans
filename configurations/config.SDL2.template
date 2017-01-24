@@ -71,17 +71,23 @@ MULTI_THREAD = 1 # Enable multithreading
 #
 # In order to use the flags, add a line like this: (-Dxxx)
 # FLAGS = -DUSE_C
+FLAGS = -DREVISION="${REVISION}"
 
 # Output directories:
 #
 # use this put objects file in same directory, where the sources are (not recommended):
 # ... otherwise defaults to 'build/default')
 #
-BUILDDIR = build/play
+BUILDDIR = build/SDL2.play
 #
 # use this to specifiy the target directory for the executable:
 # .. otherwise defaults to BUILDDIR
 #
 # MAKEOBJ_PROGDIR = $(shell pwd)
 # NETTOOL_PROGDIR = $(shell pwd)
-PROGDIR  = simutrans
+# PROGDIR  = $(shell pwd)
+PROGDIR  = $(shell pwd)/simutrans
+MAKEOBJ_PROGDIR = ${PROGDIR}
+NETTOOL_PROGDIR = ${PROGDIR}
+REVISION = $(shell git log --format=format:%h -n 1)
+PROG = sim.${REVISION}.${BACKEND}
