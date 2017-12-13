@@ -78,7 +78,7 @@ VERBOSE = 1
 #
 # In order to use the flags, add a line like this: (-Dxxx)
 # FLAGS = -DUSE_C
-FLAGS = -DDESTINATION_CITYCARS -DREVISION="${REVISION}"
+FLAGS = -DREVISION="${REVISION}"
 
 # Output directories:
 #
