@@ -93,6 +93,6 @@ BUILDDIR = build/${BACKEND}
 # MAKEOBJ_PROGDIR = $(shell pwd)
 # NETTOOL_PROGDIR = $(shell pwd)
 # PROGDIR  = $(shell pwd)
-PROGDIR  = $(shell pwd)/simutrans
+PROGDIR  = ~/.local/share/simutrans/build.play
 REVISION = $(shell git log --format=format:%h -n 1)
 PROG = sim.${REVISION}.${BACKEND}
