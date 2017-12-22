@@ -95,4 +95,3 @@ BUILDDIR = build/${BACKEND}
 # PROGDIR  = $(shell pwd)
 PROGDIR  = ~/.local/share/simutrans/build.play
 REVISION = $(shell git log --format=format:%h -n 1)
-PROG = sim.${REVISION}.${BACKEND}
