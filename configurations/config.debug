@@ -93,6 +93,7 @@ BUILDDIR = debug/${BACKEND}
 # MAKEOBJ_PROGDIR = $(shell pwd)
 # NETTOOL_PROGDIR = $(shell pwd)
 # PROGDIR  = $(shell pwd)
-PROGDIR  = $(shell pwd)/simutrans
+MAKEOBJ_PROGDIR = ${PROGDIR}
+NETTOOL_PROGDIR = ${PROGDIR}
+PROGDIR  = ~/.local/share/simutrans/build.debug
 REVISION = $(shell git log --format=format:%h -n 1)
-PROG = sim-debug.${REVISION}.${BACKEND}
