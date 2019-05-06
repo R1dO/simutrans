@@ -10,6 +10,7 @@
 
 #include <stdio.h>
 
+#include "../simcolor.h"
 #include "../tpl/stringhashtable_tpl.h"
 
 class tabfileobj_t;
@@ -96,13 +97,6 @@ private:
 	 */
 	void format_key(char *key);
 
-	/**
-	 * Format the value string (trimleft and trimright)
-	 *
-	 * @author V. Meyer
-	 */
-	void format_value(char *value);
-
 public:
 	tabfile_t() : file(NULL) {}
 	~tabfile_t() { close(); }
@@ -134,7 +128,8 @@ class tabfileobj_t {
 private:
 	stringhashtable_tpl<obj_info_t> objinfo;
 
-	bool get_x_y( const char *key, sint16 &x, sint16 &y );
+	template<class I>
+	bool get_x_y( const char *key, I &x, I &y );
 
 public:
 	tabfileobj_t() { ; }
@@ -183,14 +178,15 @@ public:
 	 * @author V. Meyer
 	 */
 	const koord &get_koord(const char *key, koord def);
-	const scr_coord &get_scr_coord(const char *key, scr_coord def);
 	const scr_size &get_scr_size(const char *key, scr_size def);
 
 	/**
-	 * Get a color index or the next matching color when given a #AABBCC
+	 * Get a color in the system format when given a #AABBCC
+	 * and optionally set RGB888 for a chosen var with color_rgb
 	 * @author prissi
+	 * change to rgb @author An_dz
 	 */
-	uint8 get_color(const char *key, uint8 def);
+	PIXVAL get_color(const char *key, PIXVAL def, uint32 *color_rgb = NULL);
 
 	/**
 	 * Get an int

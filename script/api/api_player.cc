@@ -56,12 +56,6 @@ vector_tpl<sint64> const& get_player_stat(player_t *player, sint32 INDEX, sint32
 }
 
 
-bool player_active(player_t *player)
-{
-	return player != NULL;
-}
-
-
 // export of finance_t only here
 namespace script_api {
 	declare_specialized_param(finance_t*, param<player_t*>::typemask(), param<player_t*>::squirrel_type());
@@ -95,7 +89,7 @@ SQInteger player_export_line_list(HSQUIRRELVM vm)
 
 call_tool_init player_create_line(player_t *player, waytype_t wt)
 {
-	simline_t::linetype lt = simline_t::get_linetype(wt);
+	simline_t::linetype lt = simline_t::waytype_to_linetype(wt);
 	if (lt == simline_t::MAX_LINE_TYPE) {
 		return "Invalid waytype provided";
 	}
@@ -129,15 +123,20 @@ void export_player(HSQUIRRELVM vm, bool scenario)
 	 * Class to access player statistics.
 	 * Here, a player refers to one transport company, not to an individual playing simutrans.
 	 */
-	begin_class(vm, "player_x", "extend_get");
+	begin_class(vm, "player_x", "extend_get,ingame_object");
 
 	/**
 	 * Constructor.
 	 * @param nr player number, 0 = standard player, 1 = public player
 	 * @typemask (integer)
 	 */
-	// actually defined simutrans/script/script_base.nut
+	// actually defined in simutrans/script/script_base.nut
 	// register_function(..., "constructor", ...);
+
+	/**
+	 * @returns if object is still valid.
+	 */
+	export_is_valid<player_t*>(vm); //register_function("is_valid")
 
 	if (!scenario) {
 		/**
@@ -149,13 +148,13 @@ void export_player(HSQUIRRELVM vm, bool scenario)
 		STATIC register_function(vm, &player_get_my_player, "self", 0, "", true);
 	}
 	/**
-	 * Return headquarter level.
-	 * @returns level, level is zero if no headquarter was built
+	 * Return headquarters level.
+	 * @returns level, level is zero if no headquarters was built
 	 */
 	register_method(vm, &player_t::get_headquarter_level, "get_headquarter_level");
 	/**
-	 * Return headquarter position.
-	 * @returns coordinate, (-1,-1) if no headquarter was built
+	 * Return headquarters position.
+	 * @returns coordinate, (-1,-1) if no headquarters was built
 	 */
 	register_method(vm, &player_t::get_headquarter_pos,   "get_headquarter_pos");
 	/**

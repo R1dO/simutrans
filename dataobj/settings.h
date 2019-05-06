@@ -93,6 +93,12 @@ private:
 
 	uint16 station_coverage_size;
 
+	// the maximum length of each convoi
+	uint8 max_rail_convoi_length;
+	uint8 max_road_convoi_length;
+	uint8 max_ship_convoi_length;
+	uint8 max_air_convoi_length;
+
 	/**
 	 * At which level buildings generate traffic?
 	 */
@@ -103,11 +109,17 @@ private:
 	 */
 	sint32 show_pax;
 
+	/**
+	 * the maximum and minimum allowed world height.
+	 */
+	sint8 world_maximum_height;
+	sint8 world_minimum_height;
+
 	 /**
 	 * waterlevel, climate borders, lowest snow in winter
 	 */
 
-	sint16 grundwasser;
+	sint16 groundwater;
 	sint16 climate_borders[MAX_CLIMATES];
 	sint16 winter_snowline;
 
@@ -290,6 +302,10 @@ public:
 	sint64 cst_depot_ship;
 	sint64 cst_depot_air;
 
+	// cost to merge station
+	uint32 allow_merge_distant_halt;
+	sint64 cst_multiply_merge_halt;
+
 	// alter landscape
 	sint64 cst_buy_land;
 	sint64 cst_alter_land;
@@ -346,8 +362,10 @@ public:
 
 	void copy_city_road(settings_t const& other);
 
-	// init form this file ...
+	// init from this file ...
 	void parse_simuconf( tabfile_t &simuconf, sint16 &disp_width, sint16 &disp_height, sint16 &fullscreen, std::string &objfilename );
+
+	void parse_colours(tabfile_t& simuconf);
 
 	void set_size_x(sint32 g) {size_x=g;}
 	void set_size_y(sint32 g) {size_y=g;}
@@ -377,13 +395,21 @@ public:
 	void set_show_pax(bool yesno) {show_pax=yesno;}
 	bool get_show_pax() const {return show_pax != 0;}
 
-	sint16 get_grundwasser() const {return grundwasser;}
+	sint8 get_maximumheight() const { return world_maximum_height; }
+	sint8 get_minimumheight() const { return world_minimum_height; }
+
+	sint16 get_groundwater() const {return groundwater;}
 
 	double get_max_mountain_height() const {return max_mountain_height;}
 
 	double get_map_roughness() const {return map_roughness;}
 
 	uint16 get_station_coverage() const {return station_coverage_size;}
+
+	uint8 get_max_rail_convoi_length() const {return max_rail_convoi_length;}
+	uint8 get_max_road_convoi_length() const {return max_road_convoi_length;}
+	uint8 get_max_ship_convoi_length() const {return max_ship_convoi_length;}
+	uint8 get_max_air_convoi_length() const {return max_air_convoi_length;}
 
 	void set_allow_player_change(char n) {allow_player_change=n;}	// prissi, Oct-2005
 	uint8 get_allow_player_change() const {return allow_player_change;}
@@ -548,7 +574,8 @@ public:
 
 	sint16 get_used_vehicle_reduction() const { return used_vehicle_reduction; }
 
-	void set_default_player_color( player_t *player ) const;
+	void set_player_color_to_default( player_t *player ) const;
+	void set_default_player_color(uint8 player_nr, uint8 color1, uint8 color2);
 
 	// usually only used in network mode => no need to set them!
 	uint32 get_random_counter() const { return random_counter; }
@@ -566,6 +593,8 @@ public:
 
 	bool get_allow_underground_transformers() const { return allow_underground_transformers; }
 	bool get_disable_make_way_public() const { return disable_make_way_public; }
+
+	uint32 get_allow_merge_distant_halt() const { return allow_merge_distant_halt; }
 
 	uint16 get_remove_dummy_player_months() const { return remove_dummy_player_months; }
 	uint16 get_unprotect_abandoned_player_months() const { return unprotect_abandoned_player_months; }

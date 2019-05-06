@@ -13,9 +13,9 @@
 
 
 /**
- * Klasse für Schienen in Simutrans.
- * Auf den Schienen koennen Züge fahren.
- * Jede Schiene gehört zu einer Blockstrecke
+ * Class for monorail tracks, derived from schiene.
+ * Monorail trains can drive on this tracks.
+ * Each track belongs to a section block
  *
  * @author Hj. Malthaner
  */
@@ -32,9 +32,9 @@ public:
 	 */
 	monorail_t(loadsave_t *file);
 
-	virtual waytype_t get_waytype() const {return monorail_wt;}
+	waytype_t get_waytype() const OVERRIDE {return monorail_wt;}
 
-	void rdwr(loadsave_t *file);
+	void rdwr(loadsave_t *file) OVERRIDE;
 };
 
 #endif

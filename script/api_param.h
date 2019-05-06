@@ -24,17 +24,20 @@ class koord3d;
 class label_t;
 class loadsave_t;
 struct schedule_entry_t;
+struct my_ribi_t;
+struct my_slope_t;
 class planquadrat_t;
 class plainstring;
 class scenario_t;
 class schedule_t;
 class settings_t;
 class simline_t;
-class spieler_t;
+class player_t;
 class stadt_t;
 class tool_t;
 class ware_production_t;
 class weg_t;
+class way_builder_t;
 
 /**
  * @namespace script_api The namespace contains all functions necessary to communicate
@@ -308,6 +311,14 @@ namespace script_api {
 		static SQInteger push(HSQUIRRELVM vm, T const& v) { return param<void_t>::push(vm, v); } \
 		declare_types(".", sqtype); \
 	};
+	// macro to declare enums
+#define declare_enum_param(T, inttype, sqtype) \
+	template<> struct param<T> { \
+		static T get(HSQUIRRELVM vm, SQInteger index) { return (T)param<inttype>::get(vm, index); } \
+		static SQInteger push(HSQUIRRELVM vm, T const& v) { return param<inttype>::push(vm, v); } \
+		declare_types("i", sqtype); \
+	};
+
 
 
 	declare_specialized_param(void_t, ".", "void");
@@ -322,10 +333,12 @@ namespace script_api {
 	declare_specialized_param(sint32, "i", "integer");
 	declare_specialized_param(uint64, "i", "integer");
 	declare_specialized_param(sint64, "i", "integer");
-	declare_specialized_param(waytype_t, "i", "way_types");
-	declare_specialized_param(systemtype_t, "i", "way_system_types");
-	declare_specialized_param(obj_t::typ, "i", "map_objects");
-	declare_specialized_param(climate, "i", "climates");
+	declare_enum_param(waytype_t, sint16, "way_types");
+	declare_enum_param(systemtype_t, uint8, "way_system_types");
+	declare_enum_param(obj_t::typ, uint8, "map_objects");
+	declare_enum_param(climate, uint8, "climates");
+	declare_specialized_param(my_ribi_t, "i", "dir");
+	declare_specialized_param(my_slope_t, "i", "slope");
 
 	declare_specialized_param(double, "i|f", "float");
 
@@ -358,6 +371,7 @@ namespace script_api {
 	declare_specialized_param(const factory_product_desc_t*, "t|x|y", "factory_production_x");
 	declare_param_mask(ware_production_t*, "t|x|y", "factory_production_x");
 	declare_specialized_param(tool_t*, "x", "command_x");
+	declare_specialized_param(way_builder_t*, "t|x|y", "way_planner_x");
 
 	// export of obj_t derived classes in api/map_objects.cc
 	declare_specialized_param(obj_t*, "t|x|y", "map_object_x");
@@ -465,14 +479,24 @@ namespace script_api {
 		static void koord_sq2w(koord &);
 
 		/**
-		 * rotate original direction to actual world coordinates direction
+		 * rotate actual world coordinates direction to original direction
 		 */
 		static void ribi_w2sq(ribi_t::ribi &r);
 
 		/**
-		 * rotate actual world coordinates direction to original direction
+		 * rotate original direction to actual world coordinates direction
 		 */
 		static void ribi_sq2w(ribi_t::ribi &r);
+
+		/**
+		 * rotate actual slope to original slope
+		 */
+		static void slope_w2sq(slope_t::type &s);
+
+		/**
+		 * rotate original slope to actual slope
+		 */
+		static void slope_sq2w(slope_t::type &s);
 
 		static uint8 get_rotation() { return rotation; }
 	};

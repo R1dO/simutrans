@@ -86,7 +86,7 @@ template<typename T> static inline T* obj_cast(obj_t* const d)
  * the class grund_t in Simutrans. Every tile has a ground type.</p>
  *
  * <p>Der Boden hat Eigenschaften, die abgefragt werden koennen
- * ist_natur(), ist_wasser(), hat_wegtyp(), ist_bruecke().
+ * ist_natur(), is_water(), hat_wegtyp(), ist_bruecke().
  * In dieser Basisklasse sind alle Eigenschaften false, sie werden erst
  * in den Subklassen redefiniert.</p>
  *
@@ -110,6 +110,54 @@ public:
 		has_way1 = 64,
 		has_way2 = 128
 	};
+
+	/**
+	 * @brief Back wall corner count.
+	 *
+	 * Number of corners used to produce tile back walls. Visually these corners
+	 * are the left, top and right corners of a tile.
+	 */
+	static size_t const BACK_CORNER_COUNT = 3;
+
+	/**
+	 * @brief Back wall count.
+	 *
+	 * Number of back walls a tile can have. Visually these walls are along the
+	 * top left and right edges of the tile.
+	 */
+	static size_t const BACK_WALL_COUNT = BACK_CORNER_COUNT - 1;
+
+	/**
+	 * @brief Number of wall images per wall.
+	 *
+	 * Number of unique wall image graphics per wall.
+	 */
+	static uint16 const WALL_IMAGE_COUNT = 11;
+
+	/**
+	 * @brief Number of fence images.
+	 *
+	 * Number of unique fence image graphics available. Unlike walls, fence
+	 * images are for an entire tile.
+	 */
+	static uint16 const FENCE_IMAGE_COUNT = 3;
+
+	/**
+	 * @brief Back image ID offset for encoding fences.
+	 *
+	 * The offset used to encode the fence image into a back image ID. Anything
+	 * less than this offset can be considered a wall.
+	 */
+	static sint8 const BIID_ENCODE_FENCE_OFFSET = (sint8)(WALL_IMAGE_COUNT * WALL_IMAGE_COUNT);
+
+	/**
+	 * @brief Maximum distance in tiles that hide test will be performed for.
+	 *
+	 * Maximum distance in tiles that object hide test will be performed for.
+	 * The hide test is needed for correct graphic reproduction of tunnel
+	 * entrances and such.
+	 */
+	static uint16 const MAXIMUM_HIDE_TEST_DISTANCE = 5;
 
 	// just to calculate the offset for skipping the ways ...
 	static uint8 offsets[4];
@@ -197,7 +245,6 @@ protected:
 public:
 	enum typ { boden = 1, wasser, fundament, tunnelboden, brueckenboden, monorailboden };
 
-	grund_t(loadsave_t *file);
 	grund_t(koord3d pos);
 
 private:
@@ -237,7 +284,7 @@ public:
 	 */
 	void check_update_underground()
 	{
-		if (ist_tunnel()  ||  ist_bruecke()  ||  ist_wasser()) {
+		if (ist_tunnel()  ||  ist_bruecke()  ||  is_water()) {
 			calc_image();
 		}
 		else {
@@ -258,7 +305,7 @@ public:
 	void calc_image();
 
 	/**
-	* Return the number of images the ground have.
+	* Return the number of images the ground has.
 	* @return The number of images.
 	* @author Hj. Malthaner
 	*/
@@ -315,7 +362,7 @@ public:
 	* @return die Farbe des Beschreibungstexthintergrundes.
 	* @author Hj. Malthaner
 	*/
-	PLAYER_COLOR_VAL text_farbe() const;
+	FLAGGED_PIXVAL text_farbe() const;
 
 	/**
 	 * Sets the label text (by copying it)
@@ -324,7 +371,7 @@ public:
 	void set_text(const char* text);
 
 	virtual bool ist_natur() const {return false;}
-	virtual bool ist_wasser() const {return false;}
+	virtual bool is_water() const {return false;}
 
 	/**
 	* This is called very often, it must be inlined and therefore
@@ -627,7 +674,7 @@ public:
 	weg_t *get_weg(waytype_t typ) const {
 		if (weg_t* const w = get_weg_nr(0)) {
 			const waytype_t wt = w->get_waytype();
-			if(wt == typ) {
+			if(wt == typ || (typ == any_wt && wt > 0)) {
 				return w;
 			}
 			else if (wt > typ) {
@@ -735,7 +782,7 @@ public:
 	 * A new way is built with the given ribis. Registered and assigned to the builder.
 	 * @param weg	    der neue Weg
 	 * @param ribi	    die neuen ribis
-	 * @param sp	    Player building the way
+	 * @param player    Player building the way
 	 *
 	 * @author V. Meyer
 	 */

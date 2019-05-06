@@ -5,7 +5,7 @@
 
 
 /**
- * Das Fundament dient als Untergrund fuer alle Bauwerke in Simutrans.
+ * The foundation serves as base ground for all buildings in Simutrans.
  *
  * @author Hj. Malthaner
  */
@@ -13,23 +13,23 @@ class fundament_t : public grund_t
 {
 protected:
 	/**
-	* Das Fundament hat immer das gleiche Bild.
+	* The foundation always have the same image.
 	* @author Hj. Malthaner
 	*/
-	void calc_image_internal(const bool calc_only_snowline_change);
+	void calc_image_internal(const bool calc_only_snowline_change) OVERRIDE;
 
 public:
 	fundament_t(loadsave_t *file, koord pos );
 	fundament_t(koord3d pos, slope_t::type hang);
 
 	/**
-	* Das Fundament heisst 'Fundament'.
-	* @return gibt 'Fundament' zurueck.
+	* The foundation is called 'Fundament'.
+	* @return 'Fundament'.
 	* @author Hj. Malthaner
 	*/
-	const char *get_name() const {return "Fundament";}
+	const char *get_name() const OVERRIDE {return "Fundament";}
 
-	typ get_typ() const { return fundament; }
+	typ get_typ() const OVERRIDE { return fundament; }
 
 	bool set_slope(slope_t::type) { slope = 0; return false; }
 };

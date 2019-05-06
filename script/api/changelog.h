@@ -3,6 +3,32 @@
 /** @page changelog Changelog
  *
  * @section api-trunk Current trunk
+ * - Added functions to mark tiles, see @ref tile_x::mark
+ * - Added @ref convoy_x::is_schedule_editor_open
+ *
+ * @section api-120-3 Release 120.3
+ *
+ * - Changed enable scenario scripts to open info window also on clients, see @ref gui::open_info_win_client
+ * - Added sign_x::can_pass
+ * - Added methods is_valid to check whether in-game object is still present, see @ref ingame_object
+ * - Added tile_x::can_remove_all_objects
+ * - Added @ref coord_to_dir, @ref coord.to_dir, @ref dir.to_coord
+ * - Added @ref simple_heap_x, @ref way_planner_x, @ref bridge_planner_x
+ * - Added map_object_x::is_marked
+ * - Added gui::open_info_win_at
+ * - Added ::is_convoy_allowed
+ * - Added convoy_x::is_in_depot
+ * - Added scriptable hyperlinks in scenario info window
+ * - Added @ref slope
+ * - Added functions to build stuff: command_x::build_way, command_x::build_depot, command_x::build_station, command_x::build_bridge, command_x::build_bridge_at, command_x::set_slope, command_x::restore_slope
+ * - Added sign_x, sign_desc_x, command_x::build_sign_at
+ * - Added line_x::destroy
+ *
+ * @section api-120-2-2 Release 120.2.2
+ *
+ * - Added map_object_x::mark and unmark
+ *
+ * @section api-120-2 Release 120.2
  *
  * - Feature: scripted AI players
  * - Feature: script calls can be suspended and waken up, less strict checks of 'script take too long'

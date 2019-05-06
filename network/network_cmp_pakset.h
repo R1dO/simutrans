@@ -20,9 +20,10 @@ class nwc_pakset_info_t : public network_command_t {
 public:
 	nwc_pakset_info_t(uint8 flag_=UNDEFINED) : network_command_t(NWC_PAKSETINFO), flag(flag_), name(NULL), chk(NULL) {}
 	~nwc_pakset_info_t();
-	virtual bool execute(karte_t *);
-	virtual void rdwr();
-	virtual const char* get_name() { return "nwc_pakset_info_t";}
+
+	bool execute(karte_t *) OVERRIDE;
+	void rdwr() OVERRIDE;
+	const char* get_name() OVERRIDE { return "nwc_pakset_info_t";}
 
 	enum {
 		CL_INIT       = 0, // client want pakset info
@@ -35,7 +36,7 @@ public:
 		UNDEFINED     = 255
 	};
 	uint8 flag;
-	// name of and info about besch
+	// name of and info about descriptor
 	char *name;
 	checksum_t *chk;
 	void clear() { name = NULL; chk = NULL; }

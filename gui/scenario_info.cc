@@ -7,6 +7,7 @@
 #include "../display/viewport.h"
 #include "../dataobj/scenario.h"
 #include "../dataobj/translator.h"
+#include "../utils/simstring.h"
 
 void scenario_info_t::update_dynamic_texts(gui_flowtext_t &flow, dynamic_string &text, scr_size size, bool init)
 {
@@ -14,28 +15,33 @@ void scenario_info_t::update_dynamic_texts(gui_flowtext_t &flow, dynamic_string 
 		flow.set_text( text );
 		text.clear_changed();
 		flow.set_size( size );
-		flow.set_size( flow.get_text_size() );
 		set_dirty();
 	}
 }
 
 
-scenario_info_t::scenario_info_t() :
-	gui_frame_t( translator::translate("Scenario information") ),
-	scrolly_info(&info),
-	scrolly_goal(&goal),
-	scrolly_rule(&rule),
-	scrolly_result(&result),
-	scrolly_about(&about),
-	scrolly_debug(&debug_msg),
-	scrolly_error(&error)
+uint16 scenario_info_t::get_tab_index(const char* which)
 {
-	tabs.set_pos(scr_coord(0,0));
-	tabs.add_tab(&scrolly_info, translator::translate("Scenario Info"));
-	tabs.add_tab(&scrolly_goal, translator::translate("Scenario Goal"));
-	tabs.add_tab(&scrolly_rule, translator::translate("Scenario Rules"));
-	tabs.add_tab(&scrolly_result, translator::translate("Scenario Result"));
-	tabs.add_tab(&scrolly_about, translator::translate("About scenario"));
+	const char *shorts[] = { "info", "goal", "rules", "result", "about", "debug" };
+	for (uint i = 0; i<lengthof(shorts); i++) {
+		if (strcmp(which, shorts[i]) == 0) {
+			return i+1 < lengthof(shorts) ? i : tabs.get_count() - 1;
+		}
+	}
+	return 0;
+}
+
+
+scenario_info_t::scenario_info_t() :
+	gui_frame_t( translator::translate("Scenario information") )
+{
+	set_table_layout(1,0);
+
+	tabs.add_tab(&info, translator::translate("Scenario Info"));
+	tabs.add_tab(&goal, translator::translate("Scenario Goal"));
+	tabs.add_tab(&rule, translator::translate("Scenario Rules"));
+	tabs.add_tab(&result, translator::translate("Scenario Result"));
+	tabs.add_tab(&about, translator::translate("About scenario"));
 	add_component(&tabs);
 	tabs.add_listener(this);
 
@@ -44,15 +50,12 @@ scenario_info_t::scenario_info_t() :
 	// fetch possible error message
 	const char *err_text = welt->get_scenario()->get_error_text();
 	if (err_text) {
-		tabs.add_tab(&scrolly_error, translator::translate("Scenario Error Log"));
+		tabs.add_tab(&error, translator::translate("Scenario Error Log"));
 		error.set_text( err_text );
 	}
 
 	// add debug panel
-	tabs.add_tab(&scrolly_debug, translator::translate("Scenario Debug"));
-
-	set_windowsize(scr_size(500, D_TITLEBAR_HEIGHT + D_TAB_HEADER_HEIGHT+300));
-	set_min_windowsize(scr_size(40,  D_TITLEBAR_HEIGHT + D_TAB_HEADER_HEIGHT+10));
+	tabs.add_tab(&debug_msg, translator::translate("Scenario Debug"));
 
 	scr_coord pane_pos(D_MARGIN_LEFT, D_MARGIN_TOP);
 	gui_flowtext_t *texts[] = { &info, &goal, &rule, &result, &about, &error, &debug_msg};
@@ -61,34 +64,9 @@ scenario_info_t::scenario_info_t() :
 		texts[i]->add_listener(this);
 	}
 
-	gui_scrollpane_t *scrolly[] = { &scrolly_info, &scrolly_goal, &scrolly_rule, &scrolly_result, &scrolly_error, &scrolly_about, &scrolly_debug };
-	for(uint32 i=0; i<lengthof(scrolly); i++) {
-		scrolly[i]->set_show_scroll_x(true);
-	}
-
 	set_resizemode(diagonal_resize);
-	resize(scr_coord(0,0));
-}
-
-
-
-/**
- * resize window in response to a resize event
- * @author Hj. Malthaner
- * @date   16-Oct-2003
- */
-void scenario_info_t::resize(const scr_coord delta)
-{
-	gui_frame_t::resize(delta);
-	scr_size size = get_windowsize()-scr_size(0, D_TITLEBAR_HEIGHT);
-	tabs.set_size(size);
-
-	gui_flowtext_t *texts[] = { &info, &goal, &rule, &result, &about, &error, &debug_msg};
-	size = get_client_windowsize() - info.get_pos() - scr_size(D_MARGIN_RIGHT + D_SCROLLBAR_WIDTH, D_MARGIN_BOTTOM + D_SCROLLBAR_HEIGHT);
-	for(uint32 i=0; i<lengthof(texts); i++) {
-		texts[i]->set_size( size );
-		texts[i]->set_size( texts[i]->get_text_size() );
-	}
+	reset_min_windowsize();
+	set_windowsize(scr_size(500, D_TITLEBAR_HEIGHT + D_TAB_HEADER_HEIGHT+300));
 }
 
 
@@ -146,16 +124,14 @@ bool scenario_info_t::action_triggered( gui_action_creator_t *comp, value_t v)
 					}
 				}
 			}
-			else {
-				const char *shorts[] = { "info", "goal", "rules", "result", "about" };
-				for (uint i = 0; i<lengthof(shorts); i++) {
-					if (strcmp(link, shorts[i]) == 0) {
-						tabs.set_active_tab_index(i);
-						resize(scr_coord(0,0));
-						set_dirty();
-						return true;
-					}
+			else if (const char* func = strstart(link, "script:") ) {
+				const char* err = welt->get_scenario()->eval_string(func);
+				if (err) {
+					dbg->warning("scenario_info_t::action_triggered", "error when evaluating: %s", func);
 				}
+			}
+			else {
+				open_tab(link);
 			}
 		}
 	}
@@ -163,9 +139,24 @@ bool scenario_info_t::action_triggered( gui_action_creator_t *comp, value_t v)
 }
 
 
-void scenario_info_t::open_result_tab()
+void scenario_info_t::open_tab(const char* which)
 {
-	tabs.set_active_tab_index(3);
+	tabs.set_active_tab_index(get_tab_index(which));
 	resize(scr_coord(0,0));
 	set_dirty();
+}
+
+
+void scenario_info_t::rdwr( loadsave_t *file )
+{
+	// window size
+	scr_size size = get_windowsize();
+	size.rdwr( file );
+
+	tabs.rdwr(file);
+
+	if(  file->is_loading()  ) {
+		reset_min_windowsize();
+		set_windowsize(size);
+	}
 }

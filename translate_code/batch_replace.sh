@@ -2,9 +2,9 @@
 while IFS=, read from to
 do
 	echo "Replace $from by $to"
-	REPLACE="s/$from/$to/g"
+	REPLACE="s#$from#$to#g"
 
-	find ../ -name "*.cc" -or -name "*.h" | while read fname; do
+	find ../ -name "*.cc" -or -name "*.h" -or -name "Makefile"  -or -name "*.*proj" | while read fname; do
 
 		sed "${REPLACE}" $fname > tmp.sed
 		if [ $? -ne 0 ]; then

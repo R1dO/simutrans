@@ -41,15 +41,15 @@ public:
 	* return direction or the state of the traffic light
 	* @author Hj. Malthaner
 	*/
-	ribi_t::ribi get_dir() const 	{ return dir; }
+	ribi_t::ribi get_dir() const { return dir; }
 
 	bool ist_blockiert() const {return blockend != 0;}
 
-	obj_t::typ get_typ() const 	{ return type; }
+	obj_t::typ get_typ() const OVERRIDE { return type; }
 
-	void rdwr(loadsave_t *file);
+	void rdwr(loadsave_t *file) OVERRIDE;
 
-	image_id get_image() const { return IMG_EMPTY; }
+	image_id get_image() const OVERRIDE { return IMG_EMPTY; }
 };
 
 
@@ -87,11 +87,11 @@ old_blockmanager_t::rdwr_block(karte_t *,loadsave_t *file)
 	sint32 count;
 	short int typ = obj_t::signal;
 
-	// signale laden
+	// load signal
 	file->rdwr_long(count);
 
 	for(int i=0; i<count; i++) {
-		// read the old signals (only opurpose of the here
+		// read the old signals (only when needed)
 		typ=file->rd_obj_id();
 		oldsignal_t *sig = new oldsignal_t(file, (obj_t::typ)typ);
 		DBG_MESSAGE("oldsignal_t()","on %i,%i with dir=%i blockend=%i",sig->get_pos().x,sig->get_pos().y,sig->get_dir(),sig->ist_blockiert());

@@ -1,5 +1,5 @@
 /*
- * sound with SDL_mixer.dll (not chaning the volume of other programs)
+ * sound with SDL_mixer.dll (not changing the volume of other programs)
  *
  * This file is part of the Simutrans project under the artistic license.
  */
@@ -8,6 +8,7 @@
 #include <SDL_mixer.h>
 #include <string.h>
 #include "sound.h"
+#include "../simdebug.h"
 
 
 /*
@@ -47,7 +48,7 @@ bool dr_init_sound()
 
 		if (Mix_OpenAudio(freq, format, channels, samples) != -1) {
 			Mix_QuerySpec(&freq, &format,  &channels);
-			// check if we got the right audi format
+			// check if we got the right audio format
 			if (format == AUDIO_S16SYS) {
 				// finished initializing
 				sound_ok = 1;
@@ -60,7 +61,7 @@ bool dr_init_sound()
 
 			}
 			else {
-				printf("Open audio channel doesn't meet requirements. Muting\n");
+				dbg->error("dr_init_sound()","Open audio channel doesn't meet requirements. Muting");
 				Mix_CloseAudio();
 				SDL_QuitSubSystem(SDL_INIT_AUDIO);
 			}
@@ -68,12 +69,12 @@ bool dr_init_sound()
 
 		}
 		else {
-			printf("Could not open required audio channel. Muting\n");
+			dbg->error("dr_init_sound()","Could not open required audio channel. Muting");
 			SDL_QuitSubSystem(SDL_INIT_AUDIO);
 		}
 	}
 	else {
-		printf("Could not initialize sound system. Muting\n");
+		dbg->error("dr_init_sound()","Could not initialize sound system. Muting");
 	}
 
 	use_sound = sound_ok ? 1: -1;
@@ -96,12 +97,12 @@ int dr_load_sample(const char *filename)
 		/* load the sample */
 		smp = Mix_LoadWAV(filename);
 		if (smp == NULL) {
-			printf("could not load wav (%s)\n", SDL_GetError());
+			dbg->warning("dr_load_sample()", "could not load wav (%s)", SDL_GetError());
 			return -1;
 		}
 
 		samples[samplenumber] = smp;
-		printf("Loaded %s to sample %i.\n",filename,samplenumber);
+		dbg->message("dr_load_sample()", "Loaded %s to sample %i.", filename, samplenumber);
 
 		return samplenumber++;
 	}

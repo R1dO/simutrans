@@ -17,9 +17,6 @@ scenario.version <- ""
 scenario.translation <- ""
 scenario.api <- "112.3"
 
-// table to hold routines for gui access
-gui <- {}
-
 // table to hold routines for forbidding/allowing player tools
 rules <- {}
 
@@ -42,7 +39,7 @@ foreach(tool_id in map.editing_tools) {
 
 /**
  * Called when filling toolbars, activating tools
- * Results are not transfered over network, use the rules.forbid_* functions in this case
+ * Results are not transferred over network, use the rules.forbid_* functions in this case
  *
  * @return 1 if allowed, null otherwise
  */

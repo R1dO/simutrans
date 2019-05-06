@@ -10,245 +10,188 @@
  */
 
 #include "factorylist_stats_t.h"
-
-#include "../display/simgraph.h"
-#include "../display/viewport.h"
 #include "../simskin.h"
-#include "../simcolor.h"
 #include "../simfab.h"
 #include "../simworld.h"
 #include "../simskin.h"
-#include "simwin.h"
 
-#include "gui_frame.h"
-#include "components/gui_button.h"
-
-#include "../bauer/warenbauer.h"
-#include "../besch/skin_besch.h"
+#include "../bauer/goods_manager.h"
+#include "../descriptor/skin_desc.h"
 #include "../utils/cbuffer_t.h"
 #include "../utils/simstring.h"
 
 
-factorylist_stats_t::factorylist_stats_t(factorylist::sort_mode_t sortby, bool sortreverse)
+int factorylist_stats_t::sort_mode = factorylist::by_name;
+bool factorylist_stats_t::reverse = false;
+
+
+factorylist_stats_t::factorylist_stats_t(fabrik_t *fab)
 {
-	sort(sortby,sortreverse);
-	recalc_size();
-	line_selected = 0xFFFFFFFFu;
-}
-
-
-class compare_factories
-{
-	public:
-		compare_factories(factorylist::sort_mode_t sortby_, bool reverse_) :
-			sortby(sortby_),
-			reverse(reverse_)
-		{}
-
-		bool operator ()(const fabrik_t* a, const fabrik_t* b)
-		{
-			int cmp;
-			switch (sortby) {
-				default:
-				case factorylist::by_name:
-					cmp = 0;
-					break;
-
-				case factorylist::by_input:
-				{
-					int a_in = a->get_eingang().empty() ? -1 : (int)a->get_total_in();
-					int b_in = b->get_eingang().empty() ? -1 : (int)b->get_total_in();
-					cmp = a_in - b_in;
-					break;
-				}
-
-				case factorylist::by_transit:
-				{
-					int a_transit = a->get_eingang().empty() ? -1 : (int)a->get_total_transit();
-					int b_transit = b->get_eingang().empty() ? -1 : (int)b->get_total_transit();
-					cmp = a_transit - b_transit;
-					break;
-				}
-
-				case factorylist::by_available:
-				{
-					int a_in = a->get_eingang().empty() ? -1 : (int)(a->get_total_in()+a->get_total_transit());
-					int b_in = b->get_eingang().empty() ? -1 : (int)(b->get_total_in()+b->get_total_transit());
-					cmp = a_in - b_in;
-					break;
-				}
-
-				case factorylist::by_output:
-				{
-					int a_out = a->get_ausgang().empty() ? -1 : (int)a->get_total_out();
-					int b_out = b->get_ausgang().empty() ? -1 : (int)b->get_total_out();
-					cmp = a_out - b_out;
-					break;
-				}
-
-				case factorylist::by_maxprod:
-					cmp = a->get_base_production()*a->get_prodfactor() - b->get_base_production()*b->get_prodfactor();
-					break;
-
-				case factorylist::by_status:
-					cmp = a->get_status() - b->get_status();
-					break;
-
-				case factorylist::by_power:
-					cmp = a->get_prodfactor_electric() - b->get_prodfactor_electric();
-					break;
-			}
-			if (cmp == 0) {
-				cmp = STRICMP(a->get_name(), b->get_name());
-			}
-			return reverse ? cmp > 0 : cmp < 0;
-		}
-
-	private:
-		const factorylist::sort_mode_t sortby;
-		const bool reverse;
-};
-
-
-void factorylist_stats_t::sort(factorylist::sort_mode_t sb, bool sr)
-{
-	sortby = sb;
-	sortreverse = sr;
-
-	fab_list.clear();
-	fab_list.resize(welt->get_fab_list().get_count());
-
-	FOR(slist_tpl<fabrik_t*>, const f, welt->get_fab_list()) {
-		fab_list.insert_ordered(f, compare_factories(sortby, sortreverse));
+	this->fab = fab;
+	// pos button
+	set_table_layout(6,1);
+	button_t *b = new_component<button_t>();
+	b->set_typ(button_t::posbutton_automatic);
+	b->set_targetpos(fab->get_pos().get_2d());
+	// indicator bar
+	add_component(&indicator);
+	indicator.set_max_size(scr_size(D_INDICATOR_WIDTH,D_INDICATOR_HEIGHT));
+	// boost images
+	if (fab->get_desc()->get_electric_boost() ) {
+		boost_electric.set_image(skinverwaltung_t::electricity->get_image_id(0), true);
+		add_component(&boost_electric);
 	}
+	else {
+		new_component<gui_empty_t>();
+	}
+	if (fab->get_desc()->get_pax_boost() ) {
+		boost_passenger.set_image(skinverwaltung_t::passengers->get_image_id(0), true);
+		add_component(&boost_passenger);
+	}
+	else {
+		new_component<gui_empty_t>();
+	}
+	if (fab->get_desc()->get_mail_boost() ) {
+		boost_mail.set_image(skinverwaltung_t::mail->get_image_id(0), true);
+		add_component(&boost_mail);
+	}
+	else {
+		new_component<gui_empty_t>();
+	}
+	// factory name
+	add_component(&label);
+	update_label();
 }
 
 
-/**
- * Events werden hiermit an die GUI-Komponenten
- * gemeldet
- * @author Hj. Malthaner
- */
+void factorylist_stats_t::update_label()
+{
+	cbuffer_t &buf = label.buf();
+	buf.append(fab->get_name());
+	buf.append(" (");
+
+	if (!fab->get_input().empty()) {
+		buf.printf( "%i+%i", fab->get_total_in(), fab->get_total_transit() );
+	}
+	else {
+		buf.append("-");
+	}
+	buf.append(", ");
+
+	if (!fab->get_output().empty()) {
+		buf.append(fab->get_total_out(),0);
+	}
+	else {
+		buf.append("-");
+	}
+	buf.append(", ");
+
+	buf.append(fab->get_current_production(),0);
+	buf.append(") ");
+	label.update();
+}
+
+
+void factorylist_stats_t::set_size(scr_size size)
+{
+	gui_aligned_container_t::set_size(size);
+	label.set_size(scr_size(get_size().w - label.get_pos().x, label.get_size().h));
+}
+
+
+bool factorylist_stats_t::is_valid() const
+{
+	return world()->get_fab_list().is_contained(fab);
+}
+
+
 bool factorylist_stats_t::infowin_event(const event_t * ev)
 {
-	const unsigned int line = (ev->cy) / (LINESPACE+1);
-	line_selected = 0xFFFFFFFFu;
-	if (line >= fab_list.get_count()) {
-		return false;
-	}
+	bool swallowed = gui_aligned_container_t::infowin_event(ev);
 
-	fabrik_t* fab = fab_list[line];
-	if (!fab) {
-		return false;
+	if(  !swallowed  &&  IS_LEFTRELEASE(ev)  ) {
+		fab->open_info_window();
+		swallowed = true;
 	}
-
-	// un-press goto button
-	if(  ev->button_state>0  &&  ev->cx>0  &&  ev->cx<15  ) {
-		line_selected = line;
-	}
-
-	if (IS_LEFTRELEASE(ev)) {
-		if(ev->cx>0  &&  ev->cx<15) {
-			const koord3d pos = fab->get_pos();
-			welt->get_viewport()->change_world_position(pos);
-		}
-		else {
-			fab->open_info_window();
-		}
-	}
-	else if (IS_RIGHTRELEASE(ev)) {
-		const koord3d pos = fab->get_pos();
-		welt->get_viewport()->change_world_position(pos);
-	}
-	return false;
-} // end of function factorylist_stats_t::infowin_event(const event_t * ev)
-
-
-void factorylist_stats_t::recalc_size()
-{
-	// show_scroll_x==false ->> size.w not important ->> no need to calc text pixel length
-	set_size( scr_size(210, welt->get_fab_list().get_count() * (LINESPACE+1) ) );
+	return swallowed;
 }
 
 
-/**
- * Draw the component
- * @author Hj. Malthaner
- */
-void factorylist_stats_t::draw(scr_coord offset)
+void factorylist_stats_t::draw(scr_coord pos)
 {
-	clip_dimension const cd = display_get_clip_wh();
-	const int start = cd.y-LINESPACE-1;
-	const int end = cd.yy+LINESPACE+1;
+	update_label();
+	// boost stuff
+	boost_electric.set_transparent(fab->get_prodfactor_electric()>0 ? 0 : TRANSPARENT50_FLAG | OUTLINE_FLAG | color_idx_to_rgb(COL_BLACK));
+	boost_passenger.set_transparent(fab->get_prodfactor_pax()>0 ? 0 : TRANSPARENT50_FLAG | OUTLINE_FLAG | color_idx_to_rgb(COL_BLACK));
+	boost_mail.set_transparent(fab->get_prodfactor_mail()>0 ? 0 : TRANSPARENT50_FLAG | OUTLINE_FLAG | color_idx_to_rgb(COL_BLACK));
 
-	static cbuffer_t buf;
-	int xoff = offset.x+D_POS_BUTTON_WIDTH+D_H_SPACE;
-	int yoff = offset.y;
+	indicator.set_color( color_idx_to_rgb(fabrik_t::status_to_color[fab->get_status()]) );
 
-	if(  fab_list.get_count()!=welt->get_fab_list().get_count()  ) {
-		// some deleted/ added => resort
-		sort( sortby, sortreverse );
-		recalc_size();
-	}
-
-	uint32 sel = line_selected;
-	FORX(vector_tpl<fabrik_t*>, const fab, fab_list, yoff += LINESPACE + 1) {
-		if (yoff >= end) break;
-
-		// skip invisible lines
-		if (yoff < start) continue;
-
-		if(fab) {
-			unsigned indikatorfarbe = fabrik_t::status_to_color[fab->get_status()];
-
-			buf.clear();
-			buf.append(fab->get_name());
-			buf.append(" (");
-
-			if (!fab->get_eingang().empty()) {
-				buf.printf( "%i+%i", fab->get_total_in(), fab->get_total_transit() );
-			}
-			else {
-				buf.append("-");
-			}
-			buf.append(", ");
-
-			if (!fab->get_ausgang().empty()) {
-				buf.append(fab->get_total_out(),0);
-			}
-			else {
-				buf.append("-");
-			}
-			buf.append(", ");
-
-			buf.append(fab->get_current_production(),0);
-			buf.append(") ");
+	gui_aligned_container_t::draw(pos);
+}
 
 
-			//display_ddd_box_clip(xoff+7, yoff+2, 8, 8, MN_GREY0, MN_GREY4);
-			display_fillbox_wh_clip(xoff+2, yoff+2, D_INDICATOR_WIDTH, D_INDICATOR_HEIGHT, indikatorfarbe, true);
+bool factorylist_stats_t::compare(const gui_component_t *aa, const gui_component_t *bb)
+{
+	const factorylist_stats_t* fa = dynamic_cast<const factorylist_stats_t*>(aa);
+	const factorylist_stats_t* fb = dynamic_cast<const factorylist_stats_t*>(bb);
+	// good luck with mixed lists
+	assert(fa != NULL  &&  fb != NULL);
+	fabrik_t *a=fa->fab, *b=fb->fab;
 
-			if(  fab->get_prodfactor_electric()>0  ) {
-				display_color_img(skinverwaltung_t::electricity->get_image_id(0), xoff+4+D_INDICATOR_WIDTH, yoff, 0, false, true);
-			}
-			if(  fab->get_prodfactor_pax()>0  ) {
-				display_color_img(skinverwaltung_t::passagiere->get_image_id(0), xoff+4+8+D_INDICATOR_WIDTH, yoff, 0, false, true);
-			}
-			if(  fab->get_prodfactor_mail()>0  ) {
-				display_color_img(skinverwaltung_t::post->get_image_id(0), xoff+4+18+D_INDICATOR_WIDTH, yoff, 0, false, true);
-			}
+	int cmp;
+	switch (sort_mode) {
+		default:
+		case factorylist::by_name:
+			cmp = 0;
+			break;
 
-			// show text
-			display_proportional_clip(xoff+D_INDICATOR_WIDTH+6+28,yoff,buf,ALIGN_LEFT,SYSCOL_TEXT,true);
-
-			// goto button
-			bool selected = sel==0  ||  welt->get_viewport()->is_on_center( fab->get_pos() );
-			display_img_aligned( gui_theme_t::pos_button_img[ selected ], scr_rect( offset.x, yoff, D_POS_BUTTON_WIDTH, LINESPACE ), ALIGN_CENTER_V | ALIGN_CENTER_H, true );
-			sel --;
-
-			if(  win_get_magic( (ptrdiff_t)fab )  ) {
-				display_blend_wh( xoff, yoff, size.w+D_INDICATOR_WIDTH, LINESPACE, COL_BLACK, 25 );
-			}
+		case factorylist::by_input:
+		{
+			int a_in = a->get_input().empty() ? -1 : (int)a->get_total_in();
+			int b_in = b->get_input().empty() ? -1 : (int)b->get_total_in();
+			cmp = a_in - b_in;
+			break;
 		}
+
+		case factorylist::by_transit:
+		{
+			int a_transit = a->get_input().empty() ? -1 : (int)a->get_total_transit();
+			int b_transit = b->get_input().empty() ? -1 : (int)b->get_total_transit();
+			cmp = a_transit - b_transit;
+			break;
+		}
+
+		case factorylist::by_available:
+		{
+			int a_in = a->get_input().empty() ? -1 : (int)(a->get_total_in()+a->get_total_transit());
+			int b_in = b->get_input().empty() ? -1 : (int)(b->get_total_in()+b->get_total_transit());
+			cmp = a_in - b_in;
+			break;
+		}
+
+		case factorylist::by_output:
+		{
+			int a_out = a->get_output().empty() ? -1 : (int)a->get_total_out();
+			int b_out = b->get_output().empty() ? -1 : (int)b->get_total_out();
+			cmp = a_out - b_out;
+			break;
+		}
+
+		case factorylist::by_maxprod:
+			cmp = a->get_base_production()*a->get_prodfactor() - b->get_base_production()*b->get_prodfactor();
+			break;
+
+		case factorylist::by_status:
+			cmp = a->get_status() - b->get_status();
+			break;
+
+		case factorylist::by_power:
+			cmp = a->get_prodfactor_electric() - b->get_prodfactor_electric();
+			break;
 	}
+	if (cmp == 0) {
+		cmp = STRICMP(a->get_name(), b->get_name());
+	}
+	return reverse ? cmp > 0 : cmp < 0;
 }

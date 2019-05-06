@@ -11,6 +11,9 @@
 #ifndef _MSC_VER
 #include <unistd.h>
 #include <sys/time.h>
+#else
+// need timeGetTime
+#include <mmsystem.h>
 #endif
 
 #include <signal.h>
@@ -22,6 +25,10 @@
 
 
 static bool sigterm_received = false;
+
+#if COLOUR_DEPTH != 0
+#error "Posix only compiles with color depth=0"
+#endif
 
 // no autoscaling as we have no display ...
 bool dr_auto_scale(bool)
@@ -54,7 +61,7 @@ void dr_os_close()
 {
 }
 
-// reiszes screen
+// resizes screen
 int dr_textur_resize(unsigned short** const textur, int, int)
 {
 	*textur = NULL;
@@ -127,7 +134,9 @@ void ex_ord_update_mx_my()
 {
 }
 
+#ifndef _MSC_VER
 static timeval first;
+#endif
 
 uint32 dr_time()
 {
@@ -160,7 +169,7 @@ void dr_sleep(uint32 msec)
 #ifdef _WIN32
 	Sleep( msec );
 #else
-	sleep( msec );
+	usleep( 1000u * msec );
 #endif
 }
 
@@ -178,7 +187,7 @@ void dr_notify_input_pos(int, int)
 
 static void posix_sigterm(int)
 {
-	dbg->important("Received SIGTERM, exiting...");
+	DBG_MESSAGE("Received SIGTERM", "exiting...");
 	sigterm_received = 1;
 }
 

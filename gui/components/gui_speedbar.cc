@@ -8,6 +8,7 @@
 #include <string.h>
 
 #include "gui_speedbar.h"
+#include "../gui_theme.h"
 #include "../../display/simgraph.h"
 #include "../../simcolor.h"
 #include "../../simtypes.h"
@@ -19,12 +20,22 @@ void gui_speedbar_t::set_base(sint32 base)
 }
 
 
-void gui_speedbar_t::add_color_value(const sint32 *value, uint8 color)
+void gui_speedbar_t::add_color_value(const sint32 *value, PIXVAL color)
 {
 	info_t  next =  { color, value, -1 };
 	values.insert(next);
 }
 
+
+scr_size gui_speedbar_t::get_min_size() const
+{
+	return D_INDICATOR_SIZE;
+}
+
+scr_size gui_speedbar_t::get_max_size() const
+{
+	return scr_size(scr_size::inf.w, D_INDICATOR_HEIGHT);
+}
 
 void gui_speedbar_t::draw(scr_coord offset)
 {
@@ -35,12 +46,12 @@ void gui_speedbar_t::draw(scr_coord offset)
 		FOR(slist_tpl<info_t>, const& i, values) {
 			sint32 const to = size.h - min(*i.value, base) * size.h / base;
 			if(to < from) {
-				display_fillbox_wh_clip(offset.x, offset.y + to, size.w, from - to, i.color, true);
+				display_fillbox_wh_clip_rgb(offset.x, offset.y + to, size.w, from - to, i.color, true);
 				from = to - 1;
 			}
 		}
 		if(from > 0) {
-			display_fillbox_wh_clip( offset.x, offset.y, size.w, from, MN_GREY0, true);
+			display_fillbox_wh_clip_rgb( offset.x, offset.y, size.w, from, color_idx_to_rgb(MN_GREY0), true);
 		}
 	}
 	else {
@@ -48,12 +59,12 @@ void gui_speedbar_t::draw(scr_coord offset)
 		FOR(slist_tpl<info_t>, const& i, values) {
 			sint32 const to = min(*i.value, base) * size.w / base;
 			if(to > from) {
-				display_fillbox_wh_clip(offset.x + from, offset.y, to - from, size.h, i.color, true);
+				display_fillbox_wh_clip_rgb(offset.x + from, offset.y, to - from, size.h, i.color, true);
 				from = to + 1;
 			}
 		}
 		if(from < size.w) {
-			display_fillbox_wh_clip(offset.x + from, offset.y, size.w - from, size.h, MN_GREY0, true);
+			display_fillbox_wh_clip_rgb(offset.x + from, offset.y, size.w - from, size.h, color_idx_to_rgb(MN_GREY0), true);
 		}
 	}
 }

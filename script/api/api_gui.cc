@@ -11,6 +11,10 @@
 #include "../../dataobj/scenario.h"
 #include "../../player/simplay.h"
 
+#include "../../dataobj/environment.h"
+#include "../../network/network.h"
+#include "../../network/network_cmd_scenario.h"
+
 using namespace script_api;
 
 
@@ -19,6 +23,15 @@ void_t add_scenario_message_at(const char* text, koord pos)
 	if (text) {
 		message_t *msg = welt->get_message();
 		msg->add_message(text, pos, message_t::scenario, PLAYER_FLAG|welt->get_active_player()->get_player_nr());
+	}
+	return void_t();
+}
+
+void_t add_ai_message_at(player_t *player, const char* text, koord pos)
+{
+	if (text) {
+		message_t *msg = welt->get_message();
+		msg->add_message(text, pos, message_t::ai, PLAYER_FLAG|player->get_player_nr());
 	}
 	return void_t();
 }
@@ -33,6 +46,30 @@ call_tool_init add_scenario_message(player_t* player, const char* text)
 	return call_tool_init(TOOL_ADD_MESSAGE | SIMPLE_TOOL, (const char*)buf, 0, player ? player : welt->get_active_player());
 }
 
+void_t open_info_win_client(const char* tab, uint8 player_nr)
+{
+	if (env_t::server) {
+		// void network_send_all(network_command_t* nwc, bool exclude_us )
+		nwc_scenario_t *nwc = new nwc_scenario_t();
+		nwc->what = nwc_scenario_t::OPEN_SCEN_WIN;
+		nwc->function = tab;
+		network_send_all(nwc, false, player_nr);
+	}
+	else {
+		welt->get_scenario()->open_info_win(tab);
+	}
+	return void_t();
+}
+
+void_t open_info_win_at(const char* tab)
+{
+	return open_info_win_client(tab, PLAYER_UNOWNED);
+}
+
+void_t open_info_win()
+{
+	return open_info_win_client("", PLAYER_UNOWNED);
+}
 
 void export_gui(HSQUIRRELVM vm, bool scenario)
 {
@@ -43,11 +80,28 @@ void export_gui(HSQUIRRELVM vm, bool scenario)
 
 	if (scenario) {
 		/**
-		* Opens scenario info window.
-		* @note Only available in scenario mode.
-		*/
-		STATIC register_method(vm, &scenario_t::open_info_win, "open_info_win");
+		 * Opens scenario info window and shows 'info' tab.
+		 * In network mode, opens window on all clients and server.
+		 * @note Only available in scenario mode.
+		 */
+		STATIC register_method(vm, open_info_win, "open_info_win", true);
 
+		/**
+		 * Opens scenario info window with specific tab open.
+		 * In network mode, opens window on all clients and server.
+		 * @param tab possible values are "info", "goal", "rules", "result", "about", "debug"
+		 * @note Only available in scenario mode.
+		 */
+		STATIC register_method(vm, open_info_win_at, "open_info_win_at");
+
+		/**
+		 * Opens scenario info window for certain clients (and the server),
+		 * with specific tab open.
+		 * @param tab possible values are "info", "goal", "rules", "result", "about", "debug"
+		 * @param player_nr opens scenario info window on all clients that have this player unlocked.
+		 * @note Window is always opened on server.		 *
+		 */
+		STATIC register_method(vm, open_info_win_client, "open_info_win_client");
 		/**
 		* Adds message to the players mailboxes.
 		* Will be shown in ticker or as pop-up window depending on players preferences.
@@ -71,6 +125,19 @@ void export_gui(HSQUIRRELVM vm, bool scenario)
 		*/
 		STATIC register_method(vm, &add_scenario_message, "add_message");
 	}
-
+	else {
+		/**
+		* Adds message to the players mailboxes.
+		* Will be shown in ticker or as pop-up window depending on players preferences.
+		* Message window has small view of world.
+		*
+		* @param player sending this message
+		* @param text Text to be shown. Has to be a translated string or a translatable string.
+		* @param position Position of the view on the map. Clicking on the message will center viewport at this position.
+		* @warning Message only shown on server, but stored in savegame.
+		* @ingroup ai_only
+		*/
+		STATIC register_method(vm, &add_ai_message_at, "add_message_at");
+	}
 	end_class(vm);
 }

@@ -31,7 +31,7 @@
 
 #include "bauer/vehikelbauer.h"
 
-#include "besch/haus_besch.h"
+#include "descriptor/building_desc.h"
 
 #include "utils/cbuffer_t.h"
 
@@ -46,6 +46,7 @@ depot_t::depot_t(loadsave_t *file) : gebaeude_t()
 	}
 	all_depots.append(this);
 	selected_filter = VEHICLE_FILTER_RELEVANT;
+	selected_sort_by = SORT_BY_DEFAULT;
 	last_selected_line = linehandle_t();
 	command_pending = false;
 }
@@ -56,6 +57,7 @@ depot_t::depot_t(koord3d pos, player_t *player, const building_tile_desc_t *t) :
 {
 	all_depots.append(this);
 	selected_filter = VEHICLE_FILTER_RELEVANT;
+	selected_sort_by = SORT_BY_DEFAULT;
 	last_selected_line = linehandle_t();
 	command_pending = false;
 }
@@ -72,7 +74,7 @@ depot_t::~depot_t()
 depot_t *depot_t::find_depot( koord3d start, const obj_t::typ depot_type, const player_t *player, bool forward)
 {
 	depot_t *found = NULL;
-	koord3d found_pos = forward ? koord3d(welt->get_size().x+1,welt->get_size().y+1,welt->get_grundwasser()) : koord3d(-1,-1,-1);
+	koord3d found_pos = forward ? koord3d(welt->get_size().x+1,welt->get_size().y+1,welt->get_groundwater()) : koord3d(-1,-1,-1);
 	sint32 found_hash = forward ? 0x7FFFFFF : -1;
 	sint32 start_hash = start.x + (8192 * start.y);
 	FOR(slist_tpl<depot_t*>, const d, all_depots) {
@@ -227,7 +229,7 @@ void depot_t::sell_vehicle(vehicle_t* veh)
 }
 
 
-// returns the indest of the oldest/newest vehicle in a list
+// returns the index of the oldest/newest vehicle in a list
 vehicle_t* depot_t::find_oldest_newest(const vehicle_desc_t* desc, bool old)
 {
 	vehicle_t* found_veh = NULL;
@@ -381,6 +383,9 @@ bool depot_t::start_all_convoys()
 	return (convois.get_count() == 0);
 }
 
+// implementation in simtool.cc
+bool scenario_check_convoy(karte_t *welt, player_t *player, convoihandle_t cnv, depot_t* depot, bool local);
+
 
 bool depot_t::start_convoi(convoihandle_t cnv, bool local_execution)
 {
@@ -418,6 +423,9 @@ bool depot_t::start_convoi(convoihandle_t cnv, bool local_execution)
 				buf.printf( translator::translate("Vehicle %s can't find a route!"), cnv->get_name() );
 				create_win( new news_img(buf), w_time_delete, magic_none);
 			}
+		}
+		else if (!scenario_check_convoy(welt, get_owner(), cnv, this, local_execution) ) {
+			// not allowed by scenario
 		}
 		else {
 			// convoi can start now
@@ -476,7 +484,7 @@ void depot_t::rdwr(loadsave_t *file)
 
 	rdwr_vehikel(vehicles, file);
 	if (file->get_version() < 81033) {
-		// waggons are stored extra, just add them to vehicles
+		// wagons are stored extra, just add them to vehicles
 		assert(file->is_loading());
 		rdwr_vehikel(vehicles, file);
 	}
@@ -544,7 +552,7 @@ void depot_t::rdwr_vehikel(slist_tpl<vehicle_t *> &list, loadsave_t *file)
 
 
 /**
- * @return NULL wenn OK, ansonsten eine Fehlermeldung
+ * @return NULL when OK, otherwise an error message
  * @author Hj. Malthaner
  */
 const char * depot_t::is_deletable(const player_t *player)
@@ -565,9 +573,9 @@ const char * depot_t::is_deletable(const player_t *player)
 }
 
 
-slist_tpl<vehicle_desc_t const*> const& depot_t::get_vehicle_type() const
+slist_tpl<vehicle_desc_t const*> const& depot_t::get_vehicle_type(uint8 sortkey) const
 {
-	return vehicle_builder_t::get_info(get_waytype());
+	return vehicle_builder_t::get_info(get_waytype(), sortkey);
 }
 
 
@@ -612,5 +620,17 @@ void depot_t::update_all_win()
 
 unsigned bahndepot_t::get_max_convoi_length() const
 {
-	return convoi_t::max_rail_vehicle;
+	return welt->get_settings().get_max_rail_convoi_length();
+}
+unsigned strassendepot_t::get_max_convoi_length() const
+{
+	return welt->get_settings().get_max_road_convoi_length();
+}
+unsigned schiffdepot_t::get_max_convoi_length() const
+{
+	return welt->get_settings().get_max_ship_convoi_length();
+}
+unsigned airdepot_t::get_max_convoi_length() const
+{
+	return welt->get_settings().get_max_air_convoi_length();
 }

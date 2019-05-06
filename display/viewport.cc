@@ -76,6 +76,8 @@ void viewport_t::change_world_position( koord new_ij, sint16 new_xoff, sint16 ne
 	new_ij.y += new_xoff/cached_img_size;
 	new_xoff %= cached_img_size;
 
+	new_ij = world->get_closest_coordinate(new_ij);
+
 	// truncate new_yoff, modify new_ij.y
 	int lines = 0;
 	if(new_yoff>0) {
@@ -172,7 +174,7 @@ grund_t* viewport_t::get_ground_on_screen_coordinate(scr_coord screen_pos, sint3
 	grund_t *gr = NULL;
 	// for the calculation of hmin/hmax see simview.cc
 	// for the definition of underground_level see grund_t::set_underground_mode
-	const sint8 hmin = grund_t::underground_mode != grund_t::ugm_all ? min( world->get_grundwasser() - 4, grund_t::underground_level ) : world->get_minimumheight();
+	const sint8 hmin = grund_t::underground_mode != grund_t::ugm_all ? min( world->get_groundwater() - 4, grund_t::underground_level ) : world->get_minimumheight();
 	const sint8 hmax = grund_t::underground_mode == grund_t::ugm_all ? world->get_maximumheight() : min( grund_t::underground_level, world->get_maximumheight() );
 
 	// find matching and visible grund
@@ -188,7 +190,7 @@ grund_t* viewport_t::get_ground_on_screen_coordinate(scr_coord screen_pos, sint3
 		if (gr != NULL) {
 			found = /*select_karten_boden ? gr->ist_karten_boden() :*/ gr->is_visible();
 			if( ( gr->get_typ() == grund_t::tunnelboden || gr->get_typ() == grund_t::monorailboden ) && gr->get_weg_nr(0) == NULL && !gr->get_leitung()  &&  gr->find<zeiger_t>()) {
-				// This is only a dummy ground placed by tool_build_tunnel or tool_build_way_t as a preview.
+				// This is only a dummy ground placed by tool_build_tunnel_t or tool_build_way_t as a preview.
 				found = false;
 			}
 			if (found) {
@@ -221,7 +223,7 @@ grund_t* viewport_t::get_ground_on_screen_coordinate(scr_coord screen_pos, sint3
 		if(gr != NULL) {
 			found = /*select_karten_boden ? gr->ist_karten_boden() :*/ gr->is_visible();
 			if( ( gr->get_typ() == grund_t::tunnelboden || gr->get_typ() == grund_t::monorailboden ) && gr->get_weg_nr(0) == NULL && !gr->get_leitung()  &&  gr->find<zeiger_t>()) {
-				// This is only a dummy ground placed by tool_build_tunnel or tool_build_way_t as a preview.
+				// This is only a dummy ground placed by tool_build_tunnel_t or tool_build_way_t as a preview.
 				found = false;
 			}
 			if (found) {
@@ -279,22 +281,6 @@ koord3d viewport_t::get_new_cursor_position( const scr_coord &screen_pos, bool g
 }
 
 
-bool viewport_t::is_background_visible() const
-{
-
-	sint32 i,j;
-
-	if ( get_ground_on_screen_coordinate(scr_coord(0,0),i,j)  &&  \
-		get_ground_on_screen_coordinate(scr_coord(cached_disp_width-1,0),i,j)  &&  \
-		get_ground_on_screen_coordinate(scr_coord(0,cached_disp_height-1),i,j)  &&  \
-		get_ground_on_screen_coordinate(scr_coord(cached_disp_width-1,cached_disp_height-1),i,j)  ) {
-			return false;
-	}
-
-	return true;
-}
-
-
 void viewport_t::metrics_updated()
 {
 	cached_disp_width = display_get_width();
@@ -316,6 +302,7 @@ void viewport_t::rotate90( sint16 y_size )
 
 
 viewport_t::viewport_t( karte_t *world, const koord ij_off , sint16 x_off , sint16 y_off )
+	: prepared_rect() 
 {
 	this->world = world;
 	assert(world);

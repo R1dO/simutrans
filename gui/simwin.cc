@@ -40,7 +40,7 @@
 #include "../dataobj/loadsave.h"
 #include "../dataobj/tabfile.h"
 
-#include "../besch/skin_besch.h"
+#include "../descriptor/skin_desc.h"
 
 #include "../obj/zeiger.h"
 
@@ -60,7 +60,6 @@
 #include "tool_selector.h"
 #include "player_frame_t.h"
 #include "money_frame.h"
-#include "halt_detail.h"
 #include "halt_info.h"
 #include "convoi_detail_t.h"
 #include "convoi_info_t.h"
@@ -72,11 +71,16 @@
 #include "message_option_t.h"
 #include "fabrik_info.h"
 #include "themeselector.h"
+#include "goods_frame_t.h"
+#include "loadfont_frame.h"
+#include "scenario_info.h"
 
 #include "../simversion.h"
 
 class inthashtable_tpl<ptrdiff_t,scr_coord> old_win_pos;
 
+// hash-table: magic number to windowsize
+class inthashtable_tpl<ptrdiff_t, scr_size> saved_windowsizes;
 
 #define dragger_size 12
 
@@ -166,7 +170,7 @@ static bool destroy_framed_win(simwin_t *win);
  */
 static int display_gadget_box(sint8 code,
 			      int const x, int const y,
-			      int const color,
+			      PIXVAL lighter, PIXVAL darker,
 			      bool const pushed)
 {
 
@@ -178,7 +182,8 @@ static int display_gadget_box(sint8 code,
 	}
 
 	if(pushed) {
-		display_fillbox_wh_clip(x+1, y+1, D_GADGET_WIDTH-2, D_TITLEBAR_HEIGHT-2, (color & 0xF8) + max(7, (color&0x07)+2), false );
+		// mark_rect_dirty_wc(x, y, D_GADGET_WIDTH, D_TITLEBAR_HEIGHT);
+		display_fillbox_wh_clip_rgb(x, y, D_GADGET_WIDTH, D_TITLEBAR_HEIGHT, lighter, false);
 	}
 
 	// Do we have a gadget image?
@@ -204,12 +209,12 @@ static int display_gadget_box(sint8 code,
 		else if(  code == SKIN_GADGET_PINNED  ) {
 			gadget_text	= "S";
 		}
-		display_proportional( x+4, y+4, gadget_text, ALIGN_LEFT, COL_BLACK, false );
+		display_proportional_rgb( x+4, y+4, gadget_text, ALIGN_LEFT, color_idx_to_rgb(COL_BLACK), false );
 	}
 
-	display_vline_wh_clip(x,                 y,   D_TITLEBAR_HEIGHT,   color+1,   false);
-	display_vline_wh_clip(x+D_GADGET_WIDTH-1, y+1, D_TITLEBAR_HEIGHT-2, COL_BLACK, false);
-	display_vline_wh_clip(x+D_GADGET_WIDTH,   y+1, D_TITLEBAR_HEIGHT-2, color+1,   false);
+	int side = x+REVERSE_GADGETS*D_GADGET_WIDTH-1;
+	display_vline_wh_clip_rgb(side+1, y+1, D_TITLEBAR_HEIGHT-2, lighter, false);
+	display_vline_wh_clip_rgb(side,   y+1, D_TITLEBAR_HEIGHT-2, darker,  false);
 
 	// Hajo: return width of gadget
 	return D_GADGET_WIDTH;
@@ -221,7 +226,8 @@ static int display_gadget_box(sint8 code,
 static int display_gadget_boxes(
 	simwin_gadget_flags_t* flags,
 	int x, int y,
-	int color,
+	PIXVAL lighter,
+	PIXVAL darker,
 	uint16 gadget_state,
 	bool sticky_pushed,
 	bool goto_pushed
@@ -231,25 +237,25 @@ static int display_gadget_boxes(
 
 	// Only the close and sticky gadget can be pushed.
 	if(  flags->close  ) {
-		width += k*display_gadget_box( SKIN_GADGET_CLOSE, x + width, y, color, gadget_state & (1<<SKIN_GADGET_CLOSE) );
+		width += k*display_gadget_box( SKIN_GADGET_CLOSE, x + width, y, lighter, darker, gadget_state & (1<<SKIN_GADGET_CLOSE) );
 	}
 	if(  flags->size  ) {
-		width += k*display_gadget_box( SKIN_GADGET_MINIMIZE, x + width, y, color, gadget_state & (1<<SKIN_GADGET_MINIMIZE) );
+		width += k*display_gadget_box( SKIN_GADGET_MINIMIZE, x + width, y, lighter, darker, gadget_state & (1<<SKIN_GADGET_MINIMIZE) );
 	}
 	if(  flags->help  ) {
-		width += k*display_gadget_box( SKIN_GADGET_HELP, x + width, y, color, gadget_state & (1<<SKIN_GADGET_HELP) );
+		width += k*display_gadget_box( SKIN_GADGET_HELP, x + width, y, lighter, darker, gadget_state & (1<<SKIN_GADGET_HELP) );
 	}
 	if(  flags->prev  ) {
-		width += k*display_gadget_box( SKIN_BUTTON_PREVIOUS, x + width, y, color, gadget_state & (1<<SKIN_BUTTON_PREVIOUS) );
+		width += k*display_gadget_box( SKIN_BUTTON_PREVIOUS, x + width, y, lighter, darker, gadget_state & (1<<SKIN_BUTTON_PREVIOUS) );
 	}
 	if(  flags->next  ) {
-		width += k*display_gadget_box( SKIN_BUTTON_NEXT, x + width, y, color, gadget_state & (1<<SKIN_BUTTON_NEXT) );
+		width += k*display_gadget_box( SKIN_BUTTON_NEXT, x + width, y, lighter, darker, gadget_state & (1<<SKIN_BUTTON_NEXT) );
 	}
 	if(  flags->gotopos  ) {
-		width += k*display_gadget_box( SKIN_GADGET_GOTOPOS, x + width, y, color, goto_pushed  ||  (gadget_state & (1<<SKIN_GADGET_GOTOPOS)) );
+		width += k*display_gadget_box( SKIN_GADGET_GOTOPOS, x + width, y, lighter, darker, goto_pushed  ||  (gadget_state & (1<<SKIN_GADGET_GOTOPOS)) );
 	}
 	if(  flags->sticky  ) {
-		width += k*display_gadget_box( sticky_pushed ? SKIN_GADGET_PINNED : SKIN_GADGET_NOTPINNED, x + width, y, color, gadget_state & (1<<SKIN_GADGET_NOTPINNED) );
+		width += k*display_gadget_box( sticky_pushed ? SKIN_GADGET_PINNED : SKIN_GADGET_NOTPINNED, x + width, y, lighter, darker, gadget_state & (1<<SKIN_GADGET_NOTPINNED) );
 	}
 
 	return abs( width );
@@ -318,27 +324,34 @@ static sint8 decode_gadget_boxes(
 //-------------------------------------------------------------------------
 // (Mathew Hounsell) Re-factored
 static void win_draw_window_title(const scr_coord pos, const scr_size size,
-		const PLAYER_COLOR_VAL titel_farbe,
+		const FLAGGED_PIXVAL title_color,
 		const char * const text,
-		const PLAYER_COLOR_VAL text_farbe,
+		const FLAGGED_PIXVAL text_color,
 		const koord3d welt_pos,
 		const uint16 gadget_state,
 		const bool sticky,
 		const bool goto_pushed,
 		simwin_gadget_flags_t &flags )
 {
-	PUSH_CLIP(pos.x, pos.y, size.w, size.h);
-	display_fillbox_wh_clip(pos.x, pos.y, size.w, 1, titel_farbe+1, false);
-	display_fillbox_wh_clip(pos.x, pos.y+1, size.w, D_TITLEBAR_HEIGHT-2, titel_farbe, false);
-	display_fillbox_wh_clip(pos.x, pos.y+D_TITLEBAR_HEIGHT-1, size.w, 1, COL_BLACK, false);
-	display_vline_wh_clip(pos.x+size.w-1, pos.y,   D_TITLEBAR_HEIGHT-1, COL_BLACK, false);
+	PUSH_CLIP_FIT(pos.x, pos.y, size.w, size.h);
+
+	PIXVAL lighter = display_blend_colors(title_color, color_idx_to_rgb(COL_WHITE), 25);
+	PIXVAL darker  = display_blend_colors(title_color, color_idx_to_rgb(COL_BLACK), 25);
+
+	display_fillbox_wh_clip_rgb(pos.x, pos.y, size.w, D_TITLEBAR_HEIGHT, title_color, false);
+
+	display_fillbox_wh_clip_rgb( pos.x + 1, pos.y,                         size.w - 2, 1, lighter, false );
+	display_fillbox_wh_clip_rgb( pos.x + 1, pos.y + D_TITLEBAR_HEIGHT - 1, size.w - 2, 1, darker,  false );
+
+	display_vline_wh_clip_rgb( pos.x,              pos.y, D_TITLEBAR_HEIGHT, lighter, false );
+	display_vline_wh_clip_rgb( pos.x + size.w - 1, pos.y, D_TITLEBAR_HEIGHT, darker,  false );
 
 	// Draw the gadgets and then move left and draw text.
 	flags.gotopos = (welt_pos != koord3d::invalid);
-	int width = display_gadget_boxes( &flags, pos.x+(REVERSE_GADGETS?0:size.w-D_GADGET_WIDTH-4), pos.y, titel_farbe, gadget_state, sticky, goto_pushed );
-	int titlewidth = display_proportional_clip( pos.x + (REVERSE_GADGETS?width+4:4), pos.y+(D_TITLEBAR_HEIGHT-LINEASCENT)/2, text, ALIGN_LEFT, text_farbe, false );
+	int width = display_gadget_boxes( &flags, pos.x+(REVERSE_GADGETS?0:size.w-D_GADGET_WIDTH), pos.y, lighter, darker, gadget_state, sticky, goto_pushed );
+	int titlewidth = display_proportional_clip_rgb( pos.x + (REVERSE_GADGETS?width+4:4), pos.y+(D_TITLEBAR_HEIGHT-LINEASCENT)/2, text, ALIGN_LEFT, text_color, false );
 	if(  flags.gotopos  ) {
-		display_proportional_clip( pos.x + (REVERSE_GADGETS?width+4:4)+titlewidth+8, pos.y+(D_TITLEBAR_HEIGHT-LINEASCENT)/2, welt_pos.get_2d().get_fullstr(), ALIGN_LEFT, text_farbe, false );
+		display_proportional_clip_rgb( pos.x + (REVERSE_GADGETS?width+4:4)+titlewidth+8, pos.y+(D_TITLEBAR_HEIGHT-LINEASCENT)/2, welt_pos.get_2d().get_fullstr(), ALIGN_LEFT, text_color, false );
 	}
 	POP_CLIP();
 }
@@ -359,12 +372,74 @@ static void win_draw_window_dragger(scr_coord pos, scr_size size)
 	}
 	else {
 		for(  int x=0;  x<dragger_size;  x++  ) {
-			display_fillbox_wh( pos.x-x, pos.y-dragger_size+x, x, 1, (x & 1) ? COL_BLACK : MN_GREY4, true);
+			display_fillbox_wh_clip_rgb( pos.x-x, pos.y-dragger_size+x, x, 1, color_idx_to_rgb((x & 1) ? COL_BLACK : MN_GREY4), true);
 		}
 	}
 }
 
+// Functions to save & restore windowsize
 
+ptrdiff_t guess_magic_number(simwin_t *win)
+{
+	ptrdiff_t magic = win->magic_number;
+	// reduce player-wise magic numbers
+	const ptrdiff_t magic_pl[] = {
+		magic_finances_t, magic_convoi_list, magic_convoi_list_filter, magic_line_list, magic_halt_list,
+		magic_line_management_t, magic_ai_options_t, magic_ai_selector, magic_pwd_t, magic_jump, magic_headquarter};
+
+	for (uint i=1; i<lengthof(magic_pl); i++) {
+		if (magic_pl[i-1] <= magic  &&  magic < magic_pl[i]) {
+			magic = magic_pl[i-1];
+			break;
+		}
+	}
+	return magic;
+}
+
+void save_windowsize(simwin_t *win)
+{
+	ptrdiff_t magic = guess_magic_number(win);
+	if (magic != magic_none) {
+		saved_windowsizes.set(magic, win->gui->get_windowsize() );
+	}
+}
+
+scr_size get_stored_windowsize(simwin_t *win)
+{
+	ptrdiff_t magic = guess_magic_number(win);
+	if (magic != magic_none) {
+		return saved_windowsizes.get(magic);
+	}
+	return scr_size();
+}
+
+void rdwr_win_settings(loadsave_t *file)
+{
+	if (file->is_loading()) {
+		saved_windowsizes.clear();
+		sint64 magic;
+		do {
+			file->rdwr_longlong(magic);
+			if (magic != magic_none) {
+				scr_size s;
+				file->rdwr_long(s.w);
+				file->rdwr_long(s.h);
+				saved_windowsizes.put(magic, s);
+			}
+		} while (magic != magic_none);
+	}
+	else {
+		typedef inthashtable_tpl<ptrdiff_t, scr_size> stupid_table_t;
+		FOR(stupid_table_t, it, saved_windowsizes) {
+			sint64 m = it.key;
+			file->rdwr_longlong(m);
+			file->rdwr_long(it.value.w);
+			file->rdwr_long(it.value.h);
+		}
+		sint64 m = magic_none;
+		file->rdwr_longlong(m);
+	}
+}
 //=========================================================================
 
 
@@ -398,18 +473,6 @@ bool win_set_magic( gui_frame_t *gui, ptrdiff_t magic )
 		}
 	}
 	return false;
-}
-
-
-// returns the window on this positions
-gui_frame_t *win_get_oncoord( const scr_coord pt )
-{
-	for(  int i=wins.get_count()-1;  i>=0;  i--  ) {
-		if(  wins[i].gui->is_hit( pt.x-wins[i].pos.x, pt.y-wins[i].pos.y )  ) {
-			return wins[i].gui;
-		}
-	}
-	return NULL;
 }
 
 
@@ -469,7 +532,7 @@ bool win_is_top(const gui_frame_t *ig)
 // save/restore all dialogues
 void rdwr_all_win(loadsave_t *file)
 {
-	if(  file->get_version()>102003  ) {
+	if(  file->get_version()>120007  ) {
 		if(  file->is_saving()  ) {
 			FOR(vector_tpl<simwin_t>, & i, wins) {
 				uint32 id = i.gui->get_rdwr_id();
@@ -492,17 +555,15 @@ void rdwr_all_win(loadsave_t *file)
 				file->rdwr_long(id);
 				// create the matching
 				gui_frame_t *w = NULL;
-				switch(id) {
+				switch(magic_numbers(id)) {
 
 					// end of dialogues
 					case magic_none: return;
 
 					// actual dialogues to restore
 					case magic_convoi_info:    w = new convoi_info_t(); break;
-					case magic_convoi_detail:  w = new convoi_detail_t(); break;
 					case magic_themes:         w = new themeselector_t(); break;
 					case magic_halt_info:      w = new halt_info_t(); break;
-					case magic_halt_detail:    w = new halt_detail_t(); break;
 					case magic_reliefmap:      w = new map_frame_t(); break;
 					case magic_ki_kontroll_t:  w = new ki_kontroll_t(); break;
 					case magic_schedule_rdwr_dummy: w = new schedule_gui_t(); break;
@@ -511,6 +572,9 @@ void rdwr_all_win(loadsave_t *file)
 					case magic_messageframe:   w = new message_frame_t(); break;
 					case magic_message_options: w = new message_option_t(); break;
 					case magic_factory_info:   w = new fabrik_info_t(); break;
+					case magic_goodslist:      w = new goods_frame_t(); break;
+					case magic_font:           w = new loadfont_frame_t(); break;
+					case magic_scenario_info:  w = new scenario_info_t(); break;
 
 					default:
 						if(  id>=magic_finances_t  &&  id<magic_finances_t+MAX_PLAYER_COUNT  ) {
@@ -654,6 +718,22 @@ int create_win(int x, int y, gui_frame_t* const gui, wintype const wt, ptrdiff_t
 		gui->infowin_event(&ev);
 		inside_event_handling = old;
 
+		// restore windowsize
+		scr_size stored = get_stored_windowsize(&win);
+		if (stored != gui->get_windowsize()) {
+			// send tailored resize event
+			scr_size delta = stored - gui->get_windowsize();
+			event_t wev;
+			wev.ev_class = WINDOW_RESIZE;
+			wev.ev_code = 0;
+			wev.mx = delta.w;
+			wev.my = delta.h;
+
+			inside_event_handling = gui;
+			gui->infowin_event(&wev);
+			inside_event_handling = old;
+		}
+
 		scr_size size = gui->get_windowsize();
 
 		if(x == -1) {
@@ -722,6 +802,9 @@ static bool destroy_framed_win(simwin_t *wins)
 	// mark dirty
 	const scr_size size = wins->gui->get_windowsize();
 	mark_rect_dirty_wc( wins->pos.x - 1, wins->pos.y - 1, wins->pos.x + size.w + 2, wins->pos.y + size.h + 2 ); // -1, +2 for env_t::window_frame_active
+
+	// save windowsize for later
+	save_windowsize(wins);
 
 	gui_frame_t* gui = wins->gui; // save pointer to gui window: might be modified in event handling, or could be modified if wins points to value in kill_list and kill_list is modified! nasty surprise
 	if(  gui  ) {
@@ -882,11 +965,11 @@ void display_win(int win)
 	gui_frame_t *comp = wins[win].gui;
 	scr_size size = comp->get_windowsize();
 	scr_coord pos = wins[win].pos;
-	PLAYER_COLOR_VAL title_color = (comp->get_titlecolor()&0xF8)+env_t::front_window_bar_color;
-	PLAYER_COLOR_VAL text_color = +env_t::front_window_text_color;
+	FLAGGED_PIXVAL title_color = (comp->get_titlecolor()&0xFFFF);
+	FLAGGED_PIXVAL text_color = env_t::front_window_text_color;
 	if(  (unsigned)win!=wins.get_count()-1  ) {
-		// not top => maximum brightness
-		title_color = (title_color&0xF8)+env_t::bottom_window_bar_color;
+		// not top => darker
+		title_color = display_blend_colors(title_color, color_idx_to_rgb(COL_BLACK), env_t::bottom_window_darkness);
 		text_color = env_t::bottom_window_text_color;
 	}
 	bool need_dragger = comp->get_resizemode() != gui_frame_t::no_resize;
@@ -914,10 +997,10 @@ void display_win(int win)
 	if(env_t::window_frame_active  &&  (unsigned)win==wins.get_count()-1) {
 		const int y_off = wins[win].flags.title ? 0 : D_TITLEBAR_HEIGHT;
 		if(!wins[win].rollup) {
-			display_ddd_box( wins[win].pos.x-1, wins[win].pos.y-1 + y_off, size.w+2, size.h+2 - y_off, title_color, title_color+1, wins[win].dirty | wins[win].gui->is_dirty() );
+			display_ddd_box_clip_rgb( wins[win].pos.x-1, wins[win].pos.y-1 + y_off, size.w+2, size.h+2 - y_off, title_color, title_color); //, wins[win].dirty | wins[win].gui->is_dirty() );
 		}
 		else {
-			display_ddd_box( wins[win].pos.x-1, wins[win].pos.y-1 + y_off, size.w+2, D_TITLEBAR_HEIGHT + 2 - y_off, title_color, title_color+1, wins[win].dirty | wins[win].gui->is_dirty() );
+			display_ddd_box_clip_rgb( wins[win].pos.x-1, wins[win].pos.y-1 + y_off, size.w+2, D_TITLEBAR_HEIGHT + 2 - y_off, title_color, title_color); //, wins[win].dirty | wins[win].gui->is_dirty() );
 		}
 	}
 	if(!wins[win].rollup) {
@@ -982,7 +1065,7 @@ static void remove_old_win()
 }
 
 
-static inline void snap_check_distance( sint16 *r, const sint16 a, const sint16 b )
+static inline void snap_check_distance( scr_coord_val *r, const scr_coord_val a, const scr_coord_val b )
 {
 	if(  abs(a-b)<=env_t::window_snap_distance  ) {
 		*r = a;
@@ -1019,9 +1102,9 @@ void snap_check_win( const int win, scr_coord *r, const scr_coord from_pos, cons
 			other_pos.x = 0;
 			other_pos.y = env_t::iconsize.h;
 			other_size.x = display_get_width();
-			other_size.y = display_get_height()-16-other_pos.y; // 16 = bottom ticker height?
+			other_size.y = display_get_height()-win_get_statusbar_height()-other_pos.y;
 			if(  show_ticker  ) {
-				other_size.y -= 16;
+				other_size.y -= TICKER_HEIGHT;
 			}
 		}
 		else {
@@ -1120,7 +1203,7 @@ void move_win(int win, event_t *ev)
 
 	// CLIP(wert,min,max)
 	to_pos.x = CLIP( to_pos.x, 8-to_size.x, display_get_width()-16 );
-	to_pos.y = CLIP( to_pos.y, env_t::iconsize.h, display_get_height()-24 );
+	to_pos.y = CLIP( to_pos.y, env_t::iconsize.h, display_get_height() - D_TITLEBAR_HEIGHT - win_get_statusbar_height() - TICKER_HEIGHT);
 
 	// delta is actual window movement.
 	const scr_coord delta = to_pos - from_pos;
@@ -1264,7 +1347,7 @@ bool check_pos_win(event_t *ev)
 	}
 
 	// cursor event only go to top window (but not if rolled up)
-	if(  ev->ev_class == EVENT_KEYBOARD  &&  !wins.empty()  ) {
+	if(  (ev->ev_class == EVENT_KEYBOARD  ||  ev->ev_class == EVENT_STRING)  &&  !wins.empty()  ) {
 		simwin_t &win  = wins.back();
 		if(  !win.rollup  )  {
 			inside_event_handling = win.gui;
@@ -1288,13 +1371,13 @@ bool check_pos_win(event_t *ev)
 	}
 
 	// swallow all other events in the infobar
-	if(  ev->ev_class != EVENT_KEYBOARD  &&  y > display_get_height()-16  ) {
+	if(  !(ev->ev_class == EVENT_KEYBOARD  ||  ev->ev_class == EVENT_STRING)  &&  y > display_get_height()- win_get_statusbar_height()  ) {
 		// swallow event
 		return true;
 	}
 
 	// swallow all other events in ticker (if there)
-	if(  ev->ev_class != EVENT_KEYBOARD  &&  show_ticker  &&  y > display_get_height()-32  ) {
+	if(  !(ev->ev_class == EVENT_KEYBOARD  ||  ev->ev_class == EVENT_STRING)  &&  show_ticker  &&  y > display_get_height()- win_get_statusbar_height() - TICKER_HEIGHT  ) {
 		if(  IS_LEFTCLICK(ev)  ) {
 			// goto infowin koordinate, if ticker is active
 			koord p = ticker::get_welt_pos();
@@ -1332,7 +1415,7 @@ bool check_pos_win(event_t *ev)
 				wins[i].flags.help = ( wins[i].gui->get_help_filename() != NULL );
 
 				// Where Was It ?
-				sint8 code = decode_gadget_boxes( ( & wins[i].flags ), wins[i].pos.x + (REVERSE_GADGETS?0:wins[i].gui->get_windowsize().w-D_GADGET_WIDTH-4), x );
+				sint8 code = decode_gadget_boxes( ( & wins[i].flags ), wins[i].pos.x + (REVERSE_GADGETS?0:wins[i].gui->get_windowsize().w-D_GADGET_WIDTH), x );
 
 				if(  code < SKIN_GADGET_COUNT  ) {
 					if(  IS_LEFTCLICK(ev)  ) {
@@ -1340,7 +1423,7 @@ bool check_pos_win(event_t *ev)
 					}
 					else if(  IS_LEFTRELEASE(ev)  ) {
 						wins[i].gadget_state &= ~(1 << code);
-						if(  ev->my >= wins[i].pos.y  &&  ev->my < wins[i].pos.y+D_TITLEBAR_HEIGHT  &&  decode_gadget_boxes( ( & wins[i].flags ), wins[i].pos.x + (REVERSE_GADGETS?0:wins[i].gui->get_windowsize().w-D_GADGET_WIDTH-4), ev->mx )==code  ) {
+						if(  ev->my >= wins[i].pos.y  &&  ev->my < wins[i].pos.y+D_TITLEBAR_HEIGHT  &&  decode_gadget_boxes( ( & wins[i].flags ), wins[i].pos.x + (REVERSE_GADGETS?0:wins[i].gui->get_windowsize().w-D_GADGET_WIDTH), ev->mx )==code  ) {
 							// do whatever needs to be done
 							switch(  code  ) {
 								case SKIN_GADGET_CLOSE :
@@ -1440,27 +1523,21 @@ bool check_pos_win(event_t *ev)
 }
 
 
-void win_get_event(event_t* const ev)
-{
-	display_get_event(ev);
-}
-
-
 void win_poll_event(event_t* const ev)
 {
 	display_poll_event(ev);
 	// main window resized
 	if(  ev->ev_class==EVENT_SYSTEM  &&  ev->ev_code==SYSTEM_RESIZE  ) {
 		// main window resized
-		simgraph_resize( ev->mx, ev->my );
-		ticker::redraw_ticker();
+		simgraph_resize( ev->size_x, ev->size_y );
+		ticker::redraw();
 		wl->set_dirty();
 		wl->get_viewport()->metrics_updated();
 		ev->ev_class = EVENT_NONE;
 	}
 	// save and reload all windows (currently only used when a new theme is applied)
 	if(  ev->ev_class==EVENT_SYSTEM  &&  ev->ev_code==SYSTEM_RELOAD_WINDOWS  ) {
-		chdir( env_t::user_dir );
+		dr_chdir( env_t::user_dir );
 		loadsave_t dlg;
 		if(  dlg.wr_open( "dlgpos.xml", loadsave_t::xml_zipped, "temp", SERVER_SAVEGAME_VER_NR )  ) {
 			// save all
@@ -1472,10 +1549,26 @@ void win_poll_event(event_t* const ev)
 				rdwr_all_win( &dlg );
 			}
 		}
+		wl->set_dirty();
 		ev->ev_class = EVENT_NONE;
+		ticker::redraw();
+	}
+	if(  ev->ev_class==EVENT_SYSTEM  &&  ev->ev_code==SYSTEM_THEME_CHANGED  ) {
+		// called when font is changed
+		ev->mx = ev->my = ev->cx = ev->cy = 0;
+		FOR(vector_tpl<simwin_t>, const& i, wins) {
+			i.gui->infowin_event(ev);
+		}
+		ev->ev_class = EVENT_NONE;
+		ticker::redraw();
 	}
 }
 
+
+uint16 win_get_statusbar_height()
+{
+	return max(LINESPACE + 2, 15);
+}
 
 // finally updates the display
 void win_display_flush(double konto)
@@ -1507,7 +1600,7 @@ void win_display_flush(double konto)
 		}
 	}
 	else {
-		display_fillbox_wh( 0, 0, disp_width, menu_height, MN_GREY2, false );
+		display_fillbox_wh_rgb( 0, 0, disp_width, menu_height, color_idx_to_rgb(MN_GREY2), false );
 	}
 	// .. extra logic to enable tooltips
 	tooltip_element = menu_height > get_mouse_y() ? main_menu : NULL;
@@ -1519,30 +1612,26 @@ void win_display_flush(double konto)
 	display_set_clip_wh( 0, menu_height, disp_width, disp_height-menu_height+1 );
 
 	show_ticker = false;
-	if( !ticker::empty() ) {
-		ticker::draw();
-		if (ticker::empty()) {
-			// set dirty background for removing ticker
-			if(wl) {
-				wl->set_background_dirty();
-			}
+	ticker::draw();
+	if (ticker::empty()) {
+		// set dirty background for removing ticker
+		if(wl) {
+			wl->set_background_dirty();
 		}
-		else {
-			show_ticker = true;
-			// need to adapt tooltip_y coordinates
-			tooltip_ypos = min(tooltip_ypos, disp_height-15-10-16);
-		}
+	}
+	else {
+		show_ticker = true;
+		// need to adapt tooltip_y coordinates
+		tooltip_ypos = min(tooltip_ypos, disp_height-15-10-16);
 	}
 
 	if(  skinverwaltung_t::compass_iso  &&  env_t::compass_screen_position  ) {
 		display_img_aligned( skinverwaltung_t::compass_iso->get_image_id( wl->get_settings().get_rotation() ), scr_rect(4,menu_height+4,disp_width-2*4,disp_height-menu_height-15-2*4-(TICKER_HEIGHT)*show_ticker), env_t::compass_screen_position, false );
 	}
 
-	// ok, we want to clip the height for everything!
-	// unfortunately, the easiest way is by manipulating the global high
 	{
-		sint16 oldh = display_get_height();
-		display_set_height( oldh-(wl?16:0)-(TICKER_HEIGHT)*show_ticker );
+		// clip windows to avoid drawing into menu, ticker, or status-bar
+		PUSH_CLIP(0, menu_height, display_get_width(), display_get_height() - menu_height - (TICKER_HEIGHT)*show_ticker - win_get_statusbar_height() );
 
 		display_all_win();
 		remove_old_win();
@@ -1576,7 +1665,7 @@ void win_display_flush(double konto)
 			tooltip_text = 0;
 		}
 
-		display_set_height( oldh );
+		POP_CLIP();
 
 		if(!wl) {
 			// no infos during loading etc
@@ -1584,21 +1673,25 @@ void win_display_flush(double konto)
 		}
 	}
 
-	char const *time = tick_to_string( wl->get_zeit_ms(), true );
+	char const *time = tick_to_string( wl->get_ticks(), true );
 
 	// statusbar background
+	KOORD_VAL const status_bar_height = win_get_statusbar_height();
+	KOORD_VAL const status_bar_y = disp_height - status_bar_height;
+	KOORD_VAL const status_bar_text_y = status_bar_y + (status_bar_height - LINESPACE) / 2;
+	KOORD_VAL const status_bar_icon_y = status_bar_y + (status_bar_height - 15) / 2;
 	display_set_clip_wh( 0, 0, disp_width, disp_height );
-	display_fillbox_wh(0, disp_height-16, disp_width, 1, SYSCOL_STATUSBAR_DIVIDER, false);
-	display_fillbox_wh(0, disp_height-15, disp_width, 15, SYSCOL_STATUSBAR_BACKGROUND, false);
+	display_fillbox_wh_rgb(0, status_bar_y - 1, disp_width, 1, SYSCOL_STATUSBAR_DIVIDER, false);
+	display_fillbox_wh_rgb(0, status_bar_y, disp_width, status_bar_height, SYSCOL_STATUSBAR_BACKGROUND, false);
 
-	bool tooltip_check = get_mouse_y()>disp_height-15;
+	bool tooltip_check = get_mouse_y() > status_bar_y;
 	if(  tooltip_check  ) {
 		tooltip_xpos = get_mouse_x();
-		tooltip_ypos = disp_height-15-10-TICKER_HEIGHT*show_ticker;
+		tooltip_ypos = status_bar_y-10-TICKER_HEIGHT*show_ticker;
 	}
 
 	// season color
-	display_color_img( skinverwaltung_t::seasons_icons->get_image_id(wl->get_season()), 2, disp_height-15, 0, false, true );
+	display_color_img( skinverwaltung_t::seasons_icons->get_image_id(wl->get_season()), 2, status_bar_icon_y, 0, false, true );
 	if(  tooltip_check  &&  tooltip_xpos<14  ) {
 		static char const* const seasons[] = { "q2", "q3", "q4", "q1" };
 		tooltip_text = translator::translate(seasons[wl->get_season()]);
@@ -1610,7 +1703,7 @@ void win_display_flush(double konto)
 	// shown if timeline game
 	if(  wl->use_timeline()  &&  skinverwaltung_t::timelinesymbol  ) {
 		right_border -= 14;
-		display_color_img( skinverwaltung_t::timelinesymbol->get_image_id(0), right_border, disp_height-15, 0, false, true );
+		display_color_img( skinverwaltung_t::timelinesymbol->get_image_id(0), right_border, status_bar_icon_y, 0, false, true );
 		if(  tooltip_check  &&  tooltip_xpos>=right_border  ) {
 			tooltip_text = translator::translate("timeline");
 			tooltip_check = false;
@@ -1620,7 +1713,7 @@ void win_display_flush(double konto)
 	// shown if connected
 	if(  env_t::networkmode  &&  skinverwaltung_t::networksymbol  ) {
 		right_border -= 14;
-		display_color_img( skinverwaltung_t::networksymbol->get_image_id(0), right_border, disp_height-15, 0, false, true );
+		display_color_img( skinverwaltung_t::networksymbol->get_image_id(0), right_border, status_bar_icon_y, 0, false, true );
 		if(  tooltip_check  &&  tooltip_xpos>=right_border  ) {
 			tooltip_text = translator::translate("Connected with server");
 			tooltip_check = false;
@@ -1630,7 +1723,7 @@ void win_display_flush(double konto)
 	// put pause icon
 	if(  wl->is_paused()  &&  skinverwaltung_t::pausesymbol  ) {
 		right_border -= 14;
-		display_color_img( skinverwaltung_t::pausesymbol->get_image_id(0), right_border, disp_height-15, 0, false, true );
+		display_color_img( skinverwaltung_t::pausesymbol->get_image_id(0), right_border, status_bar_icon_y, 0, false, true );
 		if(  tooltip_check  &&  tooltip_xpos>=right_border  ) {
 			tooltip_text = translator::translate("GAME PAUSED");
 			tooltip_check = false;
@@ -1640,7 +1733,7 @@ void win_display_flush(double konto)
 	// put fast forward icon
 	if(  wl->is_fast_forward()  &&  skinverwaltung_t::fastforwardsymbol  ) {
 		right_border -= 14;
-		display_color_img( skinverwaltung_t::fastforwardsymbol->get_image_id(0), right_border, disp_height-15, 0, false, true );
+		display_color_img( skinverwaltung_t::fastforwardsymbol->get_image_id(0), right_border, status_bar_icon_y, 0, false, true );
 		if(  tooltip_check  &&  tooltip_xpos>=right_border  ) {
 			tooltip_text = translator::translate("Fast forward");
 			tooltip_check = false;
@@ -1687,16 +1780,15 @@ void win_display_flush(double konto)
 		}
 	}
 #endif
-
-	scr_coord_val w_left = 20+display_proportional(20, disp_height-12, time, ALIGN_LEFT, SYSCOL_STATUSBAR_TEXT, true);
-	scr_coord_val w_right  = display_proportional(right_border-4, disp_height-12, info, ALIGN_RIGHT, SYSCOL_STATUSBAR_TEXT, true);
+	scr_coord_val w_left = 20+display_proportional_rgb(20, status_bar_text_y, time, ALIGN_LEFT, SYSCOL_STATUSBAR_TEXT, true);
+	scr_coord_val w_right  = display_proportional_rgb(right_border-4, status_bar_text_y, info, ALIGN_RIGHT, SYSCOL_STATUSBAR_TEXT, true);
 	scr_coord_val middle = (disp_width+((w_left+8)&0xFFF0)-((w_right+8)&0xFFF0))/2;
 
 	if(wl->get_active_player()) {
 		char buffer[256];
-		display_proportional( middle-5, disp_height-12, wl->get_active_player()->get_name(), ALIGN_RIGHT, PLAYER_FLAG|(wl->get_active_player()->get_player_color1()+0), true);
+		display_proportional_rgb( middle-5, status_bar_text_y, wl->get_active_player()->get_name(), ALIGN_RIGHT, PLAYER_FLAG|color_idx_to_rgb(wl->get_active_player()->get_player_color1()+0), true);
 		money_to_string(buffer, konto );
-		display_proportional( middle+5, disp_height-12, buffer, ALIGN_LEFT, konto >= 0.0?MONEY_PLUS:MONEY_MINUS, true);
+		display_proportional_rgb( middle+5, status_bar_text_y, buffer, ALIGN_LEFT, konto >= 0.0?MONEY_PLUS:MONEY_MINUS, true);
 	}
 }
 
@@ -1724,6 +1816,28 @@ bool win_change_zoom_factor(bool magnify)
 	wl->get_viewport()->metrics_updated();
 
 	return result;
+}
+
+
+void win_load_font(const char *fname, uint16 fontsize)
+{
+	bool force_reload = fontsize != env_t::fontsize;
+	env_t::fontsize = fontsize;
+
+	if (display_load_font(fname, force_reload) ) {
+		// successfull
+		gui_theme_t::themes_init( env_t::default_theme, false );
+
+		event_t *ev = new event_t();
+		ev->ev_class = EVENT_SYSTEM;
+		ev->ev_code = SYSTEM_THEME_CHANGED;
+		queue_event( ev );
+	}
+	else {
+		// restore old font
+		display_load_font(env_t::fontname.c_str(), true);
+	}
+	win_redraw_world();
 }
 
 

@@ -38,8 +38,8 @@
 #include "../vehicle/simpeople.h"
 #include "../vehicle/movingobj.h"
 
-#include "../besch/haus_besch.h"
-#include "../besch/groundobj_besch.h"
+#include "../descriptor/building_desc.h"
+#include "../descriptor/groundobj_desc.h"
 #include "../dataobj/loadsave.h"
 #include "../dataobj/freelist.h"
 #include "../dataobj/environment.h"
@@ -57,6 +57,7 @@
 
 #define baum_pri (50)
 #define pillar_pri (7)
+#define wayobj_pri (8)
 
 // priority of moving things: should be smaller than the priority of powerlines
 #define moving_obj_pri (100)
@@ -79,7 +80,7 @@ static uint8 type_to_pri[256]=
 	6, // roadsign
 	pillar_pri, // pillar
 	1, 1, 1, 1, // depots (must be before tunnel!)
-	8, // way objects (electrification)
+	wayobj_pri, // way objects (electrification)
 	0, // ways (always at the top!)
 	9, // label, indicates ownership: insert before trees
 	3, // field (factory extension)
@@ -289,14 +290,17 @@ bool objlist_t::intern_add_moving(obj_t* new_obj)
 	// vehicles types (number returned by get_typ()). However, this would increase
 	// the calculation even further. :(
 
+	// insert at this lane
+	uint8 lane = ((vehicle_base_t*)new_obj)->get_disp_lane();
+
 	// find out about the first car etc. moving thing.
 	// We can start to insert between (start) and (end)
 	uint8 start=0;
-	while(start<top  &&  !obj.some[start]->is_moving()  ) {
+	while(start<top  &&  (!obj.some[start]->is_moving()  ||  ((vehicle_base_t*)obj.some[start])->get_disp_lane() < lane) ) {
 		start ++;
 	}
 	uint8 end = top;
-	while(  end>start  &&  !obj.some[end-1]->is_moving()  ) {
+	while(  end>start  &&  (!obj.some[end-1]->is_moving()  ||  ((vehicle_base_t*)obj.some[end-1])->get_disp_lane() > lane) ) {
 		end--;
 	}
 	if(start==end) {
@@ -304,116 +308,34 @@ bool objlist_t::intern_add_moving(obj_t* new_obj)
 		return true;
 	}
 
-	// if we have two ways, the way at index 0 is ALWAYS the road!
-	// however ships and planes may be where not way is below ...
-	if(start!=0  &&  obj.some[0]->get_typ()==obj_t::way  &&  ((weg_t *)obj.some[0])->get_waytype()==road_wt) {
+	const uint8 direction = ((vehicle_base_t*)new_obj)->get_direction();
 
-		const uint8 fahrtrichtung = ((vehicle_base_t*)new_obj)->get_direction();
-
-		// this is very complicated:
-		// we may have many objects in two lanes (actually five with tram and pedestrians)
-		if(world()->get_settings().is_drive_left()) {
-
-			// driving on left side
-			if(fahrtrichtung<4) {	// north, northwest
-
-				if((fahrtrichtung&(~ribi_t::southeast))==0) {
-					// if we are going east we must be drawn as the first in east direction
-					intern_insert_at(new_obj, start);
-					return true;
-				}
-				else {
-					// we must be drawn before south or west (thus insert after)
-					for(uint8 i=start;  i<end;  i++  ) {
-						if ((((const vehicle_t*)obj.some[i])->get_direction()&ribi_t::southwest) != 0) {
-							intern_insert_at(new_obj, i);
-							return true;
-						}
-					}
-					// nothing going southwest
-					intern_insert_at(new_obj, end);
-					return true;
-				}
-
+	switch(lane) {
+		// pedestrians or road vehicles, back: either w/sw/s or n/ne/e
+		case 0:
+		case 1: {
+			// on right side to w,sw; on left to n: insert last
+			// on right side to s; on left to ne,e: insert first
+			if (direction == ribi_t::south  ||  (direction & ribi_t::east)) {
+				intern_insert_at(new_obj, start);
 			}
 			else {
-				// going south, west or the rest
-				if((fahrtrichtung&(~ribi_t::southeast))==0) {
-					// if we are going south or southeast we must be drawn as the first in east direction (after north and northeast)
-					for(uint8 i=start;  i<end;  i++  ) {
-						if (obj_t const* const dt = obj.some[i]) {
-							if (vehicle_base_t const* const v = obj_cast<vehicle_base_t>(dt)) {
-								if ((v->get_direction() & ribi_t::southwest) != 0) {
-									intern_insert_at(new_obj, i);
-									return true;
-								}
-							}
-						}
-					}
-				}
-				// nothing going southeast
 				intern_insert_at(new_obj, end);
-				return true;
 			}
-		}
-		else {
-			// driving on right side
-			if(fahrtrichtung<4) {	// north, east, northeast
-
-				if((fahrtrichtung&(~ribi_t::southeast))==0) {
-
-					// if we are going east we must be drawn as the first in east direction (after north and northeast)
-					for(uint8 i=start;  i<end;  i++  ) {
-						if ((((const vehicle_t*)obj.some[i])->get_direction()&ribi_t::northeast) != 0) {
-							intern_insert_at(new_obj, i);
-							return true;
-						}
-					}
-					// nothing going to the east
-				}
-				// we must be drawn before south or west (thus append after)
-				intern_insert_at(new_obj, end);
-				return true;
-
-			}
-			else {
-				// going south, west or the rest
-
-				if((fahrtrichtung&(~ribi_t::southeast))==0) {
-					// going south or southeast, insert as first in this dirs
-					intern_insert_at(new_obj, start);
-					return true;
-				}
-				else {
-					for(uint8 i=start;  i<end;  i++  ) {
-						// west or northwest: append after all westwards
-						if ((((const vehicle_t*)obj.some[i])->get_direction()&ribi_t::southwest) == 0) {
-							intern_insert_at(new_obj, i);
-							return true;
-						}
-					}
-					// nothing going to northeast
-					intern_insert_at(new_obj, end);
-					return true;
-				}
-			}
-
-		}	// right side/left side
-
-	}
-	else {
-		// ok, we have to sort vehicles for correct overlapping,
-		// but all vehicles are of the same typ, since this is track/channel etc. ONLY!
-
-		// => much simpler to handle
-		if((((vehicle_t*)new_obj)->get_direction()&(~ribi_t::southeast))==0) {
-			// if we are going east or south, we must be drawn before (i.e. put first)
-			intern_insert_at(new_obj, start);
 			return true;
 		}
-		else {
-			// for north east we must be draw last
-			intern_insert_at(new_obj, end);
+		// middle land
+		case 2:
+		case 3:
+		// pedestrians, road vehicles, front lane
+		case 4: {
+			// going e/s: insert first, else last
+			if ( (direction & ribi_t::northwest)==0 ) {
+				intern_insert_at(new_obj, start);
+			}
+			else {
+				intern_insert_at(new_obj, end);
+			}
 			return true;
 		}
 	}
@@ -508,6 +430,13 @@ bool objlist_t::add(obj_t* new_obj)
 				if (!pillar  ||  new_obj->get_yoff()  > pillar->get_yoff() ) {
 					break;
 				}
+			}
+		}
+		else if(  pri == wayobj_pri  &&  obj.some[i]->get_typ()==obj_t::wayobj  ) {
+			wayobj_t const* const wo = obj_cast<wayobj_t>(obj.some[i]);
+			if(  wo  &&  wo->get_waytype() < obj_cast<wayobj_t>(new_obj)->get_waytype() ) {
+				// insert after a lower waytype
+				i += 1;
 			}
 		}
 		intern_insert_at(new_obj, i);
@@ -836,6 +765,7 @@ void objlist_t::rdwr(loadsave_t *file, koord3d current_pos)
 				// some old offsets will be converted to new ones
 				case obj_t::old_fussgaenger:
 					typ = obj_t::pedestrian;
+					/* FALLTHROUGH */
 				case obj_t::pedestrian:
 				{
 					pedestrian_t* const pedestrian = new pedestrian_t(file);
@@ -853,6 +783,7 @@ void objlist_t::rdwr(loadsave_t *file, koord3d current_pos)
 
 				case obj_t::old_verkehr:
 					typ = obj_t::road_user;
+					/* FALLTHROUGH */
 				case obj_t::road_user:
 				{
 					private_car_t* const car = new private_car_t(file);
@@ -869,11 +800,13 @@ void objlist_t::rdwr(loadsave_t *file, koord3d current_pos)
 
 				case obj_t::old_monoraildepot:
 					typ = obj_t::monoraildepot;
+					/* FALLTHROUGH */
 				case obj_t::monoraildepot:
 					new_obj = new monoraildepot_t(file);
 					break;
 				case obj_t::old_tramdepot:
 					typ = obj_t::tramdepot;
+					/* FALLTHROUGH */
 				case obj_t::tramdepot:
 					new_obj = new tramdepot_t(file);
 					break;
@@ -885,6 +818,7 @@ void objlist_t::rdwr(loadsave_t *file, koord3d current_pos)
 					break;
 				case obj_t::old_airdepot:
 					typ = obj_t::airdepot;
+					/* FALLTHROUGH */
 				case obj_t::airdepot:
 					new_obj = new airdepot_t(file);
 					break;
@@ -922,6 +856,7 @@ void objlist_t::rdwr(loadsave_t *file, koord3d current_pos)
 				// check for pillars
 				case obj_t::old_pillar:
 					typ = obj_t::pillar;
+					/* FALLTHROUGH */
 				case obj_t::pillar:
 				{
 					pillar_t *p = new pillar_t(file);
@@ -964,7 +899,6 @@ void objlist_t::rdwr(loadsave_t *file, koord3d current_pos)
 					if(groundobj->get_desc() == NULL) {
 						// do not remove from this position, since there will be nothing
 						groundobj->set_flag(obj_t::not_on_map);
-						// not use entferne, since it would try to lookup besch
 						delete groundobj;
 					}
 					else {
@@ -1004,6 +938,7 @@ void objlist_t::rdwr(loadsave_t *file, koord3d current_pos)
 
 				case obj_t::old_roadsign:
 					typ = obj_t::roadsign;
+					/* FALLTHROUGH */
 				case obj_t::roadsign:
 				{
 					roadsign_t *rs = new roadsign_t(file);
@@ -1105,27 +1040,6 @@ void objlist_t::rdwr(loadsave_t *file, koord3d current_pos)
 				file->wr_obj_id(-1);
 			}
 		}
-	}
-}
-
-
-/* Dumps a short info about the things on this tile
- *  @author prissi
- */
-void objlist_t::dump() const
-{
-	if(capacity==0) {
-//		DBG_MESSAGE("objlist_t::dump()","empty");
-		return;
-	}
-	else if(capacity==1) {
-		DBG_MESSAGE("objlist_t::dump()","one object \'%s\' owned by sp %p", obj.one->get_name(), obj.one->get_owner() );
-		return;
-	}
-
-	DBG_MESSAGE("objlist_t::dump()","%i objects", top );
-	for(uint8 n=0; n<top; n++) {
-		DBG_MESSAGE( obj.some[n]->get_name(), "at %i owned by sp %p", n, obj.some[n]->get_owner() );
 	}
 }
 

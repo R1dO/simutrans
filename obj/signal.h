@@ -14,7 +14,7 @@
 
 
 /**
- * Signale für die Bahnlinien.
+ * Signals for rail tracks.
  *
  * @see blockstrecke_t
  * @see blockmanager
@@ -31,15 +31,15 @@ public:
 	* Beobachtungsfenster angezeigt wird.
 	* @author Hj. Malthaner
 	*/
-	virtual void info(cbuffer_t & buf) const;
+	void info(cbuffer_t & buf) const OVERRIDE;
 
-	typ get_typ() const { return obj_t::signal; }
-	const char *get_name() const {return "Signal";}
+	typ get_typ() const OVERRIDE { return obj_t::signal; }
+	const char *get_name() const OVERRIDE {return "Signal";}
 
 	/**
-	* berechnet aktuelles image
+	* Calculate the actual image
 	*/
-	void calc_image();
+	void calc_image() OVERRIDE;
 };
 
 #endif

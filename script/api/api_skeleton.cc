@@ -104,6 +104,8 @@ register_function("get_about_text");
  * - \<a href="..."\>: insert hyper link, text between start and end tag will be colored blue.
  *       - link to another tab of scenario info window: href="tabname", where tabname is one of: info, goal, rules, result, about
  *       - link to position on the map: href="(x,y)" or href="(x,y,z)", click on link will jump to the map position
+ *       - call scripted method: href="script:bla(1)" will call bla(1). The characters \>, ', \" are not allowed in the string and will produce weird results.
+ *         The called method should return quickly.
  *
  * @code
  * <h1>Here is an example.</h1>
@@ -252,5 +254,21 @@ register_function("is_work_allowed_here");
  * @ingroup quick_return_func
  */
 register_function("is_schedule_allowed");
+
+/**
+ * Called when user wants to start convoy.
+ *
+ * @warning Function will NOT be called in network games.
+ *
+ * @param pl player number
+ * @param convoy convoy to start
+ * @param depot convoy is in this depot
+ *
+ * @return null if allowed, an error message otherwise
+ * @typemask string(integer,convoy_x,depot_x)
+ * @ingroup scen_skel
+ * @ingroup quick_return_func
+ */
+register_function("is_convoy_allowed");
 
 #endif

@@ -230,7 +230,7 @@
  * @until }
  * Both of the strings are translated by means of calls to ttext::to_string and the result is returned.
  *
- * Thats it. The remaining parts of this script are plain routine.
+ * That's it. The remaining parts of this script are plain routine.
  */
 
 /**
@@ -315,5 +315,14 @@
  * @defgroup quick_return_func Functions that should return quickly.
  *
  * These functions are intended to quickly return a result. In network games, it is not
- * allowed to call any map-latering tools from within such a function, see the section on @ref game_cmd.
+ * allowed to call any map-altering tools from within such a function, see the section on @ref game_cmd.
+ */
+
+/**
+ * @page page_sqstdlib Available functions from the squirrel standard lib
+ *
+ * - Math Library, see http://squirrel-lang.org/squirreldoc/stdlib/stdmathlib.html#squirrel-api
+ * - String Library, see http://squirrel-lang.org/squirreldoc/stdlib/stdstringlib.html#squirrel-api
+ * - System Library: functions clock, time, date, see http://squirrel-lang.org/squirreldoc/stdlib/stdsystemlib.html#squirrel-api
+ *
  */

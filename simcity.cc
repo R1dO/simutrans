@@ -33,7 +33,7 @@
 #include "gui/karte.h"
 #include "gui/city_info.h"
 
-#include "besch/haus_besch.h"
+#include "descriptor/building_desc.h"
 
 #include "simintr.h"
 #include "simdebug.h"
@@ -46,7 +46,7 @@
 #include "dataobj/tabfile.h"
 #include "dataobj/environment.h"
 
-#include "sucher/bauplatz_sucher.h"
+#include "finder/building_placefinder.h"
 #include "bauer/wegbauer.h"
 #include "bauer/brueckenbauer.h"
 #include "bauer/hausbauer.h"
@@ -491,21 +491,21 @@ void stadt_t::cityrules_rdwr(loadsave_t *file)
 }
 
 /**
- * monument_platz_sucher_t:
+ * monument_placefinder_t:
  *
- * Search a free place for a building
- * Im Gegensatz zum bauplatz_sucher_t werden Strassen auf den Raendern
+ * Search a free place for a monument building
+ * Im Gegensatz zum building_placefinder_t werden Strassen auf den Raendern
  * toleriert.
  *
  * 22-Dec-02: Hajo: added safety checks for gr != 0 and plan != 0
  *
  * @author V. Meyer
  */
-class monument_platz_sucher_t : public platzsucher_t {
+class monument_placefinder_t : public placefinder_t {
 	public:
-		monument_platz_sucher_t(karte_t* welt, sint16 radius) : platzsucher_t(welt, radius) {}
+		monument_placefinder_t(karte_t* welt, sint16 radius) : placefinder_t(welt, radius) {}
 
-		virtual bool ist_feld_ok(koord pos, koord d, climate_bits cl) const
+		bool is_tile_ok(koord pos, koord d, climate_bits cl) const OVERRIDE
 		{
 			const planquadrat_t* plan = welt->access(pos + d);
 
@@ -519,9 +519,9 @@ class monument_platz_sucher_t : public platzsucher_t {
 				return false;
 			}
 
-			if (ist_randfeld(d)) {
+			if (is_boundary_tile(d)) {
 				return
-					gr->get_grund_hang() == slope_t::flat &&     // Flach
+					gr->get_grund_hang() == slope_t::flat &&     // Flat
 					gr->get_typ() == grund_t::boden &&           // Boden -> no building
 					(!gr->hat_wege() || gr->hat_weg(road_wt)) && // only roads
 					gr->kann_alle_obj_entfernen(NULL) == NULL;   // Irgendwas verbaut den Platz?
@@ -530,7 +530,7 @@ class monument_platz_sucher_t : public platzsucher_t {
 				return
 					gr->get_grund_hang() == slope_t::flat &&
 					gr->get_typ() == grund_t::boden &&
-					gr->ist_natur() &&                         // Keine Wege hier
+					gr->ist_natur() &&                         // No way here
 					gr->kann_alle_obj_entfernen(NULL) == NULL; // Irgendwas verbaut den Platz?
 			}
 		}
@@ -538,17 +538,17 @@ class monument_platz_sucher_t : public platzsucher_t {
 
 
 /**
- * townhallplatz_sucher_t:
+ * townhall_placefinder_t:
  *
  * 22-Dec-02: Hajo: added safety checks for gr != 0 and plan != 0
  *
  * @author V. Meyer
  */
-class townhallplatz_sucher_t : public platzsucher_t {
+class townhall_placefinder_t : public placefinder_t {
 	public:
-		townhallplatz_sucher_t(karte_t* welt, uint8 dir_) : platzsucher_t(welt), dir(dir_) {}
+		townhall_placefinder_t(karte_t* welt, uint8 dir_) : placefinder_t(welt), dir(dir_) {}
 
-		virtual bool ist_feld_ok(koord pos, koord d, climate_bits cl) const
+		bool is_tile_ok(koord pos, koord d, climate_bits cl) const OVERRIDE
 		{
 			const grund_t* gr = welt->lookup_kartenboden(pos + d);
 			if (gr == NULL  ||  gr->get_grund_hang() != slope_t::flat) {
@@ -569,7 +569,7 @@ class townhallplatz_sucher_t : public platzsucher_t {
 			if ( ((dir & ribi_t::south)!=0  &&  d.y == h - 1) ||
 				((dir & ribi_t::west)!=0  &&  d.x == 0) ||
 				((dir & ribi_t::north)!=0  &&  d.y == 0) ||
-				((dir & ribi_t::east)!=0  &&  d.x == b - 1)) {
+				((dir & ribi_t::east)!=0  &&  d.x == w - 1)) {
 				// we want to build a road here:
 				return
 					gr->get_typ() == grund_t::boden &&
@@ -608,21 +608,22 @@ void stadt_t::add_gebaeude_to_stadt(const gebaeude_t* gb, bool ordered)
 		for (k.y = 0; k.y < size.y; k.y++) {
 			for (k.x = 0; k.x < size.x; k.x++) {
 				if (gebaeude_t* const add_gb = obj_cast<gebaeude_t>(welt->lookup_kartenboden(pos + k)->first_obj())) {
-					if(add_gb->get_tile()->get_desc()!=gb->get_tile()->get_desc()) {
-						dbg->warning( "stadt_t::add_gebaeude_to_stadt()","two buildings \"%s\" and \"%s\" at (%i,%i), which might lead to problems", add_gb->get_tile()->get_desc()->get_name(), gb->get_tile()->get_desc()->get_name(), pos.x + k.x, pos.y + k.y);
-						buildings.remove(add_gb);
-					}
-					else {
+					if (gb->is_same_building(add_gb)) {
+
 						if(  ordered  ) {
 							buildings.insert_ordered(add_gb, tile->get_desc()->get_level() + 1, compare_gebaeude_pos);
 						}
 						else {
 							buildings.append(add_gb, tile->get_desc()->get_level() + 1);
 						}
+
+						add_gb->set_stadt(this);
+						if (add_gb->get_tile()->get_desc()->is_townhall()) {
+							has_townhall = true;
+						}
 					}
-					add_gb->set_stadt(this);
-					if (add_gb->get_tile()->get_desc()->is_townhall()) {
-						has_townhall = true;
+					else {
+						// found tile of another building, ignore it
 					}
 				}
 			}
@@ -703,7 +704,7 @@ void stadt_t::recalc_city_size()
 	lo = pos;
 	ur = pos;
 	FOR(weighted_vector_tpl<gebaeude_t*>, const i, buildings) {
-		if (i->get_tile()->get_desc()->get_type() != building_desc_t::headquarter) {
+		if (i->get_tile()->get_desc()->get_type() != building_desc_t::headquarters) {
 			koord const& gb_pos = i->get_pos().get_2d();
 			lo.clip_max(gb_pos);
 			ur.clip_min(gb_pos);
@@ -970,8 +971,8 @@ stadt_t::~stadt_t()
 				gebaeude_t* const gb = buildings.pop_back();
 				assert(  gb!=NULL  &&  !buildings.is_contained(gb)  );
 
-				if(gb->get_tile()->get_desc()->get_type()==building_desc_t::headquarter) {
-					stadt_t *city = welt->suche_naechste_stadt(gb->get_pos().get_2d());
+				if(gb->get_tile()->get_desc()->get_type()==building_desc_t::headquarters) {
+					stadt_t *city = welt->find_nearest_city(gb->get_pos().get_2d());
 					gb->set_stadt( city );
 					if(city) {
 						city->buildings.append(gb, gb->get_passagier_level());
@@ -1029,7 +1030,7 @@ stadt_t::stadt_t(player_t* player, koord pos, sint32 citizens) :
 
 	/* get a unique cityname */
 	char                          const* n       = "simcity";
-	weighted_vector_tpl<stadt_t*> const& staedte = welt->get_staedte();
+	weighted_vector_tpl<stadt_t*> const& staedte = welt->get_cities();
 
 	const vector_tpl<char*>& city_names = translator::get_city_name_list();
 
@@ -1097,6 +1098,9 @@ stadt_t::stadt_t(player_t* player, koord pos, sint32 citizens) :
 	}
 	city_history_year[0][HIST_CITICENS]  = get_einwohner();
 	city_history_month[0][HIST_CITICENS] = get_einwohner();
+#ifdef DESTINATION_CITYCARS
+	number_of_cars = 0;
+#endif
 }
 
 
@@ -1376,16 +1380,16 @@ void stadt_t::rotate90( const sint16 y_size )
 	best_strasse.reset(pos);
 	best_haus.reset(pos);
 	// townhall position may be changed a little!
-	sparse_tpl<uint8> pax_destinations_temp(koord( PAX_DESTINATIONS_SIZE, PAX_DESTINATIONS_SIZE ));
+	sparse_tpl<PIXVAL> pax_destinations_temp(koord( PAX_DESTINATIONS_SIZE, PAX_DESTINATIONS_SIZE ));
 
-	uint8 color;
+	PIXVAL color;
 	koord pos;
 	for( uint16 i = 0; i < pax_destinations_new.get_data_count(); i++ ) {
 		pax_destinations_new.get_nonzero(i, pos, color);
 		assert( color != 0 );
 		pax_destinations_temp.set( PAX_DESTINATIONS_SIZE-1-pos.y, pos.x, color );
 	}
-	swap<uint8>( pax_destinations_temp, pax_destinations_new );
+	swap<PIXVAL>( pax_destinations_temp, pax_destinations_new );
 
 	pax_destinations_temp.clear();
 	for( uint16 i = 0; i < pax_destinations_old.get_data_count(); i++ ) {
@@ -1394,7 +1398,7 @@ void stadt_t::rotate90( const sint16 y_size )
 		pax_destinations_temp.set( PAX_DESTINATIONS_SIZE-1-pos.y, pos.x, color );
 	}
 	pax_destinations_new_change ++;
-	swap<uint8>( pax_destinations_temp, pax_destinations_old );
+	swap<PIXVAL>( pax_destinations_temp, pax_destinations_old );
 }
 
 
@@ -1563,7 +1567,7 @@ void stadt_t::city_growth_get_factors(city_growth_factor_t(&factors)[GROWTH_FACT
 
 	// goods growth factors
 	factors[index].demand = h[HIST_GOODS_NEEDED];
-	factors[index++].supplied = h[HIST_GOODS_RECIEVED];
+	factors[index++].supplied = h[HIST_GOODS_RECEIVED];
 }
 
 sint32 stadt_t::city_growth_base(uint32 const rprec, uint32 const cprec)
@@ -1655,7 +1659,7 @@ void stadt_t::city_growth_monthly(uint32 const month)
 
 void stadt_t::new_month( bool recalc_destinations )
 {
-	swap<uint8>( pax_destinations_old, pax_destinations_new );
+	swap<PIXVAL>( pax_destinations_old, pax_destinations_new );
 	pax_destinations_new.clear();
 	pax_destinations_new_change = 0;
 
@@ -1684,7 +1688,7 @@ void stadt_t::new_month( bool recalc_destinations )
 		/* original implementation that is replaced by integer-only version below
 		double pfactor = (double)(city_history_month[1][HIST_PAS_TRANSPORTED]) / (double)(city_history_month[1][HIST_PAS_GENERATED]+1);
 		double mfactor = (double)(city_history_month[1][HIST_MAIL_TRANSPORTED]) / (double)(city_history_month[1][HIST_MAIL_GENERATED]+1);
-		double gfactor = (double)(city_history_month[1][HIST_GOODS_RECIEVED]) / (double)(city_history_month[1][HIST_GOODS_NEEDED]+1);
+		double gfactor = (double)(city_history_month[1][HIST_GOODS_RECEIVED]) / (double)(city_history_month[1][HIST_GOODS_NEEDED]+1);
 
 		double factor = pfactor > mfactor ? (gfactor > pfactor ? gfactor : pfactor ) : mfactor;
 		factor = (1.0-factor)*city_history_month[1][HIST_CITICENS];
@@ -1697,7 +1701,7 @@ void stadt_t::new_month( bool recalc_destinations )
 		// defines and initializes local sint64[2] arrays
 		decl_stat(pax, HIST_PAS_TRANSPORTED, HIST_PAS_GENERATED);
 		decl_stat(mail, HIST_MAIL_TRANSPORTED, HIST_MAIL_GENERATED);
-		decl_stat(good, HIST_GOODS_RECIEVED, HIST_GOODS_NEEDED);
+		decl_stat(good, HIST_GOODS_RECEIVED, HIST_GOODS_NEEDED);
 
 		// true if s1[0] / s1[1] > s2[0] / s2[1]
 #		define comp_stats(s1,s2) ( s1[0]*s2[1] > s2[0]*s1[1] )
@@ -1707,6 +1711,7 @@ void stadt_t::new_month( bool recalc_destinations )
 		uint32 factor = (uint32)( comp_stats(pax_stat, mail_stat) ? (comp_stats(good_stat, pax_stat) ? comp_factor(good_stat) : comp_factor(pax_stat)) : comp_factor(mail_stat) );
 		factor = log10(factor);
 
+#ifndef DESTINATION_CITYCARS
 		uint16 number_of_cars = simrand( factor * welt->get_settings().get_traffic_level() ) / 16;
 
 		city_history_month[0][HIST_CITYCARS] = number_of_cars;
@@ -1733,7 +1738,10 @@ void stadt_t::new_month( bool recalc_destinations )
 		// correct statistics for ungenerated cars
 		city_history_month[0][HIST_CITYCARS] -= number_of_cars;
 		city_history_year[0][HIST_CITYCARS] -= number_of_cars;
-
+#else
+		city_history_month[0][HIST_CITYCARS] = 0;
+		number_of_cars = simrand( factor * welt->get_settings().get_traffic_level() ) / 16;
+#endif
 	}
 }
 
@@ -1750,9 +1758,9 @@ void stadt_t::calc_growth()
 			for(  int i=0;  i<desc->get_supplier_count();  i++  ) {
 				city_history_month[0][HIST_GOODS_NEEDED] ++;
 				city_history_year[0][HIST_GOODS_NEEDED] ++;
-				if(  fab->input_vorrat_an( desc->get_supplier(i)->get_ware() )>0  ) {
-					city_history_month[0][HIST_GOODS_RECIEVED] ++;
-					city_history_year[0][HIST_GOODS_RECIEVED] ++;
+				if(  fab->input_vorrat_an( desc->get_supplier(i)->get_input_type() )>0  ) {
+					city_history_month[0][HIST_GOODS_RECEIVED] ++;
+					city_history_year[0][HIST_GOODS_RECEIVED] ++;
 				}
 			}
 		}
@@ -1830,7 +1838,7 @@ void stadt_t::step_passagiere()
 {
 	// decide whether to generate passengers or mail
 	const bool ispass = simrand(GENERATE_RATIO_PASS + GENERATE_RATIO_MAIL) < GENERATE_RATIO_PASS;
-	const ware_besch_t *const wtyp = ispass ? warenbauer_t::passagiere : warenbauer_t::post;
+	const goods_desc_t *const wtyp = ispass ? goods_manager_t::passengers : goods_manager_t::mail;
 	const uint32 history_type = ispass ? HIST_BASE_PASS : HIST_BASE_MAIL;
 	factory_set_t &target_factories = ispass ? target_factories_pax : target_factories_mail;
 
@@ -1899,13 +1907,6 @@ void stadt_t::step_passagiere()
 				factory_entry->factory->book_stat(pax_left_to_do, ispass ? FAB_PAX_GENERATED : FAB_MAIL_GENERATED);
 			}
 
-#ifdef DESTINATION_CITYCARS
-			//citycars with destination
-			if (pax_routed == 0) {
-				generate_private_cars(start_halt->get_basis_pos(), step_count, ziel);
-			}
-#endif
-
 			ware_t pax(wtyp);
 			pax.set_zielpos(dest_pos);
 			pax.menge = pax_left_to_do;
@@ -1926,7 +1927,7 @@ void stadt_t::step_passagiere()
 				city_history_month[0][history_type + HIST_OFFSET_TRANSPORTED] += pax_left_to_do;
 
 				// destination logged
-				merke_passagier_ziel(dest_pos, COL_YELLOW);
+				merke_passagier_ziel(dest_pos, color_idx_to_rgb(COL_YELLOW));
 			}
 			else if(  route_result==haltestelle_t::ROUTE_WALK  ) {
 				if(  factory_entry  ) {
@@ -1942,7 +1943,7 @@ void stadt_t::step_passagiere()
 				city_history_month[0][history_type + HIST_OFFSET_WALKED] += pax_left_to_do;
 
 				// probably not a good idea to mark them as player only cares about remote traffic
-				//merke_passagier_ziel(dest_pos, COL_YELLOW);
+				//merke_passagier_ziel(dest_pos, color_idx_to_rgb(COL_YELLOW));
 			}
 			else if(  route_result==haltestelle_t::ROUTE_OVERCROWDED  ) {
 				// overcrowded routes cause unhappiness to be logged
@@ -1954,13 +1955,13 @@ void stadt_t::step_passagiere()
 					// all routes to goal are overcrowded -> register at first stop (closest)
 					FOR(vector_tpl<halthandle_t>, const s, start_halts) {
 						s->add_pax_unhappy(pax_left_to_do);
-						merke_passagier_ziel(dest_pos, COL_ORANGE);
+						merke_passagier_ziel(dest_pos, color_idx_to_rgb(COL_ORANGE));
 						break;
 					}
 				}
 
 				// destination logged
-				merke_passagier_ziel(dest_pos, COL_ORANGE);
+				merke_passagier_ziel(dest_pos, color_idx_to_rgb(COL_ORANGE));
 			}
 			else if (  route_result == haltestelle_t::NO_ROUTE  ) {
 				// since there is no route from any start halt -> register no route at first halts (closest)
@@ -1968,10 +1969,10 @@ void stadt_t::step_passagiere()
 					s->add_pax_no_route(pax_left_to_do);
 					break;
 				}
-				merke_passagier_ziel(dest_pos, COL_DARK_ORANGE);
+				merke_passagier_ziel(dest_pos, color_idx_to_rgb(COL_DARK_ORANGE));
 #ifdef DESTINATION_CITYCARS
 				//citycars with destination
-				generate_private_cars(start_halt->get_basis_pos(), step_count, ziel);
+				generate_private_cars( origin_pos, dest_pos );
 #endif
 			}
 
@@ -1981,7 +1982,7 @@ void stadt_t::step_passagiere()
 				uint32 pax_return = pax_left_to_do;
 
 				// apply return modifiers
-				if(  will_return != city_return  &&  wtyp == warenbauer_t::post  ) {
+				if(  will_return != city_return  &&  wtyp == goods_manager_t::mail  ) {
 					// attractions and factories return more mail than they receive
 					pax_return *= MAIL_RETURN_MULTIPLIER_PRODUCERS;
 				}
@@ -2114,7 +2115,7 @@ void stadt_t::step_passagiere()
 			uint32 pax_return = num_pax;
 
 			// apply return modifiers
-			if(  will_return != city_return  &&  wtyp == warenbauer_t::post  ) {
+			if(  will_return != city_return  &&  wtyp == goods_manager_t::mail  ) {
 				// attractions and factories return more mail than they receive
 				pax_return *= MAIL_RETURN_MULTIPLIER_PRODUCERS;
 			}
@@ -2149,9 +2150,9 @@ void stadt_t::step_passagiere()
 
 #ifdef DESTINATION_CITYCARS
 		//citycars with destination
-		generate_private_cars(k, step_count, ziel);
+		generate_private_cars( origin_pos, ziel );
 #endif
-		merke_passagier_ziel(ziel, COL_DARK_ORANGE);
+		merke_passagier_ziel(ziel, color_idx_to_rgb(COL_DARK_ORANGE));
 		// we do not show no route for destination stop!
 	}
 }
@@ -2191,7 +2192,7 @@ void stadt_t::add_target_city(stadt_t *const city)
 void stadt_t::recalc_target_cities()
 {
 	target_cities.clear();
-	FOR(weighted_vector_tpl<stadt_t*>, const c, welt->get_staedte()) {
+	FOR(weighted_vector_tpl<stadt_t*>, const c, welt->get_cities()) {
 		add_target_city(c);
 	}
 }
@@ -2210,7 +2211,7 @@ void stadt_t::add_target_attraction(gebaeude_t *const attraction)
 void stadt_t::recalc_target_attractions()
 {
 	target_attractions.clear();
-	FOR(weighted_vector_tpl<gebaeude_t*>, const a, welt->get_ausflugsziele()) {
+	FOR(weighted_vector_tpl<gebaeude_t*>, const a, welt->get_attractions()) {
 		add_target_attraction(a);
 	}
 }
@@ -2257,7 +2258,7 @@ koord stadt_t::find_destination(factory_set_t &target_factories, const sint64 ge
 }
 
 
-void stadt_t::merke_passagier_ziel(koord k, uint8 color)
+void stadt_t::merke_passagier_ziel(koord k, PIXVAL color)
 {
 	const koord p = koord(
 		((k.x * PAX_DESTINATIONS_SIZE) / welt->get_size().x) & (PAX_DESTINATIONS_SIZE-1),
@@ -2269,23 +2270,23 @@ void stadt_t::merke_passagier_ziel(koord k, uint8 color)
 
 
 /**
- * bauplatz_mit_strasse_sucher_t:
+ * building_place_with_road_finder:
  * Search a free place for a building using function suche_platz() (search place).
  * added: Minimum distance between monuments
  * @author V. Meyer/prissi
  */
-class bauplatz_mit_strasse_sucher_t: public bauplatz_sucher_t
+class building_place_with_road_finder: public building_placefinder_t
 {
 	public:
 		/// if false, this will the check 'do not build next other to special buildings'
 		bool big_city;
 
-		bauplatz_mit_strasse_sucher_t(karte_t* welt, sint16 radius, bool big) : bauplatz_sucher_t(welt, radius), big_city(big) {}
+		building_place_with_road_finder(karte_t* welt, sint16 radius, bool big) : building_placefinder_t(welt, radius), big_city(big) {}
 
 		// get distance to next special building
 		int find_dist_next_special(koord pos) const
 		{
-			const weighted_vector_tpl<gebaeude_t*>& attractions = welt->get_ausflugsziele();
+			const weighted_vector_tpl<gebaeude_t*>& attractions = welt->get_attractions();
 			int dist = welt->get_size().x * welt->get_size().y;
 			FOR(  weighted_vector_tpl<gebaeude_t*>, const i, attractions  ) {
 				int const d = koord_distance(i->get_pos(), pos);
@@ -2293,7 +2294,7 @@ class bauplatz_mit_strasse_sucher_t: public bauplatz_sucher_t
 					dist = d;
 				}
 			}
-			FOR(  weighted_vector_tpl<stadt_t *>, const city, welt->get_staedte() ) {
+			FOR(  weighted_vector_tpl<stadt_t *>, const city, welt->get_cities() ) {
 				int const d = koord_distance(city->get_pos(), pos);
 				if(  d < dist  ) {
 					dist = d;
@@ -2302,20 +2303,20 @@ class bauplatz_mit_strasse_sucher_t: public bauplatz_sucher_t
 			return dist;
 		}
 
-		virtual bool ist_platz_ok(koord pos, sint16 b, sint16 h, climate_bits cl) const
+		bool is_area_ok(koord pos, sint16 w, sint16 h, climate_bits cl) const OVERRIDE
 		{
-			if(  !bauplatz_sucher_t::ist_platz_ok(pos, b, h, cl)  ) {
+			if(  !building_placefinder_t::is_area_ok(pos, w, h, cl)  ) {
 				return false;
 			}
 			bool next_to_road = false;
 			// not direct next to factories or townhalls
-			for (sint16 x = -1; x < b; x++) {
+			for (sint16 x = -1; x < w; x++) {
 				for (sint16 y = -1;  y < h; y++) {
 					grund_t *gr = welt->lookup_kartenboden(pos + koord(x,y));
 					if (!gr) {
 						return false;
 					}
-					if (	0 <= x  &&  x < b-1  &&  0 <= y  &&  y < h-1) {
+					if (	0 <= x  &&  x < w-1  &&  0 <= y  &&  y < h-1) {
 						// inside: nothing on top like elevated monorails?
 						if(  gr->get_leitung()!=NULL  ||  welt->lookup(gr->get_pos()+koord3d(0,0,1)  )!=NULL) {
 							// something on top (monorail or powerlines)
@@ -2328,7 +2329,7 @@ class bauplatz_mit_strasse_sucher_t: public bauplatz_sucher_t
 						if (big_city) {
 							if(  gebaeude_t *gb=gr->find<gebaeude_t>()  ) {
 								const building_desc_t::btype utyp = gb->get_tile()->get_desc()->get_type();
-								if(  building_desc_t::attraction_city <= utyp  &&  utyp <= building_desc_t::headquarter) {
+								if(  building_desc_t::attraction_city <= utyp  &&  utyp <= building_desc_t::headquarters) {
 									return false;
 								}
 							}
@@ -2345,7 +2346,7 @@ class bauplatz_mit_strasse_sucher_t: public bauplatz_sucher_t
 			}
 
 			// try to built a little away from previous ones
-			if (big_city  &&  find_dist_next_special(pos) < b + h + welt->get_settings().get_special_building_distance()  ) {
+			if (big_city  &&  find_dist_next_special(pos) < w + h + welt->get_settings().get_special_building_distance()  ) {
 				return false;
 			}
 			return true;
@@ -2358,13 +2359,13 @@ void stadt_t::check_bau_spezial(bool new_town)
 	// tourist attraction buildings
 	const building_desc_t* desc = hausbauer_t::get_special( bev, building_desc_t::attraction_city, welt->get_timeline_year_month(), new_town, welt->get_climate(pos) );
 	if (desc != NULL) {
-		if (simrand(100) < (uint)desc->get_chance()) {
+		if (simrand(100) < (uint)desc->get_distribution_weight()) {
 
 			bool big_city = buildings.get_count() >= 10;
 			bool is_rotate = desc->get_all_layouts() > 1;
 			sint16 radius = koord_distance( get_rechtsunten(), get_linksoben() )/2 + 10;
 			// find place
-			koord best_pos = bauplatz_mit_strasse_sucher_t(welt, radius, big_city).suche_platz(pos, desc->get_x(), desc->get_y(), desc->get_allowed_climate_bits(), &is_rotate);
+			koord best_pos = building_place_with_road_finder(welt, radius, big_city).find_place(pos, desc->get_x(), desc->get_y(), desc->get_allowed_climate_bits(), &is_rotate);
 
 			if (best_pos != koord::invalid) {
 				// then built it
@@ -2389,7 +2390,7 @@ void stadt_t::check_bau_spezial(bool new_town)
 		if (desc) {
 			koord total_size = koord(2 + desc->get_x(), 2 + desc->get_y());
 			sint16 radius = koord_distance( get_rechtsunten(), get_linksoben() )/2 + 10;
-			koord best_pos(monument_platz_sucher_t(welt, radius).suche_platz(pos, total_size.x, total_size.y, desc->get_allowed_climate_bits()));
+			koord best_pos(monument_placefinder_t(welt, radius).find_place(pos, total_size.x, total_size.y, desc->get_allowed_climate_bits()));
 
 			if (best_pos != koord::invalid) {
 				// check if borders around the monument are inside the map limits
@@ -2471,8 +2472,8 @@ void stadt_t::check_bau_townhall(bool new_town)
 
 		if(  umziehen  ) {
 
-			const building_desc_t* besch_alt = gb->get_tile()->get_desc();
-			if (besch_alt->get_level() == desc->get_level()) {
+			const building_desc_t* desc_old = gb->get_tile()->get_desc();
+			if (desc_old->get_level() == desc->get_level()) {
 				DBG_MESSAGE("check_bau_townhall()", "town hall already ok.");
 				return; // Rathaus ist schon okay
 			}
@@ -2480,14 +2481,14 @@ void stadt_t::check_bau_townhall(bool new_town)
 			const sint8 old_z = gb->get_pos().z;
 			koord pos_alt = best_pos = gr->get_pos().get_2d() - gb->get_tile()->get_offset();
 			// guess layout for broken townhall's
-			if(besch_alt->get_x() != besch_alt->get_y()  &&  besch_alt->get_all_layouts()==1) {
+			if(desc_old->get_x() != desc_old->get_y()  &&  desc_old->get_all_layouts()==1) {
 				// test all layouts
-				koord corner_offset(besch_alt->get_x()-1, besch_alt->get_y()-1);
+				koord corner_offset(desc_old->get_x()-1, desc_old->get_y()-1);
 				for(uint8 test_layout = 0; test_layout<4; test_layout++) {
 					// is there a part of our townhall in this corner
 					grund_t *gr0 = welt->lookup_kartenboden(pos + corner_offset);
 					gebaeude_t const* const gb0 = gr0 ? obj_cast<gebaeude_t>(gr0->first_obj()) : 0;
-					if (gb0  &&  gb0->is_townhall()  &&  gb0->get_tile()->get_desc()==besch_alt  &&  gb0->get_stadt()==this) {
+					if (gb0  &&  gb0->is_townhall()  &&  gb0->get_tile()->get_desc()==desc_old  &&  gb0->get_stadt()==this) {
 						old_layout = test_layout;
 						pos_alt = best_pos = gr->get_pos().get_2d() + koord(test_layout%3!=0 ? corner_offset.x : 0, test_layout&2 ? corner_offset.y : 0);
 						break;
@@ -2495,7 +2496,7 @@ void stadt_t::check_bau_townhall(bool new_town)
 					corner_offset = koord(-corner_offset.y, corner_offset.x);
 				}
 			}
-			koord groesse_alt = besch_alt->get_size(old_layout);
+			koord groesse_alt = desc_old->get_size(old_layout);
 
 			// do we need to move
 			if(  old_layout<=desc->get_all_layouts()  &&  desc->get_x(old_layout) <= groesse_alt.x  &&  desc->get_y(old_layout) <= groesse_alt.y  ) {
@@ -2506,10 +2507,10 @@ void stadt_t::check_bau_townhall(bool new_town)
 					for(k.x = 0; k.x < groesse_alt.x; k.x ++) {
 						// for buildings with holes the hole could be on a different height ->gr==NULL
 						bool ok = false;
-						if (grund_t *gr = welt->lookup(koord3d(k,0)+pos)) {
+						if (grund_t *gr = welt->lookup_kartenboden(k + pos)) {
 							if(gebaeude_t *gb_part = gr->find<gebaeude_t>()) {
 								// there may be buildings with holes, so we only remove our building!
-								if(gb_part->get_tile()  ==  besch_alt->get_tile(old_layout, k.x, k.y)) {
+								if(gb_part->get_tile()  ==  desc_old->get_tile(old_layout, k.x, k.y)) {
 									ok = true;
 								}
 							}
@@ -2533,12 +2534,12 @@ void stadt_t::check_bau_townhall(bool new_town)
 					alte_str = townhall_road;
 				}
 				else {
-					koord k = pos + (old_layout==0 ? koord(0, besch_alt->get_y()) : koord(besch_alt->get_x(),0) );
+					koord k = pos + (old_layout==0 ? koord(0, desc_old->get_y()) : koord(desc_old->get_x(),0) );
 					if (welt->lookup_kartenboden(k)->hat_weg(road_wt)) {
 						alte_str = k;
 					}
 					else {
-						k = pos - (old_layout==0 ? koord(0, besch_alt->get_y()) : koord(besch_alt->get_x(),0) );
+						k = pos - (old_layout==0 ? koord(0, desc_old->get_y()) : koord(desc_old->get_x(),0) );
 						if (welt->lookup_kartenboden(k)->hat_weg(road_wt)) {
 							alte_str = k;
 						}
@@ -2624,7 +2625,7 @@ void stadt_t::check_bau_townhall(bool new_town)
 				road1.y = desc->get_y(layout);
 		}
 		if (neugruendung || umziehen) {
-			best_pos = townhallplatz_sucher_t(welt, dir).suche_platz(pos, desc->get_x(layout) + (dir & ribi_t::eastwest ? 1 : 0), desc->get_y(layout) + (dir & ribi_t::northsouth ? 1 : 0), desc->get_allowed_climate_bits());
+			best_pos = townhall_placefinder_t(welt, dir).find_place(pos, desc->get_x(layout) + (dir & ribi_t::eastwest ? 1 : 0), desc->get_y(layout) + (dir & ribi_t::northsouth ? 1 : 0), desc->get_allowed_climate_bits());
 		}
 		// check, if the was something found
 		if(best_pos==koord::invalid) {
@@ -2747,37 +2748,297 @@ static koord const neighbors[] = {
 	koord( 0, -1),
 	koord(-1,  0),
 	// now the diagonals
-	koord(-1, -1),
+	koord( 1,  1),
 	koord( 1, -1),
 	koord(-1,  1),
-	koord( 1,  1)
+	koord(-1, -1)
 };
+
+static koord const area3x3[] = {
+	koord( 0, 1),  //  1x2
+	koord( 1, 0),  //  2x1
+	koord( 1, 1),  //  2x2
+	koord( 2, 0),  //  3x1
+	koord( 2, 1),  //  3x2
+	koord( 0, 2),  //  1x3
+	koord( 2, 2)   // 3x3
+};
+
+// updates one surrounding road with current city road
+bool update_city_street(koord pos)
+{
+// !!! We should take the bulding size into consideration, missing!!!
+	const way_desc_t* cr = world()->get_city_road();
+	for(  int i=0;  i<8;  i++  ) {
+		if(  grund_t *gr = world()->lookup_kartenboden(pos+neighbors[i])  ) {
+			if(  weg_t* const weg = gr->get_weg(road_wt)  ) {
+				// Check if any changes are needed.
+				if(  !weg->hat_gehweg()  ||  weg->get_desc() != cr  ) {
+					player_t *sp = weg->get_owner();
+					if(  sp  ){
+						player_t::add_maintenance(sp, -weg->get_desc()->get_maintenance(), road_wt);
+						weg->set_owner(NULL); // make public
+					}
+					weg->set_gehweg(true);
+					weg->set_desc(cr);
+					gr->calc_image();
+					reliefkarte_t::get_karte()->calc_map_pixel(pos+neighbors[i]);
+					return true;	// update only one road per renovation
+				}
+			}
+		}
+	}
+	return false;
+}
 
 
 // return layout
-static int const building_layout[] = { 0, 0, 1, 4, 2, 0, 5, 1, 3, 7, 1, 0, 6, 3, 2, 0 };
+#define CHECK_NEIGHBOUR (128)
+static int const building_layout[] = { CHECK_NEIGHBOUR | 0, 0, 1, 4, 2, 0, 5, CHECK_NEIGHBOUR | 1, 3, 7, 1, CHECK_NEIGHBOUR | 0, 6, CHECK_NEIGHBOUR | 3, CHECK_NEIGHBOUR | 2, CHECK_NEIGHBOUR | 0 };
 
 
-
-bool process_city_street(grund_t& gr, const way_desc_t* cr)
+// calculates the "best" oreintation of a citybuilding
+int stadt_t::orient_city_building(const koord k, const building_desc_t *h, koord maxarea )
 {
-	weg_t* const weg = gr.get_weg(road_wt);
-	if(  weg == NULL  ) {
-		return false;
+	/*******************************************************
+	* these are the layout possible for city buildings
+	********************************************************
+	dims=1,1,1
+	+---+
+	|000|
+	|0 0|
+	|000|
+	+---+
+	dims=1,1,2
+	+---+
+	|001|
+	|1 1|
+	|100|
+	+---+
+	dims=1,1,4
+	+---+
+	|221|
+	|3 1|
+	|300|
+	+---+
+	dims=1,1,8
+	+---+
+	|625|
+	|3 1|
+	|704|
+	+---+
+	********************************************************/
+
+	// we have something to built here ...
+	if(  h == NULL  ) {
+		return -1;
 	}
-	// Check if any changes are needed.
-	if(  !weg->hat_gehweg() || weg->get_desc() != cr ){
-		player_t *sp = weg->get_owner();
-		if( sp != NULL ){
-			player_t::add_maintenance(sp, -weg->get_desc()->get_wartung(), road_wt);
-			weg->set_owner(NULL); // make public
+
+	// old, highly sophisticated routines for 1x1 buildings
+	if(  h->get_x()*h->get_y()==1  ) {
+		if(  grund_t *gr = welt->lookup_kartenboden(k)  ) {
+			int rotation = 0;
+			int max_layout = h->get_all_layouts()-1;
+			if(  max_layout  ) {
+				// check for pavement
+				int streetdir = 0;
+				for(  int i = 0;  i < 4;  i++  ) {
+					// Neighbors goes through these in 'preferred' order, orthogonal first
+					gr = welt->lookup_kartenboden(k + neighbors[i]);
+					if(  gr  &&  gr->get_weg_hang() == gr->get_grund_hang()  &&  gr->hat_weg(road_wt)  ){
+						streetdir += (1 << i);
+					}
+				}
+				// not completely unique layout, see if any of the neighbouring building gives a hint
+				rotation = building_layout[streetdir] & ~CHECK_NEIGHBOUR;
+				// for four rotation stop here ...
+				if(  max_layout<7  ) {
+					return rotation & max_layout;
+				}
+				// now this is an eight roation building, so we must put in more effort
+				bool unique_orientation = !(building_layout[streetdir] & CHECK_NEIGHBOUR);
+				if(  !unique_orientation  ) {
+					// no unique answer, check nearby buildings (more likely to fail)
+					int gb_dir = 0;
+					for(  int i = 0;  i < 4;  i++  ) {
+						// look for adjacent buildings
+						gr = welt->lookup_kartenboden(k + neighbors[i]);
+						if(  gr  &&  gr->get_typ()==grund_t::fundament  ){
+							if(  gr->find<gebaeude_t>()  ) {
+								gb_dir |= (1<<i);
+							}
+						}
+					}
+					// lets hope this gives an unique answer
+					static uint8 gb_dir_to_layout[16] = { CHECK_NEIGHBOUR, 1, 0, 6, 1, 1, 7, CHECK_NEIGHBOUR, 0, 5, 0, CHECK_NEIGHBOUR, 4, CHECK_NEIGHBOUR, CHECK_NEIGHBOUR, CHECK_NEIGHBOUR };
+					if(  gb_dir_to_layout[gb_dir] == CHECK_NEIGHBOUR  ) {
+						return rotation;
+					}
+					// ok our answer is unique, now we just check for left and right via street nearby
+					rotation = gb_dir_to_layout[gb_dir];
+					if(  rotation<2  ) {
+						// check on which side is the road
+						if(  streetdir & 0x0C  ) {
+							return rotation + 2;
+						}
+					}
+				}
+			}
+			return rotation;
 		}
-		weg->set_gehweg(true);
-		weg->set_desc(cr);
-		gr.calc_image();
-		reliefkarte_t::get_karte()->calc_map_pixel(gr.get_pos().get_2d());
+		return -1;
 	}
-	return true;
+
+	// if we arrive here, we have a multitile building
+	KOORD_VAL shortest_side = min( maxarea.x, maxarea.y );
+
+	if(  grund_t *gr = welt->lookup_kartenboden(k)  ) {
+		int rotation = -1;
+		int max_layout = h->get_all_layouts()-1;
+		if(  max_layout  ) {
+
+			// we counting the streetiles, but asymmetric buildings will have an uneven number; we init with negative width 
+			int streetdir[4];
+			for(  int i = 0;  i < 4;  i++  ) {
+				streetdir[i] = -h->get_x(i&1);
+			}
+			int roads_found = 0;
+
+			// now just counting street tiles north/south of the house ...
+			sint16 extra_offset = h->get_y(0)-1;
+			for(  int offset = -1;  offset <= h->get_x(0);  offset++  ) {
+				gr = welt->lookup_kartenboden(k + koord(offset,1+extra_offset) );
+				if(  gr  &&  gr->hat_weg(road_wt)  ){
+					streetdir[0] ++;
+					roads_found ++;
+				}
+				gr = welt->lookup_kartenboden(k + koord(offset,-1) );
+				if(  gr  &&  gr->hat_weg(road_wt)  ){
+					streetdir[2] ++;
+					roads_found ++;
+				}
+			}
+			// ... and east/west
+			for(  int offset = -1;  offset <= h->get_x(1);  offset++  ) {
+				// Neighbors goes through these in 'preferred' order, orthogonal first
+				gr = welt->lookup_kartenboden(k + koord(1+extra_offset,offset) );
+				if(  gr  &&  gr->hat_weg(road_wt)  ){
+					streetdir[1] ++;
+					roads_found ++;
+				}
+				// Neighbors goes through these in 'preferred' order, orthogonal first
+				gr = welt->lookup_kartenboden(k + koord(-1,offset) );
+				if(  gr  &&  gr->hat_weg(road_wt)  ){
+					streetdir[3] ++;
+					roads_found ++;
+				}
+			}
+
+			// first, make sure we found some roads
+			if(  roads_found > 0  ) {
+
+				// now find the two sides with most streets around
+				int largest_dir_count = -9999, largest_2nd_count = -9999;
+				int largest_dir = -1, largest_2nd_dir = -1;
+				for(  int i=0;  i<4;  i++  ) {
+					if(  streetdir[i] > largest_dir_count  ) {
+						largest_dir_count = streetdir[i];
+						largest_dir = i;
+					}
+					else if(  streetdir[i] > largest_2nd_count  ) {
+						largest_2nd_dir = i;
+					}
+				}
+
+				// so we have two adjacent corners with the most roads
+				if(  max_layout > 3  &&  ((largest_2nd_dir-largest_dir)==1  ||  (largest_2nd_dir-largest_dir)==3)  ) {
+					// corner cases: only roads on two sides
+					if(  streetdir[0]<0  &&  streetdir[1]<0  ) {
+						rotation = 7;
+					}
+					else if(  streetdir[2]<0  &&  streetdir[3]<0  ) {
+						rotation = 4;
+					}
+					else if(  streetdir[3]<0  &&  streetdir[0]<0  ) {
+						rotation = 5;
+					}
+					else if(  streetdir[0]<0  &&  streetdir[1]<0  ) {
+						rotation = 6;
+					}
+					// some valid found?
+					if(  rotation >=0  &&  h->get_x(rotation) <= maxarea.x  &&  h->get_y(rotation) <= maxarea.y  ) {
+						return rotation;
+					}
+				}
+
+				// now we have to check right of it
+				if(  streetdir[(largest_dir+1)&3] == largest_dir_count  ) {
+					// but since we take the first, if the next two corner have the same street count, better rotate one further
+					if(  streetdir[(largest_dir+2)&3] == largest_dir_count  ) {
+						// both next corners same count
+						rotation = largest_dir+1;
+					}
+					else {
+						rotation = largest_dir;
+					}
+					rotation &= max_layout;
+				}
+				// and left of it
+				else if(  streetdir[(largest_dir+3)&3] == largest_dir_count  ) {
+					// but since we take the first, if the next two corner have the same street count, better rotate one further
+					if(  streetdir[(largest_dir+2)&3] == largest_dir_count  ) {
+						// both next corners same count
+						rotation = largest_dir+3;
+					}
+					else {
+						rotation = largest_dir;
+					}
+					rotation &= max_layout;
+				}
+				// this is the really only longest one
+				else {
+					rotation = largest_dir & max_layout;
+				}
+
+				// some valid found?
+				if(  rotation >= 0  &&  h->get_x(rotation) <= maxarea.x  &&  h->get_y(rotation) <= maxarea.y  ) {
+					return rotation;
+				}
+
+				return -1;
+			}
+
+			// no roads or not fitting
+			if(  roads_found == 0  ) {
+				bool even_ok = (maxarea.x <= h->get_x(0)  &&  maxarea.y <= h->get_y(0));
+				bool odd_ok = (maxarea.x <= h->get_x(1)  &&  maxarea.y <= h->get_y(1));
+
+				if(  even_ok  &&  odd_ok  ) {
+					// no roads at all and both rotations fit => random oreintation (but no corner)
+					return simrand(4) % max_layout;
+				}
+				else if(  even_ok  ) {
+					return (simrand(2)*2) % max_layout;
+				}
+				else if(  odd_ok  ) {
+					return (simrand(2)*2+1) % max_layout;
+				}
+				// nothing fits, should not happen!
+				assert(1);
+			}
+
+			// we have a preferred orientation, but it does not fit  => gave up
+			return -1;
+		}
+
+		// we landed here but maxlayout == 1, so we have only to test for fit
+		if(  maxarea.x <= h->get_x(0)  &&  maxarea.y <= h->get_y(0)  ) {
+			return 0;
+		}
+
+	}
+			
+	return -1;
 }
 
 
@@ -2818,93 +3079,107 @@ void stadt_t::build_city_building(const koord k)
 	const uint16 current_month = welt->get_timeline_year_month();
 	const climate cl = welt->get_climate(k);
 
+
 	// Run through orthogonal neighbors (only) looking for which cluster to build
 	// This is a bitmap -- up to 32 clustering types are allowed.
 	uint32 neighbor_building_clusters = 0;
+	uint8 area_level=0; // used to calculate the maximum size
+	sint8 zpos = gr->get_pos().z + slope_t::max_diff(gr->get_grund_hang());
 	for(  int i = 0;  i < 4;  i++  ) {
 		grund_t* gr = welt->lookup_kartenboden(k + neighbors[i]);
-		if(  gr && gr->get_typ() == grund_t::fundament  &&  gr->obj_bei(0)->get_typ() == obj_t::gebaeude  ) {
+		if(  gr  &&  gr->get_typ() == grund_t::fundament  &&  gr->obj_bei(0)->get_typ() == obj_t::gebaeude  ) {
 			// We have a building as a neighbor...
-			gebaeude_t const* const gb = obj_cast<gebaeude_t>(gr->first_obj());
-			if(  gb != NULL  ) {
+			if(  gebaeude_t const* const gb = obj_cast<gebaeude_t>(gr->first_obj())  ) {
 				// We really have a building as a neighbor...
 				const building_desc_t* neighbor_building = gb->get_tile()->get_desc();
 				neighbor_building_clusters |= neighbor_building->get_clusters();
+				if(  gb->get_pos().z == zpos  &&  neighbor_building->get_x()*neighbor_building->get_y()==1  ) {
+					// also in right height and citybuilding, and (1x1) (so we don not tear down existing larger building, even if we can do that)
+					area_level |= (neighbor_building->is_city_building() << i);
+				}
+			}
+			else if(  gr->ist_natur()  &&  gr->get_pos().z+slope_t::max_diff(gr->get_grund_hang())==zpos  ) {
+				// we can of course also build on nature
+					area_level |= (1 << i);
 			}
 		}
+	}
+
+	// since the above test is only enough for 2x1 and 1x2, we must test more tiles, if we want larger
+	koord maxsize=koord(1,1);
+	switch(  area_level&3  ) {
+		case 3:
+			if(  hausbauer_t::get_largest_city_building_area() > 2  ) {
+				// now test the remaining tiles for even laregr size
+				for(  area_level=2;  area_level < 8;  area_level++  ) {
+					grund_t* gr = welt->lookup_kartenboden(k + area3x3[area_level]);
+					if(  gr  &&  gr->get_typ() == grund_t::fundament  &&  gr->obj_bei(0)->get_typ() == obj_t::gebaeude  ) {
+						// We have a building as a neighbor...
+						if(  gebaeude_t const* const testgb = obj_cast<gebaeude_t>(gr->first_obj())  ) {
+							// We really have a building as a neighbor...
+							const building_desc_t* neighbor_building = testgb->get_tile()->get_desc();
+							if(  testgb->get_pos().z == zpos  &&  neighbor_building->is_city_building()  &&  neighbor_building->get_x()*neighbor_building->get_y()==1  ) {
+								// also in right height and citybuilding
+								maxsize = area3x3[area_level]+koord(1,1);
+								continue;
+							}
+						}
+						else if(  gr->ist_natur()  &&  gr->get_pos().z+slope_t::max_diff(gr->get_grund_hang())==zpos  ) {
+							// we can of course also build on nature
+							maxsize = area3x3[area_level]+koord(1,1);
+							continue;
+						}
+					}
+					// we only reach here upon unsuitable ground
+					break;
+				}
+			}
+			break;
+		case 2:
+			maxsize = area3x3[1]+koord(1,1);
+			break;
+		case 1:
+			maxsize = area3x3[0]+koord(1,1);
+			break;
+		default:
+			break;
 	}
 
 	// Find a house to build
 	const building_desc_t* h = NULL;
 
-	if (sum_commercial > sum_industrial  &&  sum_commercial > sum_residential) {
-		h = hausbauer_t::get_commercial(0, current_month, cl, neighbor_building_clusters);
+	if (sum_commercial > sum_industrial  &&  sum_commercial >= sum_residential) {
+		h = hausbauer_t::get_commercial(0, current_month, cl, neighbor_building_clusters, koord(1,1), maxsize);
 		if (h != NULL) {
 			arb += (h->get_level()+1) * 20;
 		}
 	}
 
-	if (h == NULL  &&  sum_industrial > sum_residential  &&  sum_industrial > sum_residential) {
-		h = hausbauer_t::get_industrial(0, current_month, cl, neighbor_building_clusters);
+	if (h == NULL  &&  sum_industrial > sum_residential  &&  sum_industrial >= sum_commercial) {
+		h = hausbauer_t::get_industrial(0, current_month, cl, neighbor_building_clusters, koord(1,1), maxsize);
 		if (h != NULL) {
 			arb += (h->get_level()+1) * 20;
 		}
 	}
 
-	if (h == NULL  &&  sum_residential > sum_industrial  &&  sum_residential > sum_commercial) {
-		h = hausbauer_t::get_residential(0, current_month, cl, neighbor_building_clusters);
+	if (h == NULL  &&  sum_residential > sum_industrial  &&  sum_residential >= sum_commercial) {
+		h = hausbauer_t::get_residential(0, current_month, cl, neighbor_building_clusters, koord(1,1), maxsize);
 		if (h != NULL) {
 			// will be aligned next to a street
 			won += (h->get_level()+1) * 10;
 		}
 	}
 
-	/*******************************************************
-		* this are the layout possible for city buildings
-	********************************************************
-	dims=1,1,1
-	+---+
-	|000|
-	|0 0|
-	|000|
-	+---+
-	dims=1,1,2
-	+---+
-	|001|
-	|1 1|
-	|100|
-	+---+
-	dims=1,1,4
-	+---+
-	|221|
-	|3 1|
-	|300|
-	+---+
-	dims=1,1,8
-	+---+
-	|625|
-	|3 1|
-	|704|
-	+---+
-	********************************************************/
-
-	// we have something to built here ...
-	if(  h != NULL  ) {
-		// check for pavement
-		int streetdir = 0;
-		for(  int i = 0;  i < 8;  i++  ) {
-			// Neighbors goes through these in 'preferred' order, orthogonal first
-			gr = welt->lookup_kartenboden(k + neighbors[i]);
-			if( gr && gr->get_weg_hang() == gr->get_grund_hang() && process_city_street(*gr, welt->get_city_road()) && i < 4 ){
-				streetdir += (1 << i);
-			}
-		}
-		// TO DO: fix building orientation here, to improve terraced building appearance.
-
-		const gebaeude_t* gb = hausbauer_t::build(NULL, pos, building_layout[streetdir], h);
+	// so we found at least one suitable building for this place
+	int rotation = orient_city_building( k, h, maxsize );
+	if(  rotation >= 0  ) {
+		const gebaeude_t* gb = hausbauer_t::build(NULL, welt->lookup_kartenboden(k)->get_pos(), rotation, h);
 		add_gebaeude_to_stadt(gb);
 	}
+	// to be extended for larger building ...
+	update_city_street(k);
 }
+
 
 
 void stadt_t::renovate_city_building(gebaeude_t *gb)
@@ -2914,13 +3189,11 @@ void stadt_t::renovate_city_building(gebaeude_t *gb)
 		return; // only renovate res, com, ind
 	}
 
-	if(  gb->get_tile()->get_desc()->get_x()*gb->get_tile()->get_desc()->get_y() != 1  ) {
-		return; // too big ...
-	}
-
 	// Now we are sure that this is a city building
-	const int level = gb->get_tile()->get_desc()->get_level();
-	const koord k = gb->get_pos().get_2d();
+	const building_desc_t *gb_desc = gb->get_tile()->get_desc();
+	const int level = gb_desc->get_level();
+	
+	koord k = gb->get_pos().get_2d() - gb->get_tile()->get_offset();
 
 	// Divide unemployed by 4, because it counts towards commercial and industrial,
 	// and both of those count 'double' for population relative to residential.
@@ -2941,16 +3214,53 @@ void stadt_t::renovate_city_building(gebaeude_t *gb)
 	// Run through orthogonal neighbors (only) looking for which cluster to build
 	// This is a bitmap -- up to 32 clustering types are allowed.
 	uint32 neighbor_building_clusters = 0;
-	for (int i = 0; i < 4; i++) {
-		grund_t* gr = welt->lookup_kartenboden(k + neighbors[i]);
-		if (gr  &&  gr->get_typ() == grund_t::fundament  &&  gr->obj_bei(0)->get_typ() == obj_t::gebaeude) {
+	sint8 zpos = gb->get_pos().z;
+	koord minsize = gb->get_tile()->get_desc()->get_size(gb->get_tile()->get_layout());
+	for(  int i = 0;  i < 4;  i++  ) {
+		// since we handle buildings larger than (1x1) we add an offset
+		grund_t* gr = welt->lookup_kartenboden(k + neighbors[i]+minsize-koord(1,1));
+		if(  gr  &&  gr->get_typ() == grund_t::fundament  &&  gr->obj_bei(0)->get_typ() == obj_t::gebaeude  ) {
 			// We have a building as a neighbor...
-			gebaeude_t const* const gb = obj_cast<gebaeude_t>(gr->first_obj());
-			if (gb != NULL) {
+			if(  gebaeude_t const* const testgb = obj_cast<gebaeude_t>(gr->first_obj())  ) {
 				// We really have a building as a neighbor...
-				const building_desc_t* neighbor_building = gb->get_tile()->get_desc();
+				const building_desc_t* neighbor_building = testgb->get_tile()->get_desc();
 				neighbor_building_clusters |= neighbor_building->get_clusters();
 			}
+		}
+	}
+
+	// now test the surrounding tiles for larger size
+	koord maxsize=minsize;
+	if(  hausbauer_t::get_largest_city_building_area() > 1  ) {
+		for(  int area_level=0;  area_level < 8;  area_level++  ) {
+			grund_t* gr = welt->lookup_kartenboden(k + area3x3[area_level]);
+			if(  gr  &&  gr->get_typ() == grund_t::fundament  &&  gr->obj_bei(0)->get_typ() == obj_t::gebaeude  ) {
+				// We have a building as a neighbor...
+				if(  gebaeude_t const* const testgb = obj_cast<gebaeude_t>(gr->first_obj())  ) {
+					// We really have a building as a neighbor...
+					const building_desc_t* neighbor_building = testgb->get_tile()->get_desc();
+					if(  gb->get_tile()->get_desc() == neighbor_building  &&  testgb->get_tile()->get_offset() == area3x3[area_level]  ) {
+						// part of same building
+						maxsize = area3x3[area_level]+koord(1,1);
+						continue;
+					}
+					if(  testgb->get_pos().z == zpos  &&  neighbor_building->is_city_building()  &&  neighbor_building->get_x()*neighbor_building->get_y()==1  ) {
+						// also in right height and citybuilding
+						maxsize = area3x3[area_level]+koord(1,1);
+						continue;
+					}
+				}
+#if 0
+/* since we only replace tiles, natur is not allowed for the moment, but could be easilz changed */
+				else if(  gr->ist_natur()  &&  gr->get_pos().z+slope_t::max_diff(gr->get_grund_hang())==zpos  ) {
+					// we can of course also build on nature
+					maxsize = area3x3[area_level]+koord(1,1);
+					continue;
+				}
+#endif
+			}
+			// we only reach here upon unsuitable ground
+			break;
 		}
 	}
 
@@ -2962,7 +3272,7 @@ void stadt_t::renovate_city_building(gebaeude_t *gb)
 	if (sum_commercial > sum_industrial && sum_commercial > sum_residential) {
 		// we must check, if we can really update to higher level ...
 		const int try_level = (alt_typ == building_desc_t::city_com ? level + 1 : level);
-		h = hausbauer_t::get_commercial(try_level, current_month, cl, neighbor_building_clusters);
+		h = hausbauer_t::get_commercial(try_level, current_month, cl, neighbor_building_clusters, minsize, maxsize );
 		if(  h != NULL  &&  h->get_level() >= try_level  ) {
 			want_to_have = building_desc_t::city_com;
 			sum = sum_commercial;
@@ -2973,7 +3283,7 @@ void stadt_t::renovate_city_building(gebaeude_t *gb)
       || (sum_commercial > sum_residential  &&  want_to_have == building_desc_t::unknown)  ) {
 		// we must check, if we can really update to higher level ...
 		const int try_level = (alt_typ == building_desc_t::city_ind ? level + 1 : level);
-		h = hausbauer_t::get_industrial(try_level , current_month, cl, neighbor_building_clusters);
+		h = hausbauer_t::get_industrial(try_level , current_month, cl, neighbor_building_clusters, minsize, maxsize );
 		if(  h != NULL  &&  h->get_level() >= try_level  ) {
 			want_to_have = building_desc_t::city_ind;
 			sum = sum_industrial;
@@ -2984,7 +3294,7 @@ void stadt_t::renovate_city_building(gebaeude_t *gb)
 	if(  want_to_have == building_desc_t::unknown  ) {
 		// we must check, if we can really update to higher level ...
 		const int try_level = (alt_typ == building_desc_t::city_res ? level + 1 : level);
-		h = hausbauer_t::get_residential(try_level, current_month, cl, neighbor_building_clusters);
+		h = hausbauer_t::get_residential(try_level, current_month, cl, neighbor_building_clusters, minsize, maxsize );
 		if(  h != NULL  &&  h->get_level() >= try_level  ) {
 			want_to_have = building_desc_t::city_res;
 			sum = sum_residential;
@@ -3002,76 +3312,114 @@ void stadt_t::renovate_city_building(gebaeude_t *gb)
 	if(  sum > 0  &&  h != NULL  ) {
 //		DBG_MESSAGE("stadt_t::renovate_city_building()", "renovation at %i,%i (%i level) of typ %i to typ %i with desire %i", k.x, k.y, alt_typ, want_to_have, sum);
 
-		// check for pavement
-		// and make sure our house is not on a neighbouring tile, to avoid boring towns
-		int streetdir = 0;
-		for(  int i = 0;  i < 8;  i++  ) {
-			// Neighbors goes through this in a specific order:
-			// orthogonal first, then diagonal
-			grund_t* gr = welt->lookup_kartenboden(k + neighbors[i]);
-			if(  gr != NULL  &&  gr->get_weg_hang() == gr->get_grund_hang()  ) {
-				if( process_city_street(*gr, welt->get_city_road()) && i < 4 ){
-					streetdir += (1 << i);
+		// no renovation for now, if new is smaller
+		assert(  gb_desc->get_x()*gb_desc->get_y() <= h->get_x()*h->get_y()  );
+
+		int rotation = 0;
+		if(  h->get_all_layouts()>1  ) {
+		
+			// only do this of symmetric of small enough building
+			if(  h->get_x()==h->get_y()  ||  (h->get_x()<maxsize.y  &&  h->get_x()<maxsize.x)  ) {
+				// check for pavement
+				int streetdir = 0;
+				for(  int i = 0;  i < 4;  i++  ) {
+					// Neighbors goes through these in 'preferred' order, orthogonal first
+					grund_t *gr = welt->lookup_kartenboden(k + neighbors[i]);
+					if(  gr  &&  gr->get_weg_hang() == gr->get_grund_hang()  &&  gr->hat_weg(road_wt)  ){
+						streetdir += (1 << i);
+					}
 				}
-				else if(  gr->get_typ() == grund_t::fundament  ) {
-					// do not renovate, if the identical building is already in a neighbour tile
-					// identical mean same desc and same rotation (neroden suggested to relax this for clusters)
-					gebaeude_t const* const gb = obj_cast<gebaeude_t>(gr->first_obj());
-					if(  gb  &&  gb->get_tile()->get_desc() == h  &&  gb->get_tile() == h->get_tile(building_layout[streetdir], 0, 0)  ) {
-						return;
+				// not completely unique layout, see if any of the neighbouring building gives a hint
+				rotation = building_layout[streetdir] & ~CHECK_NEIGHBOUR;
+				bool unique_orientation = !(building_layout[streetdir] & CHECK_NEIGHBOUR);
+				// only streets in diagonal corners => make a house there in L direction
+				if(  !streetdir  ) {
+					int count = 0;
+					for(  int i = 4;  i < 8;  i++  ) {
+						// Neighbors goes through these in 'preferred' order, orthogonal first
+						grund_t *gr = welt->lookup_kartenboden(k + neighbors[i]);
+						if(  gr  &&  gr->get_weg_hang() == gr->get_grund_hang()  &&  gr->hat_weg(road_wt)  ) {
+							rotation = i;
+							count ++;
+						}
+					}
+					unique_orientation = (count==1);
+				}
+				if(  !unique_orientation  ) {
+					int max_layout = h->get_all_layouts()-1;
+					for(  int i = 0;  i < 4;  i++  ) {
+						// Neighbors goes through these in 'preferred' order, orthogonal first
+						grund_t *gr = welt->lookup_kartenboden(k + neighbors[i]);
+						if(  gr  &&  gr->get_typ()==grund_t::fundament  ){
+							if(  gebaeude_t *gb = gr->find<gebaeude_t>()  ) {
+								if(  gb->get_tile()->get_desc()->get_all_layouts() > max_layout  ) {
+									// so take the roation of the next bilding with similar or more rotations
+									rotation = gb->get_tile()->get_layout();
+									max_layout = gb->get_tile()->get_desc()->get_all_layouts();
+								}
+							}
+						}
 					}
 				}
 			}
+			else {
+				// asymmetric building
+				rotation = (h->get_x(0)<=maxsize.x  &&  h->get_y(0)<=maxsize.y) ? 0 : 1;
+			}
 		}
 
-		switch(alt_typ) {
-			case building_desc_t::city_res: won -= level * 10; break;
-			case building_desc_t::city_com: arb -= level * 20; break;
-			case building_desc_t::city_ind: arb -= level * 20; break;
-			default: break;
-		}
-		// exchange building; try to face it to street in front
-		gb->mark_images_dirty();
-		gb->set_tile( h->get_tile(building_layout[streetdir], 0, 0), true );
-		welt->lookup_kartenboden(k)->calc_image();
-		update_gebaeude_from_stadt(gb);
-
-		switch(want_to_have) {
-			case building_desc_t::city_res: won += h->get_level() * 10; break;
-			case building_desc_t::city_com: arb += h->get_level() * 20; break;
-			case building_desc_t::city_ind: arb += h->get_level() * 20; break;
-			default: break;
+		for(  int x=0;  x<h->get_x(rotation);  x++  ) {
+			for(  int y=0;  y<h->get_y(rotation);  y++  ) {
+				koord kpos = k+koord(x,y);
+				grund_t *gr = welt->lookup_kartenboden(kpos);
+				gebaeude_t *oldgb = gr->find<gebaeude_t>();
+				switch(oldgb->get_tile()->get_desc()->get_type()) {
+					case building_desc_t::city_res: won -= level * 10; break;
+					case building_desc_t::city_com: arb -= level * 20; break;
+					case building_desc_t::city_ind: arb -= level * 20; break;
+					default: break;
+				}
+				// exchange building; try to face it to street in front
+				oldgb->mark_images_dirty();
+				oldgb->set_tile( h->get_tile(rotation, x, y), true );
+				welt->lookup_kartenboden(kpos)->calc_image();
+				update_gebaeude_from_stadt(oldgb);
+				update_city_street(kpos);
+				switch(h->get_type()) {
+					case building_desc_t::city_res: won += h->get_level() * 10; break;
+					case building_desc_t::city_com: arb += h->get_level() * 20; break;
+					case building_desc_t::city_ind: arb += h->get_level() * 20; break;
+					default: break;
+				}
+			}
 		}
 	}
 }
 
 
-void stadt_t::generate_private_cars(koord pos, sint32 level, koord target)
+#ifdef DESTINATION_CITYCARS
+void stadt_t::generate_private_cars(koord pos, koord target)
 {
-	int const traffic_level = welt->get_settings().get_traffic_level();
-	if (traffic_level > 0 && level % (17 - traffic_level) == 0) {
+	if (!private_car_t::list_empty()  &&  number_of_cars>0  ) {
 		koord k;
 		for (k.y = pos.y - 1; k.y <= pos.y + 1; k.y++) {
 			for (k.x = pos.x - 1; k.x <= pos.x + 1; k.x++) {
-				if (welt->is_within_limits(k)) {
-					grund_t* gr = welt->lookup_kartenboden(k);
+				if(  grund_t* gr = welt->lookup_kartenboden(k) ) {
 					const weg_t* weg = gr->get_weg(road_wt);
-
 					if (weg != NULL && (
 								gr->get_weg_ribi_unmasked(road_wt) == ribi_t::northsouth ||
 								gr->get_weg_ribi_unmasked(road_wt) == ribi_t::eastwest
 							)) {
-#ifdef DESTINATION_CITYCARS
 						// already a car here => avoid congestion
 						if(gr->obj_bei(gr->get_top()-1)->is_moving()) {
 							continue;
 						}
-#endif
-						if (!private_car_t::list_empty()) {
-							private_car_t* vt = new private_car_t(gr, target);
-							gr->obj_add(vt);
-							welt->sync.add(vt);
-						}
+						private_car_t* vt = new private_car_t(gr, target);
+						gr->obj_add(vt);
+						welt->sync.add(vt);
+						city_history_month[0][HIST_CITYCARS] ++;
+						city_history_year[0][HIST_CITYCARS] ++;
+						number_of_cars --;
 						return;
 					}
 				}
@@ -3079,6 +3427,7 @@ void stadt_t::generate_private_cars(koord pos, sint32 level, koord target)
 		}
 	}
 }
+#endif
 
 
 /**
@@ -3111,11 +3460,11 @@ bool stadt_t::build_road(const koord k, player_t* player_, bool forced)
 	slope_t::type slope = bd->get_grund_hang();
 	if (!slope_t::is_way(slope)) {
 		climate c = welt->get_climate(k);
-		if (welt->can_ebne_planquadrat(NULL, k, bd->get_hoehe()+1, true)) {
-			welt->ebne_planquadrat(NULL, k, bd->get_hoehe()+1, true);
+		if (welt->can_flatten_tile(NULL, k, bd->get_hoehe()+1, true)) {
+			welt->flatten_tile(NULL, k, bd->get_hoehe()+1, true);
 		}
-		else if(  bd->get_hoehe() > welt->get_water_hgt(k)  &&  welt->can_ebne_planquadrat(NULL, k, bd->get_hoehe() )  ) {
-			welt->ebne_planquadrat(NULL, k, bd->get_hoehe());
+		else if(  bd->get_hoehe() > welt->get_water_hgt(k)  &&  welt->can_flatten_tile(NULL, k, bd->get_hoehe() )  ) {
+			welt->flatten_tile(NULL, k, bd->get_hoehe());
 		}
 		else {
 			return false;
@@ -3253,7 +3602,7 @@ bool stadt_t::build_road(const koord k, player_t* player_, bool forced)
 		if(ribi_t::is_single(connection_roads)) {
 			koord zv = koord(ribi_t::backward(connection_roads));
 			grund_t *bd_next = welt->lookup_kartenboden( k + zv );
-			if(bd_next  &&  (bd_next->ist_wasser()  ||  (bd_next->hat_weg(water_wt)  &&  bd_next->get_weg(water_wt)->get_desc()->get_styp()== type_river))) {
+			if(bd_next  &&  (bd_next->is_water()  ||  (bd_next->hat_weg(water_wt)  &&  bd_next->get_weg(water_wt)->get_desc()->get_styp()== type_river))) {
 				// ok there is a river
 				const bridge_desc_t *bridge = bridge_builder_t::find_bridge(road_wt, welt->get_city_road()->get_topspeed(), welt->get_timeline_year_month() );
 				if(  bridge==NULL  ) {
@@ -3267,14 +3616,17 @@ bool stadt_t::build_road(const koord k, player_t* player_, bool forced)
 					// try to find shortest possible
 					end = bridge_builder_t::find_end_pos(NULL, bd->get_pos(), zv, bridge, err, bridge_height, true);
 				}
-				if((err==NULL||*err == 0)  &&   koord_distance( k, end.get_2d())<=3) {
+				if((err==NULL||*err == 0)  &&   koord_distance( k, end.get_2d())<=3  &&  welt->is_within_limits((end+zv).get_2d())) {
 					bridge_builder_t::build_bridge(NULL, bd->get_pos(), end, zv, bridge_height, bridge, welt->get_city_road());
 					// try to build one connecting piece of road
 					build_road( (end+zv).get_2d(), NULL, false);
 					// try to build a house near the bridge end
 					uint32 old_count = buildings.get_count();
 					for(uint8 i=0; i<lengthof(koord::neighbours)  &&  buildings.get_count() == old_count; i++) {
-						build_city_building(end.get_2d()+zv+koord::neighbours[i]);
+						koord c(end.get_2d()+zv+koord::neighbours[i]);
+						if (welt->is_within_limits(c)) {
+							build_city_building(end.get_2d()+zv+koord::neighbours[i]);
+						}
 					}
 				}
 			}

@@ -27,9 +27,11 @@
 
 #include "../tpl/vector_tpl.h"
 #include "../tpl/array_tpl.h"
-#include "../sucher/bauplatz_sucher.h"
+#include "../finder/building_placefinder.h"
 
 #include "../utils/cbuffer_t.h"
+
+#include "../descriptor/objversion.h"
 
 #include "../gui/karte.h"	// to update map after construction of new industry
 
@@ -90,12 +92,13 @@ void init_fab_map( karte_t *welt )
 
 
 /**
- * @param x,y world position
+ * @param x,y world position, needs to be valid coordinates
  * @returns true, if factory coordinate
  */
 inline bool is_factory_at( sint16 x, sint16 y)
 {
-	return (fab_map[(fab_map_w*y)+(x/8)]&(1<<(x%8)))!=0;
+	uint32 idx = (fab_map_w*y)+(x/8);
+	return idx < fab_map.get_count()  &&  (fab_map[idx]&(1<<(x%8)))!=0;
 }
 
 
@@ -109,46 +112,92 @@ void factory_builder_t::new_world()
  * Searches for a suitable building site using suche_platz().
  * The site is chosen so that there is a street next to the building site.
  */
-class factory_bauplatz_mit_strasse_sucher_t: public bauplatz_sucher_t  {
+class factory_site_searcher_t: public building_placefinder_t  {
 
+	factory_desc_t::site_t site;
 public:
-	factory_bauplatz_mit_strasse_sucher_t(karte_t* welt) : bauplatz_sucher_t(welt) {}
+	factory_site_searcher_t(karte_t* welt, factory_desc_t::site_t site_) : building_placefinder_t(welt), site(site_) {}
 
-	virtual bool ist_platz_ok(koord pos, sint16 b, sint16 h, climate_bits cl) const
+	bool is_area_ok(koord pos, sint16 w, sint16 h, climate_bits cl) const OVERRIDE
 	{
-		if(  !bauplatz_sucher_t::ist_platz_ok(pos, b, h, cl)  ) {
+		if(  !building_placefinder_t::is_area_ok(pos, w, h, cl)  ) {
 			return false;
 		}
-		bool next_to_road = false;
+		uint16 mincond = 0;
+		uint16 condmet = 0;
+		switch(site) {
+			case factory_desc_t::forest:
+				mincond = w*h+w+h; // at least w*h+w+h trees, i.e. few tiles with more than one tree
+				break;
 
-		for (sint16 y = -1;  y < h; y++) {
-			for (sint16 x = -1; x < b; x++) {
+			case factory_desc_t::shore:
+			case factory_desc_t::river:
+			case factory_desc_t::City:
+			default:
+				mincond = 1;
+		}
+
+		// needs to run one tile wider than the factory on all sides
+		for (sint16 y = -1;  y <= h; y++) {
+			for (sint16 x = -1; x <= w; x++) {
 				koord k(pos + koord(x,y));
 				grund_t *gr = welt->lookup_kartenboden(k);
 				if (!gr) {
 					return false;
 				}
-				if (	0 <= x  &&  x < b-1  &&  0 <= y  &&  y < h-1) {
-					// not at border: is there something top like elevated monorails?
+				// do not build on an existing factory
+				if( is_factory_at(k.x, k.y)  ) {
+					return false;
+				}
+				if(  0 <= x  &&  x < w  &&  0 <= y  &&  y < h  ) {
+					// actual factorz tile: is there something top like elevated monorails?
 					if(  gr->get_leitung()!=NULL  ||  welt->lookup(gr->get_pos()+koord3d(0,0,1)  )!=NULL) {
 						// something on top (monorail or power lines)
 						return false;
 					}
-
+					// check for trees unless the map was generated without trees
+					if(  site==factory_desc_t::forest  &&  !welt->get_settings().get_no_trees()  &&  condmet < mincond  ) {
+						for(uint8 i=0; i< gr->get_top(); i++) {
+							if (gr->obj_bei(i)->get_typ() == obj_t::baum) {
+								condmet++;
+							}
+						}
+					}
 				}
 				else {
-					// border but not corner: near a road if possible
-					if (!next_to_road  &&  (0 <= x  ||  x < b-1)  &&  (0 <= y  ||  y < h-1)) {
-						next_to_road = gr->hat_weg(road_wt);
-					}
-					// do not build on an existing factory
-					if( is_factory_at(k.x, k.y)  ) {
-						return false;
+					// border tile: check for road, shore, river
+					if(  condmet < mincond  &&  (-1==x  ||  x==w)  &&  (-1==y  ||  y==h)  ) {
+						switch (site) {
+							case factory_desc_t::City:
+								condmet += gr->hat_weg(road_wt);
+								break;
+							case factory_desc_t::shore:
+								condmet += welt->get_climate(k)==water_climate;
+								break;
+							case factory_desc_t::river:
+							if(  welt->get_settings().get_river_number() >0  ) {
+								weg_t* river = gr->get_weg(water_wt);
+								if (river  &&  river->get_desc()->get_styp()==type_river) {
+									condmet++;
+									printf("Found river near %s\n", pos.get_str());
+								}
+								break;
+							}
+							else {
+								// always succeeds on maps without river ...
+								condmet++;
+								break;
+							}
+							default: ;
+						}
 					}
 				}
 			}
 		}
-		return next_to_road;
+		if(  site==factory_desc_t::forest  &&  condmet>=3  ) {
+			dbg->message("", "found %d at %s", condmet, pos.get_str() );
+		}
+		return condmet >= mincond;
 	}
 };
 
@@ -181,7 +230,7 @@ const factory_desc_t *factory_builder_t::get_random_consumer(bool electric, clim
 			current->get_building()->is_allowed_climate_bits(cl)  &&
 			(electric ^ !current->is_electricity_producer())  &&
 			current->get_building()->is_available(timeline)  ) {
-				consumer.insert_unique_ordered(current, current->get_chance(), compare_fabrik_desc);
+				consumer.insert_unique_ordered(current, current->get_distribution_weight(), compare_fabrik_desc);
 		}
 	}
 	// no consumer installed?
@@ -213,7 +262,7 @@ void factory_builder_t::register_desc(factory_desc_t *desc)
 DBG_DEBUG("factory_builder_t::register_desc()","Correction for old factory: Increase production from %i by %i",p&0x7FFF,k.x*k.y);
 	}
 	if(  const factory_desc_t *old_desc = desc_table.remove(desc->get_name())  ) {
-		dbg->warning( "factory_builder_t::register_desc()", "Object %s was overlaid by addon!", desc->get_name() );
+		dbg->doubled( "factory", desc->get_name() );
 		delete old_desc;
 	}
 	desc_table.put(desc->get_name(), desc);
@@ -231,21 +280,21 @@ bool factory_builder_t::successfully_loaded()
 		// check for crossconnects
 		for(  int j=0;  j < current->get_supplier_count();  j++  ) {
 			weighted_vector_tpl<const factory_desc_t *>producer;
-			find_producer( producer, current->get_supplier(j)->get_ware(), 0 );
+			find_producer( producer, current->get_supplier(j)->get_input_type(), 0 );
 			if(  producer.is_contained(current)  ) {
 				// must not happen else
-				dbg->fatal( "factory_builder_t::build_link()", "Factory %s output %s cannot be its own input!", i.key, current->get_supplier(j)->get_ware()->get_name() );
+				dbg->fatal( "factory_builder_t::successfully_loaded()", "Factory %s output %s cannot be its own input!", i.key, current->get_supplier(j)->get_input_type()->get_name() );
 			}
 		}
 		checksum_t *chk = new checksum_t();
 		current->calc_checksum(chk);
-		pakset_info_t::append(current->get_name(), chk);
+		pakset_info_t::append(current->get_name(), obj_factory, chk);
 	}
 	return true;
 }
 
 
-int factory_builder_t::count_producers(const ware_besch_t *ware, uint16 timeline)
+int factory_builder_t::count_producers(const goods_desc_t *ware, uint16 timeline)
 {
 	int count=0;
 
@@ -254,7 +303,7 @@ int factory_builder_t::count_producers(const ware_besch_t *ware, uint16 timeline
 		factory_desc_t const* const tmp = t.value;
 		for (uint i = 0; i < tmp->get_product_count(); i++) {
 			const factory_product_desc_t *product = tmp->get_product(i);
-			if(  product->get_ware()==ware  &&  tmp->get_chance()>0  &&  tmp->get_building()->is_available(timeline)  ) {
+			if(  product->get_output_type()==ware  &&  tmp->get_distribution_weight()>0  &&  tmp->get_building()->is_available(timeline)  ) {
 				count++;
 			}
 		}
@@ -268,17 +317,17 @@ DBG_MESSAGE("factory_builder_t::count_producers()","%i producer for good '%s' fo
  * Finds a random producer producing @p ware.
  * @param timeline the current time(months)
  */
-void factory_builder_t::find_producer(weighted_vector_tpl<const factory_desc_t *> &producer, const ware_besch_t *ware, uint16 timeline )
+void factory_builder_t::find_producer(weighted_vector_tpl<const factory_desc_t *> &producer, const goods_desc_t *ware, uint16 timeline )
 {
 	// find all producers
 	producer.clear();
 	FOR(stringhashtable_tpl<factory_desc_t const*>, const& t, desc_table) {
 		factory_desc_t const* const tmp = t.value;
-		if (  tmp->get_chance()>0  &&  tmp->get_building()->is_available(timeline)  ) {
+		if (  tmp->get_distribution_weight()>0  &&  tmp->get_building()->is_available(timeline)  ) {
 			for(  uint i=0; i<tmp->get_product_count();  i++  ) {
 				const factory_product_desc_t *product = tmp->get_product(i);
-				if(  product->get_ware()==ware  ) {
-					producer.insert_unique_ordered(tmp, tmp->get_chance(), compare_fabrik_desc);
+				if(  product->get_output_type()==ware  ) {
+					producer.insert_unique_ordered(tmp, tmp->get_distribution_weight(), compare_fabrik_desc);
 					break;
 				}
 			}
@@ -293,48 +342,50 @@ void factory_builder_t::find_producer(weighted_vector_tpl<const factory_desc_t *
 }
 
 
-bool factory_builder_t::check_construction_site(koord pos, koord size, bool water, bool is_factory, climate_bits cl)
+bool factory_builder_t::check_construction_site(koord pos, koord size, factory_desc_t::site_t site, bool is_factory, climate_bits cl)
 {
 	// check for water (no shore in sight!)
-	if(water) {
+	if(site==factory_desc_t::Water) {
 		for(int y=0;y<size.y;y++) {
 			for(int x=0;x<size.x;x++) {
 				const grund_t *gr=welt->lookup_kartenboden(pos+koord(x,y));
-				if(gr==NULL  ||  !gr->ist_wasser()  ||  gr->get_grund_hang()!=slope_t::flat) {
+				if(gr==NULL  ||  !gr->is_water()  ||  gr->get_grund_hang()!=slope_t::flat) {
 					return false;
 				}
 			}
 		}
 	}
 	else {
-		// check on land
-		if (!welt->square_is_free(pos, size.x, size.y, NULL, cl)) {
-			return false;
+		if (is_factory  &&  site!=factory_desc_t::Land) {
+			return factory_site_searcher_t(welt, site).is_area_ok(pos, size.x, size.y, cl);
 		}
-	}
-	// check for existing factories
-	if (is_factory) {
-		for(int y=0;y<size.y;y++) {
-			for(int x=0;x<size.x;x++) {
-				if (is_factory_at(pos.x + x, pos.y + y)){
-					return false;
-				}
+		else {
+			// check on land
+			// do not build too close or on an existing factory
+			if( !welt->is_within_limits(pos)  || is_factory_at(pos.x, pos.y)  ) {
+				return false;
 			}
+			return welt->square_is_free(pos, size.x, size.y, NULL, cl);
 		}
 	}
 	return true;
 }
 
 
-koord3d factory_builder_t::find_random_construction_site( koord pos, const int radius, koord size, bool wasser, const building_desc_t *desc, bool ignore_climates, uint32 max_iterations )
+koord3d factory_builder_t::find_random_construction_site(koord pos, int radius, koord size, factory_desc_t::site_t site, const building_desc_t *desc, bool ignore_climates, uint32 max_iterations)
 {
 	bool is_factory = desc->get_type()==building_desc_t::factory;
+	bool wasser = site == factory_desc_t::Water;
+
 	if(wasser) {
 		// to ensure at least 3x3 water around (maybe this should be the station catchment area+1?)
 		size += koord(6,6);
 	}
 
 	climate_bits climates = !ignore_climates ? desc->get_allowed_climate_bits() : ALL_CLIMATES;
+	if (ignore_climates  &&  site != factory_desc_t::Water) {
+		//site = factory_desc_t::Land;
+	}
 
 	uint32 diam   = 2*radius + 1;
 	uint32 area   = diam * diam;
@@ -352,12 +403,19 @@ koord3d factory_builder_t::find_random_construction_site( koord pos, const int r
 		k = koord( pos.x - radius + (index % diam), pos.y - radius + (index / diam) );
 
 		// check place (it will actually check an grosse.x/y size rectangle, so we can iterate over less tiles)
-		if(  factory_builder_t::check_construction_site(k, size, wasser, is_factory, climates)  ) {
+		if(  factory_builder_t::check_construction_site(k, size, site, is_factory, climates)  ) {
 			// then accept first hit
+			if (site != factory_desc_t::Water && site != factory_desc_t::Land) {
+				DBG_MESSAGE("factory_builder_t::find_random_construction_site","Found spot for %d at %s / %d\n", site, k.get_str(), max_iterations);
+			}
+			// we accept first hit
 			goto finish;
 		}
 	}
 	// nothing found
+	if (site != factory_desc_t::Water  &&  site != factory_desc_t::Land) {
+		DBG_MESSAGE("factory_builder_t::find_random_construction_site","No spot found for location %d of %s near %s / %d\n", site, desc->get_name(), pos.get_str(), max_iterations);
+	}
 	return koord3d::invalid;
 
 finish:
@@ -395,7 +453,7 @@ void factory_builder_t::distribute_attractions(int max_number)
 		}
 
 		int	rotation=simrand(attraction->get_all_layouts()-1);
-		pos = find_random_construction_site(pos.get_2d(), 20, attraction->get_size(rotation),false,attraction,false,0x0FFFFFFF);	// so far -> land only
+		pos = find_random_construction_site(pos.get_2d(), 20, attraction->get_size(rotation), factory_desc_t::Land, attraction, false, 0x0FFFFFFF);	// so far -> land only
 		if(welt->lookup(pos)) {
 			// space found, build attraction
 			hausbauer_t::build(welt->get_public_player(), pos, rotation, attraction);
@@ -461,7 +519,7 @@ fabrik_t* factory_builder_t::build_factory(koord3d* parent, const factory_desc_t
 						grund_t *gr = welt->lookup_kartenboden(x,y);
 						// build the halt on factory tiles on open water only,
 						// since the halt can't be removed otherwise
-						if(gr->ist_wasser()  &&  !(gr->hat_weg(water_wt))  &&  gr->find<gebaeude_t>()) {
+						if(gr->is_water()  &&  !(gr->hat_weg(water_wt))  &&  gr->find<gebaeude_t>()) {
 							halt->add_grund( gr );
 						}
 					}
@@ -489,7 +547,7 @@ fabrik_t* factory_builder_t::build_factory(koord3d* parent, const factory_desc_t
 
 	// add passenger to pax>0, (so no suicide diver at the fish swarm)
 	if(info->get_pax_level()>0) {
-		const weighted_vector_tpl<stadt_t*>& staedte = welt->get_staedte();
+		const weighted_vector_tpl<stadt_t*>& staedte = welt->get_cities();
 		vector_tpl<stadt_t *>distance_stadt( staedte.get_count() );
 
 		FOR(weighted_vector_tpl<stadt_t*>, const i, staedte) {
@@ -520,14 +578,14 @@ bool factory_builder_t::can_factory_tree_rotate( const factory_desc_t *desc )
 	// now check all suppliers if they can rotate
 	for(  int i=0;  i<desc->get_supplier_count();  i++   ) {
 
-		const ware_besch_t *ware = desc->get_supplier(i)->get_ware();
+		const goods_desc_t *ware = desc->get_supplier(i)->get_input_type();
 
 		// unfortunately, for every for iteration we have to check all factories ...
 		FOR(stringhashtable_tpl<factory_desc_t const*>, const& t, desc_table) {
 			factory_desc_t const* const tmp = t.value;
 			// now check if we produce this good...
 			for (uint i = 0; i < tmp->get_product_count(); i++) {
-				if(tmp->get_product(i)->get_ware()==ware  &&  tmp->get_chance()>0) {
+				if(tmp->get_product(i)->get_output_type()==ware  &&  tmp->get_distribution_weight()>0) {
 
 					if(!can_factory_tree_rotate( tmp )) {
 						return false;
@@ -549,7 +607,7 @@ bool factory_builder_t::can_factory_tree_rotate( const factory_desc_t *desc )
  * is the maximum number of good types for which suppliers chains are built
  * (meaning there are no unfinished factory chains).
  */
-int factory_builder_t::build_link(koord3d* parent, const factory_desc_t* info, sint32 initial_prod_base, int rotate, koord3d* pos, player_t* player, int number_of_chains )
+int factory_builder_t::build_link(koord3d* parent, const factory_desc_t* info, sint32 initial_prod_base, int rotate, koord3d* pos, player_t* player, int number_of_chains, bool ignore_climates)
 {
 	int n = 1;
 	int org_rotation = -1;
@@ -560,7 +618,7 @@ int factory_builder_t::build_link(koord3d* parent, const factory_desc_t* info, s
 	}
 
 	// no cities at all?
-	if (info->get_placement() == factory_desc_t::City  &&  welt->get_staedte().empty()) {
+	if (info->get_placement() == factory_desc_t::City  &&  welt->get_cities().empty()) {
 		return 0;
 	}
 
@@ -580,7 +638,9 @@ int factory_builder_t::build_link(koord3d* parent, const factory_desc_t* info, s
 		koord size=info->get_building()->get_size(0);
 
 		// build consumer (factory) in town
-		stadt_t *city = welt->suche_naechste_stadt(pos->get_2d());
+		stadt_t *city = welt->find_nearest_city(pos->get_2d());
+
+		climate_bits cl = ignore_climates ? ALL_CLIMATES : info->get_building()->get_allowed_climate_bits();
 
 		/* Three variants:
 		 * A:
@@ -591,12 +651,12 @@ int factory_builder_t::build_link(koord3d* parent, const factory_desc_t* info, s
 		 */
 		bool is_rotate=info->get_building()->get_all_layouts()>1  &&  size.x!=size.y  &&  info->get_building()->can_rotate();
 		// first try with standard orientation
-		koord k = factory_bauplatz_mit_strasse_sucher_t(welt).suche_platz(city->get_pos(), size.x, size.y, info->get_building()->get_allowed_climate_bits());
+		koord k = factory_site_searcher_t(welt, factory_desc_t::City).find_place(city->get_pos(), size.x, size.y, cl );
 
 		// second try: rotated
 		koord k1 = koord::invalid;
 		if (is_rotate  &&  (k == koord::invalid  ||  simrand(256)<128)) {
-			k1 = factory_bauplatz_mit_strasse_sucher_t(welt).suche_platz(city->get_pos(), size.y, size.x, info->get_building()->get_allowed_climate_bits());
+			k1 = factory_site_searcher_t(welt, factory_desc_t::City).find_place(city->get_pos(), size.y, size.x, cl );
 		}
 
 		rotate = simrand( info->get_building()->get_all_layouts() );
@@ -629,7 +689,7 @@ int factory_builder_t::build_link(koord3d* parent, const factory_desc_t* info, s
 		 * often hidden behind a row of houses, cut off from roads.
 		 */
 #if 0
-		k = bauplatz_sucher_t(welt).suche_platz(city->get_pos(), land_bau.dim.x, land_bau.dim.y, info->get_building()->get_allowed_climate_bits(), &is_rotate);
+		k = building_placefinder_t(welt).find_place(city->get_pos(), land_bau.dim.x, land_bau.dim.y, info->get_building()->get_allowed_climate_bits(), &is_rotate);
 #endif
 
 		if(k != koord::invalid) {
@@ -683,11 +743,11 @@ int factory_builder_t::build_chain_link(const fabrik_t* our_fab, const factory_d
 	 * We must take care to add capacity for cross-connected factories!
 	 */
 	const factory_supplier_desc_t *supplier = info->get_supplier(supplier_nr);
-	const ware_besch_t *ware = supplier->get_ware();
+	const goods_desc_t *ware = supplier->get_input_type();
 	const int producer_count=count_producers( ware, welt->get_timeline_year_month() );
 
 	if(producer_count==0) {
-		dbg->error("factory_builder_t::build_link()","No producer for %s found, chain incomplete!",ware->get_name() );
+		dbg->error("factory_builder_t::build_chain_link()","No producer for %s found, chain incomplete!",ware->get_name() );
 		return 0;
 	}
 
@@ -701,7 +761,7 @@ int factory_builder_t::build_chain_link(const fabrik_t* our_fab, const factory_d
 	int lcount = supplier->get_supplier_count();
 	int lfound = 0;	// number of found producers
 
-DBG_MESSAGE("factory_builder_t::build_link","supplier_count %i, lcount %i (need %i of %s)",info->get_supplier_count(),lcount,consumption,ware->get_name());
+	DBG_MESSAGE("factory_builder_t::build_chain_link","supplier_count %i, lcount %i (need %i of %s)",info->get_supplier_count(),lcount,consumption,ware->get_name());
 
 	// Hajo: search if there already is one or two (cross-connect everything if possible)
 	FOR(slist_tpl<fabrik_t*>, const fab, welt->get_fab_list()) {
@@ -721,7 +781,7 @@ DBG_MESSAGE("factory_builder_t::build_link","supplier_count %i, lcount %i (need 
 				// now guess how much this factory can supply
 				const factory_desc_t* const fd = fab->get_desc();
 				for (uint gg = 0; gg < fd->get_product_count(); gg++) {
-					if (fd->get_product(gg)->get_ware() == ware && fab->get_lieferziele().get_count() < 10) { // does not make sense to split into more ...
+					if (fd->get_product(gg)->get_output_type() == ware && fab->get_lieferziele().get_count() < 10) { // does not make sense to split into more ...
 						sint32 production_left = fab->get_base_production() * fd->get_product(gg)->get_factor();
 						const vector_tpl <koord> & lieferziele = fab->get_lieferziele();
 
@@ -730,7 +790,7 @@ DBG_MESSAGE("factory_builder_t::build_link","supplier_count %i, lcount %i (need 
 							if (production_left <= 0) break;
 							fabrik_t* const zfab = fabrik_t::get_fab(i);
 							for(int zz=0;  zz<zfab->get_desc()->get_supplier_count();  zz++) {
-								if(zfab->get_desc()->get_supplier(zz)->get_ware()==ware) {
+								if(zfab->get_desc()->get_supplier(zz)->get_input_type()==ware) {
 									production_left -= zfab->get_base_production()*zfab->get_desc()->get_supplier(zz)->get_consumption();
 									break;
 								}
@@ -742,7 +802,7 @@ DBG_MESSAGE("factory_builder_t::build_link","supplier_count %i, lcount %i (need 
 							if(production_left>0) {
 								consumption -= production_left;
 								fab->add_lieferziel(our_fab->get_pos().get_2d());
-								DBG_MESSAGE("factory_builder_t::build_link","supplier %s can supply approx %i of %s to us", fd->get_name(), production_left, ware->get_name());
+								DBG_MESSAGE("factory_builder_t::build_chain_link","supplier %s can supply approx %i of %s to us", fd->get_name(), production_left, ware->get_name());
 							}
 							else {
 								/* we steal something; however the total capacity
@@ -779,12 +839,12 @@ DBG_MESSAGE("factory_builder_t::build_link","supplier_count %i, lcount %i (need 
 	if(  producer.empty()  ) {
 		// can happen with timeline
 		if(!info->is_consumer_only()) {
-			dbg->error( "factory_builder_t::build_link()", "no producer for %s!", ware->get_name() );
+			dbg->error( "factory_builder_t::build_chain_link()", "no producer for %s!", ware->get_name() );
 			return 0;
 		}
 		else {
 			// only consumer: Will do with partly covered chains
-			dbg->error( "factory_builder_t::build_link()", "no producer for %s!", ware->get_name() );
+			dbg->error( "factory_builder_t::build_chain_link()", "no producer for %s!", ware->get_name() );
 		}
 	}
 
@@ -800,7 +860,7 @@ DBG_MESSAGE("factory_builder_t::build_link","supplier_count %i, lcount %i (need 
 
 		INT_CHECK("fabrikbauer 697");
 
-		koord3d k = find_random_construction_site( our_fab->get_pos().get_2d(), DISTANCE, producer_d->get_building()->get_size(rotate),producer_d->get_placement()==factory_desc_t::Water, producer_d->get_building(), ignore_climates, 20000 );
+		koord3d k = find_random_construction_site( our_fab->get_pos().get_2d(), DISTANCE, producer_d->get_building()->get_size(rotate), producer_d->get_placement(), producer_d->get_building(), ignore_climates, 20000 );
 		if(  k == koord3d::invalid  ) {
 			// this factory cannot buuild in the desired vincinity
 			producer.remove( producer_d );
@@ -817,8 +877,8 @@ DBG_MESSAGE("factory_builder_t::build_link","supplier_count %i, lcount %i (need 
 
 		INT_CHECK("fabrikbauer 697");
 
-DBG_MESSAGE("factory_builder_t::build_link","Try to built supplier %s at (%i,%i) r=%i for %s.",producer_d->get_name(),k.x,k.y,rotate,info->get_name());
-		n += build_link(&parent_pos, producer_d, -1 /*random prodbase */, rotate, &k, player, 10000 );
+		DBG_MESSAGE("factory_builder_t::build_chain_link","Try to built supplier %s at (%i,%i) r=%i for %s.",producer_d->get_name(),k.x,k.y,rotate,info->get_name());
+		n += build_link(&parent_pos, producer_d, -1 /*random prodbase */, rotate, &k, player, 10000, ignore_climates);
 		lfound ++;
 
 		INT_CHECK( "fabrikbauer 702" );
@@ -826,7 +886,7 @@ DBG_MESSAGE("factory_builder_t::build_link","Try to built supplier %s at (%i,%i)
 		// now subtract current supplier
 		fabrik_t *fab = fabrik_t::get_fab(k.get_2d() );
 		if(fab==NULL) {
-DBG_MESSAGE( "factory_builder_t::build_link", "Failed to build at %s", k.get_str() );
+			DBG_MESSAGE( "factory_builder_t::build_chain_link", "Failed to build at %s", k.get_str() );
 			retry --;
 			continue;
 		}
@@ -835,11 +895,11 @@ DBG_MESSAGE( "factory_builder_t::build_link", "Failed to build at %s", k.get_str
 		// connect new supplier to us
 		const factory_desc_t* const fd = fab->get_desc();
 		for (uint gg = 0; gg < fab->get_desc()->get_product_count(); gg++) {
-			if (fd->get_product(gg)->get_ware() == ware) {
+			if (fd->get_product(gg)->get_output_type() == ware) {
 				sint32 production = fab->get_base_production() * fd->get_product(gg)->get_factor();
 				// the take care of how much this factory could supply
 				consumption -= production;
-				DBG_MESSAGE("factory_builder_t::build_link", "new supplier %s can supply approx %i of %s to us", fd->get_name(), production, ware->get_name());
+				DBG_MESSAGE("factory_builder_t::build_chain_link", "new supplier %s can supply approx %i of %s to us", fd->get_name(), production, ware->get_name());
 				break;
 			}
 		}
@@ -897,11 +957,11 @@ int factory_builder_t::increase_industry_density( bool tell_me )
 		// ok, found consumer
 		if(  last_built_consumer  ) {
 			for(  int i=0;  i < last_built_consumer->get_desc()->get_supplier_count();  i++  ) {
-				ware_besch_t const* const w = last_built_consumer->get_desc()->get_supplier(i)->get_ware();
+				goods_desc_t const* const w = last_built_consumer->get_desc()->get_supplier(i)->get_input_type();
 				FOR(vector_tpl<koord>, const& j, last_built_consumer->get_suppliers()) {
 					factory_desc_t const* const fd = fabrik_t::get_fab(j)->get_desc();
 					for (uint32 k = 0; k < fd->get_product_count(); k++) {
-						if (fd->get_product(k)->get_ware() == w) {
+						if (fd->get_product(k)->get_output_type() == w) {
 							last_built_consumer_ware = i+1;
 							goto next_ware_check;
 						}
@@ -946,7 +1006,7 @@ next_ware_check:
 			DBG_MESSAGE( "factory_builder_t::increase_industry_density()", "added ware %i to factory %s", last_built_consumer_ware, last_built_consumer->get_name() );
 			// tell the player
 			if(tell_me) {
-				stadt_t *s = welt->suche_naechste_stadt( last_built_consumer->get_pos().get_2d() );
+				stadt_t *s = welt->find_nearest_city( last_built_consumer->get_pos().get_2d() );
 				const char *stadt_name = s ? s->get_name() : translator::translate("nowhere");
 				cbuffer_t buf;
 				buf.printf( translator::translate("Factory chain extended\nfor %s near\n%s built with\n%i factories."), translator::translate(last_built_consumer->get_name()), stadt_name, nr );
@@ -965,10 +1025,10 @@ next_ware_check:
 
 	FOR(slist_tpl<fabrik_t*>, const fab, welt->get_fab_list()) {
 		if(  fab->get_desc()->is_electricity_producer()  ) {
-			electric_supply += fab->get_scaled_electric_amount() / PRODUCTION_DELTA_T;
+			electric_supply += fab->get_scaled_electric_demand() / PRODUCTION_DELTA_T;
 		}
 		else {
-			electric_demand += fab->get_scaled_electric_amount() / PRODUCTION_DELTA_T;
+			electric_demand += fab->get_scaled_electric_demand() / PRODUCTION_DELTA_T;
 		}
 	}
 
@@ -984,7 +1044,7 @@ next_ware_check:
 			const factory_desc_t *fab=get_random_consumer( no_electric==0, ALL_CLIMATES, welt->get_timeline_year_month() );
 			if(fab) {
 				const bool in_city = fab->get_placement() == factory_desc_t::City;
-				if (in_city && welt->get_staedte().empty()) {
+				if (in_city && welt->get_cities().empty()) {
 					// we cannot build this factory here
 					continue;
 				}
@@ -992,17 +1052,17 @@ next_ware_check:
 				int rotation = simrand( fab->get_building()->get_all_layouts() );
 				if(!in_city) {
 					// find somewhere on the map
-					pos = find_random_construction_site( koord(welt->get_size().x/2,welt->get_size().y/2), welt->get_size_max()/2, fab->get_building()->get_size(rotation),fab->get_placement()==factory_desc_t::Water,fab->get_building(),ignore_climates,10000);
+					pos = find_random_construction_site( koord(welt->get_size().x/2,welt->get_size().y/2), welt->get_size_max()/2, fab->get_building()->get_size(rotation),fab->get_placement(),fab->get_building(),ignore_climates,10000);
 				}
 				else {
 					// or within the city limit
-					const stadt_t *city = pick_any_weighted(welt->get_staedte());
+					const stadt_t *city = pick_any_weighted(welt->get_cities());
 					koord diff = city->get_rechtsunten()-city->get_linksoben();
-					pos = find_random_construction_site( city->get_center(), max(diff.x,diff.y)/2, fab->get_building()->get_size(rotation),fab->get_placement()==factory_desc_t::Water,fab->get_building(),ignore_climates, 1000);
+					pos = find_random_construction_site( city->get_center(), max(diff.x,diff.y)/2, fab->get_building()->get_size(rotation),fab->get_placement(),fab->get_building(),ignore_climates, 1000);
 				}
 				if(welt->lookup(pos)) {
 					// Space found...
-					nr += build_link(NULL, fab, -1 /* random prodbase */, rotation, &pos, welt->get_public_player(), 1 );
+					nr += build_link(NULL, fab, -1 /* random prodbase */, rotation, &pos, welt->get_public_player(), 1, ignore_climates);
 					if(nr>0) {
 						fabrik_t *our_fab = fabrik_t::get_fab( pos.get_2d() );
 						reliefkarte_t::get_karte()->calc_map_size();

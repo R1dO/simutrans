@@ -148,6 +148,11 @@ call_tool_init convoy_generic_tool(convoi_t *cnv, player_t *player, uint8 cnvtoo
 	return call_tool_init(TOOL_CHANGE_CONVOI | SIMPLE_TOOL, buf, 0, player);
 }
 
+bool convoy_is_schedule_editor_open(convoi_t *cnv)
+{
+	return cnv->get_state() == convoi_t::EDIT_SCHEDULE;
+}
+
 void export_convoy(HSQUIRRELVM vm)
 {
 	/**
@@ -186,7 +191,11 @@ void export_convoy(HSQUIRRELVM vm)
 	 * Class to access a convoy.
 	 * Player vehicles are convoys, which themselves consist of individual vehicles (trucks, trailers, ...).
 	 */
-	begin_class(vm, "convoy_x", "extend_get");
+	begin_class(vm, "convoy_x", "extend_get,ingame_object");
+	/**
+	 * @returns if object is still valid.
+	 */
+	export_is_valid<convoi_t*>(vm); //register_function("is_valid")
 	/**
 	 * Does convoy needs electrified ways?
 	 * @returns true if this is the case
@@ -311,10 +320,18 @@ void export_convoy(HSQUIRRELVM vm)
 	 */
 	register_method(vm, &convoi_t::get_withdraw, "is_withdrawn");
 	/**
+	 * @returns true if convoy is in depot
+	 */
+	register_method(vm, &convoi_t::in_depot, "is_in_depot");
+	/**
 	 * Destroy the convoy.
 	 * @ingroup game_cmd
 	 */
 	register_method_fv(vm, convoy_generic_tool, "destroy", freevariable<uint8>('x'), true);
+	/**
+	 * @returns returns true if the schedule of the convoy is currently being edited.
+	 */
+	register_method(vm, convoy_is_schedule_editor_open, "is_schedule_editor_open", true);
 
 #define STATIC
 	/**

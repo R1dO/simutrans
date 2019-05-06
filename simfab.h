@@ -14,7 +14,7 @@
 #include "tpl/slist_tpl.h"
 #include "tpl/vector_tpl.h"
 #include "tpl/array_tpl.h"
-#include "besch/fabrik_besch.h"
+#include "descriptor/factory_desc.h"
 #include "halthandle_t.h"
 #include "simworld.h"
 #include "utils/plainstring.h"
@@ -23,6 +23,7 @@
 class player_t;
 class stadt_t;
 class ware_t;
+class leitung_t;
 
 
 /**
@@ -77,15 +78,18 @@ class ware_t;
 /**
  * JIT2 output scale constants.
  */
-// The fixed point precision of production scale factors.
-// Supported range 1 to 30.
-static const uint32 PRODUCTION_SCALE_BITS = 10;
+// The fixed point precision for work done fraction.
+static const uint32 WORK_BITS = 16;
 // The minimum allowed production rate for a factory. This is to limit the time outputs take to fill completly (so factories idle sooner).
 // Fixed point form range must be between 0.0 and 1.0.
-static const sint32 OUTPUT_SCALE_MINIMUM_FRACTION = (5 << PRODUCTION_SCALE_BITS) / 100; // ~5%, 1/20 of the full production rate.
+static const sint32 WORK_SCALE_MINIMUM_FRACTION = (5 << WORK_BITS) / 100; // ~5%, 1/20 of the full production rate.
 // The number of times minimum_shipment must be in current storage before rampdown starts.
-// Must be at least 2 to allow for full production.
+// Must be at least 2 to allow for full production as shipment is not instant.
 static const sint32 OUTPUT_SCALE_RAMPDOWN_MULTIPLYER = 2; // Two shipments must be ready.
+// The maximum rate at which power boost change change per second.
+// This limit is required to help stiffen overloaded networks to combat oscilations caused by feedback.
+static const sint32 BOOST_POWER_CHANGE_RATE = (5 << DEFAULT_PRODUCTION_FACTOR_BITS) / 100; // ~5%
+
 
 /**
  * Shipment size constants.
@@ -108,7 +112,7 @@ sint64 convert_boost(sint64 value);
 class ware_production_t
 {
 private:
-	const ware_besch_t *type;
+	const goods_desc_t *type;
 	// Knightly : statistics for each goods
 	sint64 statistics[MAX_MONTH][MAX_FAB_GOODS_STAT];
 	sint64 weighted_sum_storage;
@@ -125,8 +129,8 @@ public:
 		init_stats();
 	}
 
-	const ware_besch_t* get_typ() const { return type; }
-	void set_typ(const ware_besch_t *t) { type=t; }
+	const goods_desc_t* get_typ() const { return type; }
+	void set_typ(const goods_desc_t *t) { type=t; }
 
 	// Knightly : functions for manipulating goods statistics
 	void roll_stats(uint32 factor, sint64 aggregate_weight);
@@ -149,9 +153,6 @@ public:
 	}
 	void book_weighted_sum_storage(uint32 factor, sint64 delta_time);
 
-	// Utility methods.
-	sint32 scale_production(sint32 prod);
-
 	sint32 menge;	// in internal units shifted by precision_bits (see step)
 	sint32 max;
 	/// Cargo currently in transit from/to this slot. Equivalent to statistics[0][FAB_GOODS_TRANSIT].
@@ -160,13 +161,13 @@ public:
 	/// Annonmyous union used to save memory and readability. Contains supply flow control limiters.
 	union{
 		// Classic : Current limit on cargo in transit (maximum network capacity), depending on sum of all supplier output storage.
-		sint32 max_transit;
+		sint32 max_transit; //JIT<2 Input
 
 		// JIT Version 2 : Current demand for the good. Orders when greater than 0.
-		sint32 demand_buffer;
+		sint32 demand_buffer; //JIT2 Input
 
 		// The minimum shipment size. Used to control delivery to stops and for production ramp-down.
-		sint32 min_shipment;
+		sint32 min_shipment; // Output
 	};
 
 	// Ordering lasts at least 1 tick period to allow all suppliers time to send (fair). Used by inputs.
@@ -176,6 +177,12 @@ public:
 	sint32 count_suppliers;	// only needed for averaging
 #endif
 	uint32 index_offset; // used for haltlist and lieferziele searches in verteile_waren to produce round robin results
+
+	// Production rate for outputs. Returns fixed point with WORK_BITS fractional bits.
+	sint32 calculate_output_production_rate() const;
+
+	// Production rate for JIT2 demands. Returns fixed point with WORK_BITS fractional bits.
+	sint32 calculate_demand_production_rate() const;
 };
 
 
@@ -191,7 +198,7 @@ class fabrik_t
 {
 public:
 	/**
-	 * Konstanten
+	 * Constants
 	 * @author Hj. Malthaner
 	 */
 	enum { precision_bits = 10, old_precision_bits = 10, precision_mask = 1023 };
@@ -220,11 +227,10 @@ private:
 		CL_FACT_MANY,    // Enhanced factory logic, consume at average of output rate or minimum input averaged.
 		// Consumers are at the top of every supply chain.
 		CL_CONS_CLASSIC, // Classic consumer logic. Can generate power.
-		CL_CONS_MANY,    // Consumer that consumes multiple inputs.
-		// Electricity producers provider power.
+		CL_CONS_MANY,    // Consumer that consumes multiple inputs, possibly produces power.
+		// Electricity producers provide power.
 		CL_ELEC_PROD,    // Simple electricity source. (green energy)
 		CL_ELEC_CLASSIC, // Classic electricity producer behaviour with no inputs.
-		CL_ELEC_CONS,    // Power produced based on input satisfaction.
 	} control_type;
 
 	// Demand buffer order logic;
@@ -258,7 +264,7 @@ private:
 	uint32 lieferziele_active_last_month;
 
 	/**
-	 * suppliers to this factry
+	 * suppliers to this factory
 	 * @author hsiegeln
 	 */
 	vector_tpl <koord> suppliers;
@@ -281,7 +287,7 @@ private:
 	vector_tpl <field_data_t> fields;
 
 	/**
-	 * Die erzeugten waren auf die Haltestellen verteilen
+	 * Distribute products to connected stops
 	 * @author Hj. Malthaner
 	 */
 	void verteile_waren(const uint32 product);
@@ -295,34 +301,27 @@ private:
 	const factory_desc_t *desc;
 
 	/**
-	 * Bauposition gedreht?
+	 * Is construction site rotated?
 	 * @author V.Meyer
 	 */
 	uint8 rotate;
 
 	/**
-	 * productionsgrundmenge
+	 * production base amount
 	 * @author Hj. Malthaner
 	 */
 	sint32 prodbase;
 
 	/**
-	 * multiplikator für die Produktionsgrundmenge
+	 * multipliers for the production base amount
 	 * @author Hj. Malthaner
 	 */
 	sint32 prodfactor_electric;
 	sint32 prodfactor_pax;
 	sint32 prodfactor_mail;
 
-	array_tpl<ware_production_t> eingang; ///< array for input/consumed goods
-	array_tpl<ware_production_t> ausgang; ///< array for output/produced goods
-
-	/**
-	 * Some handy cached numbers for active inputs and outputs.
-	 */
-	uint8 inactive_outputs;
-	uint8 inactive_inputs;
-	uint8 inactive_demands;
+	array_tpl<ware_production_t> input;  ///< array for input/consumed goods
+	array_tpl<ware_production_t> output; ///< array for output/produced goods
 
 	/**
 	 * Zeitakkumulator für Produktion
@@ -337,20 +336,23 @@ private:
 	// Knightly : number of rounds where there is active production or consumption
 	uint8 activity_count;
 
-	// true if the factory has a transformer adjacent
-	bool transformer_connected;
+	// The adjacent connected transformer, if any.
+	leitung_t *transformer;
 
 	// true, if the factory did produce enough in the last step to require power
 	bool currently_producing;
 
-	// power that can be currently drawn from this station (or the amount delivered)
-	uint32 power;
-
-	// power requested for next step
-	uint32 power_demand;
+	uint32 last_sound_ms;
 
 	uint32 total_input, total_transit, total_output;
 	uint8 status;
+
+	/**
+	 * Inactive caches, used to speed up logic when dealing with inputs and outputs.
+	 */
+	uint8 inactive_outputs;
+	uint8 inactive_inputs;
+	uint8 inactive_demands;
 
 	/// Position of a building of the factory.
 	koord3d pos;
@@ -369,7 +371,7 @@ private:
 	 * Electricity amount scaled with prodbase
 	 * @author TurfIt
 	 */
-	uint32 scaled_electric_amount;
+	uint32 scaled_electric_demand;
 
 	/**
 	 * Pax/mail demand scaled with prodbase and month length
@@ -382,7 +384,7 @@ private:
 	 * Update scaled electricity amount
 	 * @author TurfIt
 	 */
-	void update_scaled_electric_amount();
+	void update_scaled_electric_demand();
 
 	/**
 	 * Update scaled pax/mail demand
@@ -463,9 +465,44 @@ private:
 	// scales the amount of production based on the amount already in storage
 	uint32 scale_output_production(const uint32 product, uint32 menge) const;
 
+	/**
+	 * Convenience method that deals with casting.
+	 */
+	void set_power_supply(uint32 supply);
+
+	/**
+	 * Convenience method that deals with casting.
+	 */
+	uint32 get_power_supply() const;
+
+	/**
+	 * Convenience method that deals with casting.
+	 */
+	sint32 get_power_consumption() const;
+
+	/**
+	 * Convenience method that deals with casting.
+	 */
+	void set_power_demand(uint32 demand);
+
+	/**
+	 * Convenience method that deals with casting.
+	 */
+	uint32 get_power_demand() const;
+
+	/**
+	 * Convenience method that deals with casting.
+	 */
+	sint32 get_power_satisfaction() const;
+
+	/**
+	 *
+	 */
+	 sint64 get_power() const;
+
 public:
 	fabrik_t(loadsave_t *file);
-	fabrik_t(koord3d pos, player_t* owner, const factory_desc_t* fabesch, sint32 initial_prod_base);
+	fabrik_t(koord3d pos, player_t* owner, const factory_desc_t* factory_desc, sint32 initial_prod_base);
 	~fabrik_t();
 
 	/**
@@ -553,37 +590,35 @@ public:
 	 *   -1 wenn typ nicht produziert wird
 	 *   sonst die gelagerte menge
 	 */
-	sint32 input_vorrat_an(const ware_besch_t *ware);        // Vorrat von Warentyp
-	sint32 vorrat_an(const ware_besch_t *ware);        // Vorrat von Warentyp
-
-	// returns all power and consume it to prevent multiple pumpes
-	uint32 get_power() { uint32 p=power; power=0; return p; }
-
-	// returns power wanted by the factory for next step and sets to 0 to prevent multiple senkes on same powernet
-	uint32 get_power_demand() { uint32 p=power_demand; power_demand=0; return p; }
-
-	// give power to the factory to consume ...
-	void add_power(uint32 p) { power += p; }
-
-	// senkes give back wanted power they can't supply such that a senke on a different powernet can try suppling
-	// WARNING: senke stepping order can vary between ingame construction and savegame loading => different results after saveing/loading the game
-	void add_power_demand(uint32 p) { power_demand +=p; }
+	sint32 input_vorrat_an(const goods_desc_t *ware);        // Vorrat von Warentyp
+	sint32 vorrat_an(const goods_desc_t *ware);        // Vorrat von Warentyp
 
 	// true, if there was production requiring power in the last step
 	bool is_currently_producing() const { return currently_producing; }
 
-	// used to limit transformers to 1 per factory and for controling power bonus.
-	bool is_transformer_connected() const { return transformer_connected; }
-	void set_transformer_connected(bool connected) { transformer_connected = connected; }
+	/**
+	 * True if a transformer is connected to this factory.
+	 */
+	bool is_transformer_connected() const { return transformer != NULL; }
+
+	/**
+	 * Connect transformer to this factory.
+	 */
+	void set_transformer_connected(leitung_t *transformer) { this->transformer = transformer; }
 
 	/**
 	 * @return 1 wenn consumption,
 	 * 0 wenn Produktionsstopp,
 	 * -1 wenn Ware nicht verarbeitet wird
 	 */
-	sint8 is_needed(const ware_besch_t *) const;
+	sint8 is_needed(const goods_desc_t *) const;
 
-	sint32 liefere_an(const ware_besch_t *, sint32 menge);
+	sint32 liefere_an(const goods_desc_t *, sint32 menge);
+
+	/**
+	 * Calculate the JIT2 logic power boost amount using the currently attached transformer.
+	 */
+	sint32 get_jit2_power_boost() const;
 
 	void step(uint32 delta_t);                  // factory muss auch arbeiten
 	void new_month();
@@ -591,7 +626,7 @@ public:
 	char const* get_name() const;
 	void set_name( const char *name );
 
-	sint32 get_color() const { return desc->get_color(); }
+	PIXVAL get_color() const { return desc->get_color(); }
 
 	player_t *get_owner() const
 	{
@@ -647,8 +682,8 @@ public:
 	 * total and current procduction/storage values
 	 * @author Hj. Malthaner
 	 */
-	const array_tpl<ware_production_t>& get_eingang() const { return eingang; }
-	const array_tpl<ware_production_t>& get_ausgang() const { return ausgang; }
+	const array_tpl<ware_production_t>& get_input() const { return input; }
+	const array_tpl<ware_production_t>& get_output() const { return output; }
 
 	/**
 	 * Production multipliers
@@ -667,7 +702,7 @@ public:
 
 	/* prissi: returns the status of the current factory, as well as output */
 	enum { bad, medium, good, inactive, nothing };
-	static unsigned status_to_color[5];
+	static uint8 status_to_color[5];
 
 	uint8  get_status() const { return status; }
 	uint32 get_total_in() const { return total_input; }
@@ -689,14 +724,28 @@ public:
 	 * Return the scaled electricity amount and pax/mail demand
 	 * @author Knightly
 	 */
-	uint32 get_scaled_electric_amount() const { return scaled_electric_amount; }
+	uint32 get_scaled_electric_demand() const { return scaled_electric_demand; }
 	uint32 get_scaled_pax_demand() const { return scaled_pax_demand; }
 	uint32 get_scaled_mail_demand() const { return scaled_mail_demand; }
 
-	bool is_end_consumer() const { return (ausgang.empty() && !desc->is_electricity_producer()); }
+	bool is_end_consumer() const { return (output.empty() && !desc->is_electricity_producer()); }
 
 	// Returns a list of goods produced by this factory.
-	slist_tpl<const ware_besch_t*> *get_produced_goods() const;
+	slist_tpl<const goods_desc_t*> *get_produced_goods() const;
+
+	// Rebuild the factory inactive caches.
+	void rebuild_inactive_cache();
+
+	double get_production_per_second() const;
+
+	/* Calculate work rate using a ramp function.
+	 * amount: The current amount.
+	 * minimum: Minimum amount before work rate starts ramp down.
+	 * maximum: Maximum before production stops.
+	 * (opt) precision: Work rate fixed point fractional precision.
+	 * returns: Work rate in fixed point form.
+	 */
+	static sint32 calculate_work_rate_ramp(sint32 const amount, sint32 const minimum, sint32 const maximum, uint32 const precision = WORK_BITS);
 };
 
 #endif

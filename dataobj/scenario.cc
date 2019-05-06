@@ -1,3 +1,4 @@
+#include "../simsys.h"
 #include "../simconst.h"
 #include "../simtypes.h"
 #include "../simdebug.h"
@@ -26,6 +27,7 @@
 #include "../script/export_objs.h"
 #include "../script/api/api.h"
 #include "../script/api_param.h"
+#include "../script/api_class.h"
 
 #include "../tpl/plainstringhashtable_tpl.h"
 
@@ -273,6 +275,7 @@ bool scenario_t::forbidden_t::operator ==(const forbidden_t &other) const
 				eq = eq  &&  (hmin == other.hmin)  &&  (hmax == other.hmax);
 				eq = eq  &&  (pos_nw == other.pos_nw);
 				eq = eq  &&  (pos_se == other.pos_se);
+				/* FALLTHROUGH */
 			case forbid_tool:
 				eq = eq  &&  (toolnr == other.toolnr);
 				break;
@@ -545,8 +548,8 @@ const char* scenario_t::is_schedule_allowed(const player_t* player, const schedu
 	if (schedule == NULL) {
 		return "";
 	}
-	if (schedule->empty()  ||  env_t::server) {
-		// empty schedule, networkgame: all allowed
+	if (env_t::server) {
+		// networkgame: allowed
 		return NULL;
 	}
 	// call script
@@ -557,6 +560,28 @@ const char* scenario_t::is_schedule_allowed(const player_t* player, const schedu
 		return err == NULL ? msg.c_str() : NULL;
 	}
 	return NULL;
+}
+
+
+const char* scenario_t::is_convoy_allowed(const player_t* player, convoihandle_t cnv, depot_t* depot)
+{
+	// sanity checks
+	if (!cnv.is_bound()  ||  depot == NULL) {
+		return "";
+	}
+	if (env_t::server) {
+		// networkgame: allowed
+		return NULL;
+	}
+	// call script
+	if (what_scenario == SCRIPTED) {
+		static plainstring msg;
+		const char *err = script->call_function(script_vm_t::FORCE, "is_convoy_allowed", msg, (uint8)(player  ?  player->get_player_nr() : PLAYER_UNOWNED), cnv, (obj_t*)depot);
+
+		return err == NULL ? msg.c_str() : NULL;
+	}
+	return NULL;
+
 }
 
 
@@ -698,7 +723,7 @@ plainstring scenario_t::load_language_file(const char* filename)
 	}
 	std::string path = scenario_path.c_str();
 	// try user language
-	std::string wanted_file = path + translator::get_lang()->iso + "/" + filename;
+	std::string wanted_file = path + translator::get_lang()->iso + PATH_SEPARATOR + filename;
 
 	const plainstring& cached = cached_text_files.get(wanted_file.c_str());
 	if (cached != NULL) {
@@ -706,14 +731,14 @@ plainstring scenario_t::load_language_file(const char* filename)
 		return cached;
 	}
 	// not cached: try to read file
-	FILE* file = fopen(wanted_file.c_str(), "rb");
+	FILE* file = dr_fopen(wanted_file.c_str(), "rb");
 	if (file == NULL) {
 		// try English
-		file = fopen((path + "en/" + filename).c_str(), "rb");
+		file = dr_fopen((path + "en" + PATH_SEPARATOR + filename).c_str(), "rb");
 	}
 	if (file == NULL) {
 		// try scenario directory
-		file = fopen((path + filename).c_str(), "rb");
+		file = dr_fopen((path + filename).c_str(), "rb");
 	}
 
 	plainstring text = "";
@@ -736,7 +761,7 @@ plainstring scenario_t::load_language_file(const char* filename)
 	return text;
 }
 
-bool scenario_t::open_info_win() const
+bool scenario_t::open_info_win(const char* tab) const
 {
 	// pop up for the win
 	scenario_info_t *si = (scenario_info_t*)win_get_magic(magic_scenario_info);
@@ -744,7 +769,7 @@ bool scenario_t::open_info_win() const
 		si = new scenario_info_t();
 		create_win(si, w_info, magic_scenario_info);
 	}
-	si->open_result_tab();
+	si->open_tab(tab);
 	return true; // dummy return value
 }
 
@@ -926,4 +951,13 @@ bool scenario_t::set_completion(sint32 player_nr, sint32 percentage)
 		update_won_lost(mask, 0);
 	}
 	return true;
+}
+
+
+const char* scenario_t::eval_string(const char* squirrel_string) const
+{
+	if (what_scenario == SCRIPTED) {
+		return script->eval_string(squirrel_string);
+	}
+	return "";
 }

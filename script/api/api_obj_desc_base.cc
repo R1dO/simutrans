@@ -4,14 +4,15 @@
 #include "../../bauer/hausbauer.h"
 #include "../../bauer/tunnelbauer.h"
 #include "../../bauer/vehikelbauer.h"
-#include "../../bauer/warenbauer.h"
+#include "../../bauer/goods_manager.h"
 #include "../../bauer/wegbauer.h"
-#include "../../besch/bruecke_besch.h"
-#include "../../besch/tunnel_besch.h"
-#include "../../besch/vehikel_besch.h"
-#include "../../besch/ware_besch.h"
-#include "../../besch/weg_besch.h"
+#include "../../descriptor/bridge_desc.h"
+#include "../../descriptor/tunnel_desc.h"
+#include "../../descriptor/vehicle_desc.h"
+#include "../../descriptor/goods_desc.h"
+#include "../../descriptor/way_desc.h"
 #include "../../obj/baum.h"
+#include "../../obj/roadsign.h"
 #include "../../squirrel/sq_extensions.h"
 
 using namespace script_api;
@@ -21,13 +22,14 @@ static const way_desc_t *my_get_desc(const char *name)
 	return way_builder_t::get_desc(name);
 }
 
-implement_besch_param(tree_desc_t, "tree_desc_x", &baum_t::find_tree);
-implement_besch_param(building_desc_t, "building_desc_x", &hausbauer_t::get_desc);
-implement_besch_param(ware_besch_t, "good_desc_x", (const ware_besch_t* (*)(const char*))(&warenbauer_t::get_info) );
-implement_besch_param(way_desc_t, "way_desc_x", &my_get_desc);
-implement_besch_param(vehicle_desc_t, "vehicle_desc_x", &vehicle_builder_t::get_info);
-implement_besch_param(tunnel_desc_t, "tunnel_desc_x", &tunnel_builder_t::get_desc);
-implement_besch_param(bridge_desc_t, "bridge_desc_x", &bridge_builder_t::get_desc);
+implement_desc_param(tree_desc_t, "tree_desc_x", &baum_t::find_tree);
+implement_desc_param(building_desc_t, "building_desc_x", &hausbauer_t::get_desc);
+implement_desc_param(goods_desc_t, "good_desc_x", (const goods_desc_t* (*)(const char*))(&goods_manager_t::get_info) );
+implement_desc_param(way_desc_t, "way_desc_x", &my_get_desc);
+implement_desc_param(vehicle_desc_t, "vehicle_desc_x", &vehicle_builder_t::get_info);
+implement_desc_param(tunnel_desc_t, "tunnel_desc_x", &tunnel_builder_t::get_desc);
+implement_desc_param(bridge_desc_t, "bridge_desc_x", &bridge_builder_t::get_desc);
+implement_desc_param(roadsign_desc_t, "sign_desc_x", &roadsign_t::find_desc);
 
 /**
  * Macro to get the implementation of get method based on unique tag.

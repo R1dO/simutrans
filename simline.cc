@@ -20,6 +20,7 @@ uint8 convoi_to_line_catgory_[convoi_t::MAX_CONVOI_COST] = {
 	LINE_CAPACITY, LINE_TRANSPORTED_GOODS, LINE_REVENUE, LINE_OPERATIONS, LINE_PROFIT, LINE_DISTANCE, LINE_MAXSPEED, LINE_WAYTOLL
 };
 
+
 uint8 simline_t::convoi_to_line_catgory(uint8 cnv_cost)
 {
 	assert(cnv_cost < convoi_t::MAX_CONVOI_COST);
@@ -79,7 +80,7 @@ simline_t::~simline_t()
 }
 
 
-simline_t::linetype simline_t::get_linetype(const waytype_t wt)
+simline_t::linetype simline_t::waytype_to_linetype(const waytype_t wt)
 {
 	switch (wt) {
 		case road_wt: return simline_t::truckline;
@@ -92,6 +93,20 @@ simline_t::linetype simline_t::get_linetype(const waytype_t wt)
 		case air_wt: return simline_t::airline;
 		default: return simline_t::MAX_LINE_TYPE;
 	}
+}
+
+
+const char *simline_t::get_linetype_name(const simline_t::linetype lt)
+{
+	static const char *lt2name[MAX_LINE_TYPE] = {"All", "Truck", "Train", "Ship", "Air", "Monorail", "Tram", "Maglev", "Narrowgauge" };
+	return translator::translate( lt2name[lt] );
+}
+
+
+waytype_t simline_t::linetype_to_waytype(const linetype lt)
+{
+	static const waytype_t wt2lt[MAX_LINE_TYPE] = { invalid_wt, road_wt, track_wt, water_wt, air_wt, monorail_wt, tram_wt, maglev_wt, narrowgauge_wt };
+	return wt2lt[lt];
 }
 
 
@@ -274,7 +289,7 @@ void simline_t::rdwr(loadsave_t *file)
 		file->rdwr_bool(withdraw);
 	}
 
-	// otherwise inintialized to zero if loading ...
+	// otherwise initialized to zero if loading ...
 	financial_history[0][LINE_CONVOIS] = count_convoys();
 }
 
@@ -389,17 +404,17 @@ void simline_t::init_financial_history()
 void simline_t::recalc_status()
 {
 	if(financial_history[0][LINE_CONVOIS]==0) {
-		// noconvois assigned to this line
+		// no convois assigned to this line
 		state_color = SYSCOL_TEXT_HIGHLIGHT;
 		withdraw = false;
 	}
 	else if(financial_history[0][LINE_PROFIT]<0) {
 		// ok, not performing best
-		state_color = COL_RED;
+		state_color = color_idx_to_rgb(COL_RED);
 	}
 	else if((financial_history[0][LINE_OPERATIONS]|financial_history[1][LINE_OPERATIONS])==0) {
 		// nothing moved
-		state_color = COL_YELLOW;
+		state_color = color_idx_to_rgb(COL_YELLOW);
 	}
 	else if(welt->use_timeline()) {
 		// convois has obsolete vehicles?
@@ -409,7 +424,7 @@ void simline_t::recalc_status()
 			if (has_obsolete) break;
 		}
 		// now we have to set it
-		state_color = has_obsolete ? COL_DARK_BLUE : SYSCOL_TEXT;
+		state_color = has_obsolete ? color_idx_to_rgb(COL_DARK_BLUE) : SYSCOL_TEXT;
 	}
 	else {
 		// normal state
@@ -461,7 +476,7 @@ void simline_t::recalc_catg_index()
 void simline_t::set_withdraw( bool yes_no )
 {
 	withdraw = yes_no && !line_managed_convoys.empty();
-	// convois in depots will be immeadiately destroyed, thus we go backwards
+	// convois in depots will be immediately destroyed, thus we go backwards
 	for (size_t i = line_managed_convoys.get_count(); i-- != 0;) {
 		line_managed_convoys[i]->set_no_load(yes_no);	// must be first, since set withdraw might destroy convoi if in depot!
 		line_managed_convoys[i]->set_withdraw(yes_no);

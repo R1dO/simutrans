@@ -22,7 +22,7 @@
 #include "simticker.h"
 #include "gui/simwin.h"
 #include "simworld.h"
-#include "besch/sound_besch.h"
+#include "descriptor/sound_desc.h"
 #include "obj/zeiger.h"
 #include "display/viewport.h"
 
@@ -198,6 +198,7 @@ void interaction_t::interactive_event( const event_t &ev )
 					// Ignore Enter and Backspace but not Ctrl-H and Ctrl-M
 					break;
 				}
+				/* FALLTHROUGH */
 
 			default:
 				{
@@ -209,6 +210,12 @@ void interaction_t::interactive_event( const event_t &ev )
 							break;
 						}
 					}
+#ifdef STEAM_BUILT
+					// Block F12 from bringing up Keyboard Help (for Steam Screenshot) - but still allow F12 to be used if defined in pakset
+					if (ev.ev_code==SIM_KEY_F12) {
+						ok=true;
+					}
+#endif
 					if(!ok) {
 						help_frame_t::open_help_on( "keys.txt" );
 					}
@@ -303,7 +310,7 @@ bool interaction_t::process_event( event_t &ev )
 			env_t::server_save_game_on_quit = false;
 
 			// following code quite similar to nwc_sync_t::do_coomand
-			chdir( env_t::user_dir );
+			dr_chdir( env_t::user_dir );
 
 			// first save password hashes
 			char fn[256];
@@ -334,7 +341,8 @@ bool interaction_t::process_event( event_t &ev )
 			world->save( fn, loadsave_t::save_mode, SAVEGAME_VER_NR, false );
 			env_t::restore_UI = old_restore_UI;
 		}
-		else if(  env_t::reload_and_save_on_quit  ) {
+		else if(  env_t::reload_and_save_on_quit  &&  !env_t::networkmode  ) {
+			// save current game, if not online
 			bool old_restore_UI = env_t::restore_UI;
 			env_t::restore_UI = true;
 
@@ -380,7 +388,7 @@ bool interaction_t::process_event( event_t &ev )
 		move_view(ev);
 	}
 	else if(  (left_drag  ||  world->get_tool(world->get_active_player_nr())->get_id() == (TOOL_QUERY | GENERAL_TOOL))  &&  IS_LEFTDRAG(&ev)  ) {
-		/* ok, we have the query tool selected, and we have a left drag or left release event with an actual different
+		/* ok, we have the query tool selected, and we have a left drag or left release event with an actual difference
 		 * => move the map */
 		if(  !left_drag  ) {
 			display_show_pointer(false);
@@ -392,7 +400,7 @@ bool interaction_t::process_event( event_t &ev )
 	}
 
 	if(  IS_LEFTRELEASE(&ev)  &&  left_drag  ) {
-		// show then mouse and swallow this event if we were dragging before
+		// show the mouse and swallow this event if we were dragging before
 		ev.ev_code = EVENT_NONE;
 		display_show_pointer(true);
 		left_drag = false;

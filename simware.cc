@@ -18,14 +18,12 @@
 #include "dataobj/loadsave.h"
 #include "dataobj/koord.h"
 
-#include "besch/ware_besch.h"
-#include "bauer/warenbauer.h"
+#include "descriptor/goods_desc.h"
+#include "bauer/goods_manager.h"
 
 
 
-const ware_besch_t *ware_t::index_to_desc[256];
-
-
+const goods_desc_t *ware_t::index_to_desc[256];
 
 ware_t::ware_t() : ziel(), zwischenziel(), zielpos(-1, -1)
 {
@@ -35,24 +33,18 @@ ware_t::ware_t() : ziel(), zwischenziel(), zielpos(-1, -1)
 }
 
 
-ware_t::ware_t(const ware_besch_t *wtyp) : ziel(), zwischenziel(), zielpos(-1, -1)
+ware_t::ware_t(const goods_desc_t *wtyp) : ziel(), zwischenziel(), zielpos(-1, -1)
 {
 	menge = 0;
 	index = wtyp->get_index();
 	to_factory = 0;
 }
 
+
 ware_t::ware_t(loadsave_t *file)
 {
 	rdwr(file);
 }
-
-
-void ware_t::set_desc(const ware_besch_t* type)
-{
-	index = type->get_index();
-}
-
 
 
 void ware_t::rdwr(loadsave_t *file)
@@ -87,10 +79,10 @@ void ware_t::rdwr(loadsave_t *file)
 	else {
 		char typ[256];
 		file->rdwr_str(typ, lengthof(typ));
-		const ware_besch_t *type = warenbauer_t::get_info(typ);
+		const goods_desc_t *type = goods_manager_t::get_info(typ);
 		if(type==NULL) {
 			dbg->warning("ware_t::rdwr()","unknown ware of catg %d!",catg);
-			index = warenbauer_t::get_info_catg(catg)->get_index();
+			index = goods_manager_t::get_info_catg(catg)->get_index();
 			menge = 0;
 		}
 		else {
@@ -179,7 +171,7 @@ void ware_t::update_factory_target()
 }
 
 
-sint64 ware_t::calc_revenue(const ware_besch_t* desc, waytype_t wt, sint32 speedkmh)
+sint64 ware_t::calc_revenue(const goods_desc_t* desc, waytype_t wt, sint32 speedkmh)
 {
 	static karte_ptr_t welt;
 
@@ -190,4 +182,30 @@ sint64 ware_t::calc_revenue(const ware_besch_t* desc, waytype_t wt, sint32 speed
 	const sint32 grundwert_bonus = 1000+kmh_base*desc->get_speed_bonus();      // speed bonus factor
 	// take the larger of both
 	return desc->get_value() * (grundwert128 > grundwert_bonus ? grundwert128 : grundwert_bonus);
+}
+
+ware_t::goods_amount_t ware_t::add_goods(goods_amount_t const number) {
+	goods_amount_t const limit = GOODS_AMOUNT_LIMIT - menge;
+	if (limit < number) {
+		menge = GOODS_AMOUNT_LIMIT;
+		return number - limit;
+	}
+
+	menge+= number;
+	return 0;
+}
+
+ware_t::goods_amount_t ware_t::remove_goods(goods_amount_t const number) {
+	if (menge < number) {
+		goods_amount_t const remainder = number - menge;
+		menge = 0;
+		return remainder;
+	}
+
+	menge-= number;
+	return 0;
+}
+
+bool ware_t::is_goods_amount_maxed() const {
+	return menge == GOODS_AMOUNT_LIMIT;
 }

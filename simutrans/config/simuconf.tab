@@ -43,6 +43,10 @@
 #
 #################################program stuff##################################
 
+# You can use a system font. BUT you must specify the whole path to it!
+# This can be only set in the user defined simuconf.tab
+#fontname=C:\Windows\fonts\arial.ttf
+
 # maximum number of position tested during a way search
 # 100000 should be ok even for large maps with ships
 # 10000 is ok for everything else (consumes 16*x Bytes main memory, no further harm)
@@ -295,7 +299,7 @@ pedes_and_car_info = 0
 citycar_level = 5
 
 # After how many month a citycar breaks (and will be forever gone) ...
-# default is ten years
+# default is ten years (at bits_per_month setting of 20)
 default_citycar_life = 36
 
 # Show info on trees?
@@ -314,7 +318,7 @@ townhall_info = 0
 # (1=hide, 0=show anyway)
 hide_rail_return_ticket = 1
 
-# don not show the buttons to delete old savegames (default)
+# do not show the buttons to delete old savegames (default)
 show_delete_buttons = 0
 
 # always open only a single info window for the ground,
@@ -390,6 +394,14 @@ disable_make_way_public = 0
 # the loss is given in 1/1000th, i.e 300 mean the value will be 70%
 used_vehicle_reduction = 0
 
+# convois can have a maximum number of trailing vehicles (up to 250)
+# These are the dafult values. Pakset with airplanes with dual cargo holds
+# may need to increase the air counter!
+max_rail_convoi_length = 24
+max_road_convoi_length = 4
+max_ship_convoi_length = 4
+max_air_convoi_length = 1
+
 # lowest possible income with speedbonus (1000=1) default 125 (=1/8th)
 bonus_basefactor = 125
 
@@ -417,6 +429,12 @@ toll_waycost_percentage = 0
 #cost_depot_road=1300
 #cost_depot_ship=2500
 
+# maximum distance for merging non-adjacent stations
+allow_merge_distant_halt=2
+
+# the cost to merge stations: the actual cost is (cost*2^distance)
+#cost_multiply_merge_halt=700
+
 # other way related stuff
 #cost_signal=500
 #cost_tunnel=10000
@@ -436,12 +454,17 @@ toll_waycost_percentage = 0
 #cost_maintain_transformer=20
 
 # how many months of maintainance the make public tool costs
-#cst_make_public_months=60
+#cost_make_public_months=60
 
 ###################################other stuff##################################
 #
 # also pak dependent
 #
+
+# minimum/maximum allowed height level for the map (too high might cause display errors)
+# Also those number must no be the same
+#world_minimum_height = -12
+#world_maximum_height = 32
 
 # minimum distance between two townhalls
 #minimum_city_distance = 16
@@ -637,9 +660,9 @@ fast_forward = 50
 #server_frames_ahead = 4
 
 # How much extra delay in command execution on the client side, on top of server_frames_ahead.
-# A larger number can compensate for larger fluctuations in communication latency.
+# A larger number can compensate for larger fluctuations in communication latency to smooth out play.
 # This is set by the client side.
-#additional_client_frames_behind = 0
+#additional_client_frames_behind = 4
 
 # In network mode, there will be a fixed number of screen updates before a step.
 # Reasonable values should result in 2-5 steps per second.
@@ -648,7 +671,7 @@ fast_forward = 50
 # The server sends after a fixed number of steps some information to the clients.
 # Large values here means: reduced server communication (if that is of importance...)
 # Small values should improve the timing of the clients.
-#server_frames_between_checks = 256
+#server_frames_between_checks = 24
 
 # Automatically announce server on the central server directory (http://servers.simutrans.org/)
 # 0 (default) = off, 1 = on
@@ -663,6 +686,12 @@ fast_forward = 50
 
 # Fully Qualified Domain Name (FQDN) or IP address of your server (IPv6 or IPv4)
 #server_dns = 127.0.0.1
+
+# alternative server name (an or IP6) Use only if server_dns is set!
+#server_altdns = fe80::1
+
+# Port address (usually set via command line)
+#server_port = 13353
 
 # Name of server in server listing
 #server_name = My Simutrans Server

@@ -13,8 +13,9 @@
 #include "messagebox.h"
 
 #include "../display/simgraph.h"
+#include "../display/simimg.h"
 #include "../display/viewport.h"
-#include "../gui/simwin.h"
+#include "simwin.h"
 #include "../simworld.h"
 #include "../simskin.h"
 
@@ -22,7 +23,7 @@
 
 
 message_stats_t::message_stats_t() :
-	msg(welt->get_message()), message_type(0), last_count(0), message_selected(-1), message_list(NULL)
+	msg(welt->get_message()), message_type(0), last_count(0), message_selected(-1), message_list(NULL), min_size(0,0)
 {
 	filter_messages(-1);
 }
@@ -163,7 +164,9 @@ void message_stats_t::recalc_size()
 		}
 	}
 
-	set_size(scr_size(x_size+4,y_size));
+	min_size = scr_size(x_size+4,y_size);
+	// wont do any harm as we are anyway inside a scroll-pane
+	set_size(min_size);
 }
 
 
@@ -229,7 +232,7 @@ void message_stats_t::draw(scr_coord offset)
 		}
 
 		// correct for player color
-		PLAYER_COLOR_VAL colorval = n.get_player_color(welt);
+		FLAGGED_PIXVAL colorval = n.get_player_color(welt);
 
 		// add time
 		char time[64];
@@ -255,7 +258,7 @@ void message_stats_t::draw(scr_coord offset)
 		}
 		scr_coord_val left = 14;
 		if(  time[0]  ) {
-			left += display_proportional_clip(offset.x+left, y, time, ALIGN_LEFT, colorval, true)+8;
+			left += display_proportional_clip_rgb(offset.x+left, y, time, ALIGN_LEFT, colorval, true)+8;
 		}
 
 		// display text with clipping
@@ -266,6 +269,6 @@ void message_stats_t::draw(scr_coord offset)
 				break;
 			}
 		}
-		display_proportional_clip(offset.x+left, y, buf, ALIGN_LEFT, colorval, true);
+		display_proportional_clip_rgb(offset.x+left, y, buf, ALIGN_LEFT, colorval, true);
 	}
 }

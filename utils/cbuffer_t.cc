@@ -92,6 +92,12 @@ void cbuffer_t::append(double n,int decimals)
 	append(tmp);
 }
 
+void cbuffer_t::append_money(double money)
+{
+	char tmp[128];
+	money_to_string(tmp, money, true);
+	append(tmp);
+}
 
 const char* cbuffer_t::get_str() const
 {
@@ -104,7 +110,7 @@ const char* cbuffer_t::get_str() const
  * If an error occurs, an error message is printed into @p error.
  * Checks for positional parameters: either all or no parameter have to be positional as eg %1$d.
  * If positional parameter %[n]$ is specified then all up to n have to be present in the string as well.
- * Treates all integer parameters %i %u %d etc the same.
+ * Treats all integer parameters %i %u %d etc the same.
  * Ignores positional width parameters as *[n].
  *
  * @param format format string
@@ -173,7 +179,7 @@ static void get_format_mask(const char* format, char *typemask, int max_params, 
 		for(uint16 i=0; i<found; i++) {
 			if (typemask[i]==0) {
 				// unspecified
-				error.printf("Positional parameter %d not specified.", i+1);
+				error.printf("Positional parameter %d not specified.", i);
 				return;
 			}
 		}
@@ -233,7 +239,6 @@ bool cbuffer_t::check_format_strings(const char* master, const char* translated)
 			               i+1, translated, master, master_tm[i], translated_tm[i], master_tm,translated_tm);
 			return false;
 		}
-		i++;
 	}
 	return true;
 }
@@ -260,7 +265,7 @@ static int my_vsnprintf(char *buf, size_t n, const char* fmt, va_list ap )
 	if(  const char *c=strstr( fmt, "%1$" )  ) {
 		// but they are requested here ...
 		// our routine can only handle max. 9 parameters
-		char pos[6];
+		char pos[14];
 		static char format_string[256];
 		char *cfmt = format_string;
 		static char buffer[16000];	// the longest possible buffer ...
@@ -269,7 +274,7 @@ static int my_vsnprintf(char *buf, size_t n, const char* fmt, va_list ap )
 			sprintf( pos, "%%%i$", count+1 );
 			c = strstr( fmt, pos );
 			if(  c  ) {
-				// extend format string, using 1 as marke between strings
+				// extend format string, using 1 as mark between strings
 				if(  count  ) {
 					*cfmt++ = '\01';
 				}

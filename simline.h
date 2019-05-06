@@ -60,7 +60,7 @@ private:
 	 * the current state saved as color
 	 * Meanings are BLACK (ok), WHITE (no convois), YELLOW (no vehicle moved), RED (last month income minus), BLUE (at least one convoi vehicle is obsolete)
 	 */
-	COLOR_VAL state_color;
+	PIXVAL state_color;
 
 	/*
 	 * a list of all convoys assigned to this line
@@ -126,10 +126,10 @@ public:
 	 * returns the state of the line
 	 * @author prissi
 	 */
-	COLOR_VAL get_state_color() const { return state_color; }
+	PIXVAL get_state_color() const { return state_color; }
 
 	/*
-	 * return schedule (schedule) of line
+	 * return the schedule of the line
 	 * @author hsiegeln
 	 */
 	schedule_t * get_schedule() const { return schedule; }
@@ -186,7 +186,10 @@ public:
 	void new_month();
 
 	linetype get_linetype() { return type; }
-	static linetype get_linetype( const waytype_t wt );
+
+	static waytype_t linetype_to_waytype( const linetype lt );
+	static linetype waytype_to_linetype( const waytype_t wt );
+	static const char *get_linetype_name( const linetype lt );
 
 	const minivec_tpl<uint8> &get_goods_catg_index() const { return goods_catg_index; }
 
@@ -198,6 +201,7 @@ public:
 	bool get_withdraw() const { return withdraw; }
 
 	player_t *get_owner() const {return player;}
+
 
 };
 

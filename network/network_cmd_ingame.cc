@@ -50,6 +50,7 @@ network_command_t* network_command_t::read_from_packet(packet_t *p)
 		case NWC_SCENARIO:    nwc = new nwc_scenario_t(); break;
 		case NWC_SCENARIO_RULES:
 		                      nwc = new nwc_scenario_rules_t(); break;
+		case NWC_STEP:        nwc = new nwc_step_t(); break;
 		default:
 			dbg->warning("network_command_t::read_from_socket", "received unknown packet id %d", p->get_id());
 	}
@@ -87,7 +88,7 @@ bool nwc_gameinfo_t::execute(karte_t *welt)
 			gi.rdwr( &fd );
 			fd.close();
 			// get gameinfo size
-			FILE *fh = fopen( "serverinfo.sve", "rb" );
+			FILE *fh = dr_fopen( "serverinfo.sve", "rb" );
 			fseek( fh, 0, SEEK_END );
 			nwgi.len = ftell( fh );
 			rewind( fh );
@@ -109,7 +110,7 @@ bool nwc_gameinfo_t::execute(karte_t *welt)
 				dbg->warning( "nwc_gameinfo_t::execute", "send of NWC_GAMEINFO failed" );
 			}
 			fclose( fh );
-			remove( "serverinfo.sve" );
+			dr_remove("serverinfo.sve");
 		}
 		socket_list_t::remove_client( s );
 	}
@@ -193,9 +194,9 @@ void nwc_nick_t::server_tools(karte_t *welt, uint32 client_id, uint8 what, const
 			csv.add_field( info.address.get_str() );
 			csv.add_field( info.nickname.c_str() );
 			dbg->warning( "__ChatLog__", "%s", csv.get_str() );
-
 			break;
 		}
+
 		case CHANGE_NICK: {
 			if (nick==NULL  ||  info.nickname == nick) {
 				return;
@@ -278,7 +279,7 @@ void nwc_chat_t::add_message (karte_t* welt) const
 	dbg->warning("nwc_chat_t::add_message", "");
 	cbuffer_t buf;  // Output which will be printed to chat window
 
-	PLAYER_COLOR_VAL color = player_nr < PLAYER_UNOWNED  ?  welt->get_player( player_nr )->get_player_color1()  :  COL_WHITE;
+	FLAGGED_PIXVAL color = player_nr < PLAYER_UNOWNED  ?  color_idx_to_rgb(welt->get_player( player_nr )->get_player_color1())  :  color_idx_to_rgb(COL_WHITE);
 	uint16 flag = message_t::chat;
 
 	if (  destination == NULL  ) {
@@ -682,7 +683,7 @@ void nwc_sync_t::do_command(karte_t *welt)
 	}
 	// transfer game, all clients need to sync (save, reload, and pause)
 	// now save and send
-	chdir( env_t::user_dir );
+	dr_chdir( env_t::user_dir );
 	if(  !env_t::server  ) {
 		char fn[256];
 		sprintf( fn, "client%i-network.sve", network_get_client_id() );

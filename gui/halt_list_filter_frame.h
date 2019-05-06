@@ -29,11 +29,11 @@ private:
 	* Needed since a button_t does not know its parent.
 	*/
 	class ware_item_t : public button_t {
-		const ware_besch_t *ware_ab;
-		const ware_besch_t *ware_an;
+		const goods_desc_t *ware_ab;
+		const goods_desc_t *ware_an;
 		halt_list_filter_frame_t *parent;
 	public:
-		ware_item_t(halt_list_filter_frame_t *parent, const ware_besch_t *ware_ab, const ware_besch_t *ware_an)
+		ware_item_t(halt_list_filter_frame_t *parent, const goods_desc_t *ware_ab, const goods_desc_t *ware_an)
 		{
 			this->ware_ab = ware_ab;
 			this->ware_an = ware_an;
@@ -47,7 +47,7 @@ private:
 			}
 			return button_t::infowin_event(ev);
 		}
-		virtual void draw(scr_coord offset) {
+		void draw(scr_coord offset) OVERRIDE {
 			if(ware_ab) {
 				pressed = parent->get_ware_filter_ab(ware_ab);
 			}
@@ -64,7 +64,6 @@ private:
 	 */
 	enum { FILTER_BUTTONS=16 };
 
-	static scr_coord filter_buttons_pos[FILTER_BUTTONS];
 	static halt_list_frame_t::filter_flag_t filter_buttons_types[FILTER_BUTTONS];
 	static const char *filter_buttons_text[FILTER_BUTTONS];
 
@@ -86,15 +85,15 @@ private:
 	button_t ware_keine_ab;
 	button_t ware_invers_ab;
 
+	gui_aligned_container_t ware_cont_ab;
 	gui_scrollpane_t ware_scrolly_ab;
-	gui_container_t ware_cont_ab;
 
 	button_t ware_alle_an;
 	button_t ware_keine_an;
 	button_t ware_invers_an;
 
+	gui_aligned_container_t ware_cont_an;
 	gui_scrollpane_t ware_scrolly_an;
-	gui_container_t ware_cont_an;
 
 public:
 	halt_list_filter_frame_t(player_t *player, halt_list_frame_t *main_frame);
@@ -104,20 +103,20 @@ public:
 	 * Propagate function from main_frame for ware_item_t
 	 * @author V. Meyer
 	 */
-	bool get_ware_filter_ab(const ware_besch_t *ware) const { return main_frame->get_ware_filter_ab(ware); }
-	bool get_ware_filter_an(const ware_besch_t *ware) const { return main_frame->get_ware_filter_an(ware); }
+	bool get_ware_filter_ab(const goods_desc_t *ware) const { return main_frame->get_ware_filter_ab(ware); }
+	bool get_ware_filter_an(const goods_desc_t *ware) const { return main_frame->get_ware_filter_an(ware); }
 
 	/**
 	 * Handler for ware_item_t event.
 	 * @author V. Meyer
 	 */
-	void ware_item_triggered(const ware_besch_t *ware_ab, const ware_besch_t *ware_an);
+	void ware_item_triggered(const goods_desc_t *ware_ab, const goods_desc_t *ware_an);
 
 	/**
 	 * Does this window need a min size button in the title bar?
 	 * @return true if such a button is needed
 	 */
-	bool has_min_sizer() const {return true;}
+	bool has_min_sizer() const OVERRIDE {return true;}
 
 	/**
 	 * Draw new component. The values to be passed refer to the window
@@ -125,19 +124,14 @@ public:
 	 * component is displayed.
 	 * @author V. Meyer
 	 */
-	void draw(scr_coord pos, scr_size size);
-
-    /**
-     * resize window in response to a resize event
-     */
-	void resize(const scr_coord delta);
+	void draw(scr_coord pos, scr_size size) OVERRIDE;
 
 	/**
 	 * Set the window associated helptext
 	 * @return the filename for the helptext, or NULL
 	 * @author V. Meyer
 	 */
-	const char * get_help_filename() const {return "haltlist_filter.txt"; }
+	const char * get_help_filename() const OVERRIDE {return "haltlist_filter.txt"; }
 
 	bool action_triggered(gui_action_creator_t*, value_t) OVERRIDE;
 };

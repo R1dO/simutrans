@@ -6,7 +6,7 @@
  */
 
 #include "welt.h"
-#include "../gui/simwin.h"
+#include "simwin.h"
 #include "../simversion.h"
 #include "../dataobj/settings.h"
 #include "../dataobj/environment.h"
@@ -14,6 +14,7 @@
 #include "../player/finance.h" // MAX_PLAYER_HISTORY_YEARS
 #include "../vehicle/simvehicle.h"
 #include "settings_stats.h"
+#include "components/gui_divider.h"
 
 
 /* stuff not set here ....
@@ -39,28 +40,17 @@ static char const* const version[] =
 	"0.111.4",
 	"0.112.0",
 	"0.112.2",
-	"0.120.1"
+	"0.120.1",
+	"0.120.2",
+	"0.120.3",
+	"0.120.4",
+	"0.120.5"
 };
 
 
-// just free memory
-void settings_stats_t::free_all()
+bool settings_general_stats_t::action_triggered(gui_action_creator_t *comp, value_t v)
 {
-	while(  !label.empty()  ) {
-		delete label.remove_first();
-	}
-	while(  !numinp.empty()  ) {
-		delete numinp.remove_first();
-	}
-	while(  !button.empty()  ) {
-		delete button.remove_first();
-	}
-}
-
-
-bool settings_general_stats_t::action_triggered(gui_action_creator_t *komp, value_t v)
-{
-	assert( komp==&savegame ); (void)komp;
+	assert( comp==&savegame ); (void)comp;
 
 	if(  v.i==-1  ) {
 		savegame.set_selection( 0 );
@@ -76,10 +66,8 @@ void settings_general_stats_t::init(settings_t const* const sets)
 	INIT_INIT
 
 	// combobox for savegame version
-	savegame.set_pos( scr_coord(0, ypos) );
-	savegame.set_size( scr_size(70, D_BUTTON_HEIGHT) );
 	for(  uint32 i=0;  i<lengthof(version);  i++  ) {
-		savegame.append_element( new gui_scrolled_list_t::const_text_scrollitem_t( version[i]+2, SYSCOL_TEXT ) );
+		savegame.new_component<gui_scrolled_list_t::const_text_scrollitem_t>( version[i]+2, SYSCOL_TEXT ) ;
 		if(  strcmp(version[i],env_t::savegame_version_str)==0  ) {
 			savegame.set_selection( i );
 		}
@@ -88,7 +76,6 @@ void settings_general_stats_t::init(settings_t const* const sets)
 	add_component( &savegame );
 	savegame.add_listener( this );
 	INIT_LB( "savegame version" );
-	label.back()->set_pos( scr_coord( 70 + 6, label.back()->get_pos().y + 2 ) );
 	SEPERATOR
 	INIT_BOOL( "drive_left", sets->is_drive_left() );
 	INIT_BOOL( "signals_on_left", sets->is_signals_left() );
@@ -116,10 +103,12 @@ void settings_general_stats_t::init(settings_t const* const sets)
 	SEPERATOR
 	INIT_NUM( "compass_map_position", env_t::compass_map_position, 0, 16, gui_numberinput_t::AUTOLINEAR, false );
 	INIT_NUM( "compass_screen_position", env_t::compass_screen_position, 0, 16, gui_numberinput_t::AUTOLINEAR, false );
+	SEPERATOR
+	INIT_NUM( "world_maximum_height", sets->get_maximumheight(), 16, 127, gui_numberinput_t::AUTOLINEAR, false );
+	INIT_NUM( "world_minimum_height", sets->get_minimumheight(), -127, -12, gui_numberinput_t::AUTOLINEAR, false );
 
+	INIT_END
 	clear_dirty();
-	height = ypos;
-	set_size( settings_stats_t::get_size() );
 }
 
 void settings_general_stats_t::read(settings_t* const sets)
@@ -158,6 +147,9 @@ void settings_general_stats_t::read(settings_t* const sets)
 
 	READ_NUM_VALUE( env_t::compass_map_position );
 	READ_NUM_VALUE( env_t::compass_screen_position );
+
+	READ_NUM_VALUE( sets->world_maximum_height );
+	READ_NUM_VALUE( sets->world_minimum_height );
 }
 
 void settings_display_stats_t::init(settings_t const* const)
@@ -170,25 +162,23 @@ void settings_display_stats_t::init(settings_t const* const)
 	SEPERATOR
 	INIT_BOOL( "window_buttons_right", env_t::window_buttons_right );
 	INIT_BOOL( "window_frame_active", env_t::window_frame_active );
-	INIT_NUM( "front_window_bar_color", env_t::front_window_bar_color, 0, 6, gui_numberinput_t::AUTOLINEAR, 0 );
-	INIT_NUM( "front_window_text_color", env_t::front_window_text_color, 208, 240, gui_numberinput_t::AUTOLINEAR, 0 );
-	INIT_NUM( "bottom_window_bar_color", env_t::bottom_window_bar_color, 0, 6, gui_numberinput_t::AUTOLINEAR, 0 );
-	INIT_NUM( "bottom_window_text_color", env_t::bottom_window_text_color, 208, 240, gui_numberinput_t::AUTOLINEAR, 0 );
+	INIT_NUM( "default_window_title_color", env_t::default_window_title_color_rgb, 0, 16777215, gui_numberinput_t::AUTOLINEAR, 0 );
+	INIT_NUM( "front_window_text_color", env_t::front_window_text_color_rgb, 0, 16777215, gui_numberinput_t::AUTOLINEAR, 0 );
+	INIT_NUM( "bottom_window_text_color", env_t::bottom_window_text_color_rgb, 0, 16777215, gui_numberinput_t::AUTOLINEAR, 0 );
+	INIT_NUM( "bottom_window_darkness", env_t::bottom_window_darkness, 0, 100, gui_numberinput_t::AUTOLINEAR, 0 );
 	SEPERATOR
 	INIT_BOOL( "show_tooltips", env_t::show_tooltips );
-	INIT_NUM( "tooltip_background_color", env_t::tooltip_color, 0, 255, 1, 0 );
-	INIT_NUM( "tooltip_text_color", env_t::tooltip_textcolor, 0, 255, 1, 0 );
+	INIT_NUM( "tooltip_background_color", env_t::tooltip_color_rgb, 0, 16777215, 1, 0 );
+	INIT_NUM( "tooltip_text_color", env_t::tooltip_textcolor_rgb, 0, 16777215, 1, 0 );
 	INIT_NUM( "tooltip_delay", env_t::tooltip_delay, 0, 10000, gui_numberinput_t::AUTOLINEAR, 0 );
 	INIT_NUM( "tooltip_duration", env_t::tooltip_duration, 0, 30000, gui_numberinput_t::AUTOLINEAR, 0 );
 	SEPERATOR
-	INIT_NUM( "cursor_overlay_color", env_t::cursor_overlay_color, 0, 255, gui_numberinput_t::AUTOLINEAR, 0 );
+	INIT_NUM( "cursor_overlay_color", env_t::cursor_overlay_color_rgb, 0, 16777215, gui_numberinput_t::AUTOLINEAR, 0 );
 	INIT_BOOL( "left_to_right_graphs", env_t::left_to_right_graphs );
 	SEPERATOR
 	INIT_BOOL( "player_finance_display_account", env_t::player_finance_display_account );
 
-	clear_dirty();
-	height = ypos;
-	set_size( settings_stats_t::get_size() );
+	INIT_END
 }
 
 void settings_display_stats_t::read(settings_t* const)
@@ -202,18 +192,18 @@ void settings_display_stats_t::read(settings_t* const)
 
 	READ_BOOL_VALUE( env_t::window_buttons_right );
 	READ_BOOL_VALUE( env_t::window_frame_active );
-	READ_NUM_VALUE( env_t::front_window_bar_color );
-	READ_NUM_VALUE( env_t::front_window_text_color );
-	READ_NUM_VALUE( env_t::bottom_window_bar_color );
-	READ_NUM_VALUE( env_t::bottom_window_text_color );
+	READ_NUM_VALUE( env_t::default_window_title_color_rgb );
+	READ_NUM_VALUE( env_t::front_window_text_color_rgb );
+	READ_NUM_VALUE( env_t::bottom_window_text_color_rgb );
+	READ_NUM_VALUE( env_t::bottom_window_darkness );
 
 	READ_BOOL_VALUE( env_t::show_tooltips );
-	READ_NUM_VALUE( env_t::tooltip_color );
-	READ_NUM_VALUE( env_t::tooltip_textcolor );
+	READ_NUM_VALUE( env_t::tooltip_color_rgb );
+	READ_NUM_VALUE( env_t::tooltip_textcolor_rgb );
 	READ_NUM_VALUE( env_t::tooltip_delay );
 	READ_NUM_VALUE( env_t::tooltip_duration );
 
-	READ_NUM_VALUE( env_t::cursor_overlay_color );
+	READ_NUM_VALUE( env_t::cursor_overlay_color_rgb );
 	READ_BOOL_VALUE( env_t::left_to_right_graphs );
 
 	READ_BOOL_VALUE( env_t::player_finance_display_account );
@@ -226,6 +216,7 @@ void settings_routing_stats_t::init(settings_t const* const sets)
 	INIT_BOOL( "avoid_overcrowding", sets->is_avoid_overcrowding() );
 	INIT_BOOL( "no_routing_over_overcrowded", sets->is_no_routing_over_overcrowding() );
 	INIT_NUM( "station_coverage", sets->get_station_coverage(), 1, 8, gui_numberinput_t::AUTOLINEAR, false );
+	INIT_NUM( "allow_merge_distant_halt", sets->get_allow_merge_distant_halt(), 0, 0x7FFFFFFFul, gui_numberinput_t::POWER2, false );
 	SEPERATOR
 	INIT_NUM( "max_route_steps", sets->get_max_route_steps(), 0, 0x7FFFFFFFul, gui_numberinput_t::POWER2, false );
 	INIT_NUM( "max_choose_route_steps", sets->get_max_choose_route_steps(), 0, 0x7FFFFFFFul, gui_numberinput_t::POWER2, false );
@@ -241,9 +232,7 @@ void settings_routing_stats_t::init(settings_t const* const sets)
 	INIT_NUM( "way_max_bridge_len", sets->way_max_bridge_len, 1, 1000, gui_numberinput_t::AUTOLINEAR, false );
 	INIT_NUM( "way_leaving_road", sets->way_count_leaving_road, 1, 1000, gui_numberinput_t::AUTOLINEAR, false );
 
-	clear_dirty();
-	height = ypos;
-	set_size( settings_stats_t::get_size() );
+	INIT_END
 }
 
 void settings_routing_stats_t::read(settings_t* const sets)
@@ -254,6 +243,7 @@ void settings_routing_stats_t::read(settings_t* const sets)
 	READ_BOOL_VALUE( sets->avoid_overcrowding );
 	READ_BOOL_VALUE( sets->no_routing_over_overcrowding );
 	READ_NUM_VALUE( sets->station_coverage_size );
+	READ_NUM_VALUE( sets->allow_merge_distant_halt );
 	READ_NUM_VALUE( sets->max_route_steps );
 	READ_NUM_VALUE( sets->max_choose_route_steps );
 	READ_NUM_VALUE( sets->max_hops );
@@ -275,21 +265,29 @@ void settings_economy_stats_t::init(settings_t const* const sets)
 	INIT_INIT
 	INIT_NUM( "remove_dummy_player_months", sets->get_remove_dummy_player_months(), 0, MAX_PLAYER_HISTORY_YEARS*12, 12, false );
 	INIT_NUM( "unprotect_abandoned_player_months", sets->get_unprotect_abandoned_player_months(), 0, MAX_PLAYER_HISTORY_YEARS*12, 12, false );
+	INIT_NUM( "ai_construction_speed", sets->get_default_ai_construction_speed(), 0, 1000000000, 1000, false );
 	SEPERATOR
+
 	INIT_COST( "starting_money", sets->get_starting_money(sets->get_starting_year()), 1, 0x7FFFFFFFul, 10000, false );
 	INIT_NUM( "pay_for_total_distance", sets->get_pay_for_total_distance_mode(), 0, 2, gui_numberinput_t::AUTOLINEAR, true );
 	INIT_NUM( "bonus_basefactor", sets->get_bonus_basefactor(), 0, 1000, gui_numberinput_t::AUTOLINEAR, false );
 	INIT_BOOL_NEW( "first_beginner", sets->get_beginner_mode() );
 	INIT_NUM( "beginner_price_factor", sets->get_beginner_price_factor(), 1, 25000, gui_numberinput_t::AUTOLINEAR, false );
+	SEPERATOR
+
 	INIT_BOOL( "allow_buying_obsolete_vehicles", sets->get_allow_buying_obsolete_vehicles() );
-	INIT_NUM( "used_vehicle_reduction", sets->get_used_vehicle_reduction(), 0, 1000, gui_numberinput_t::AUTOLINEAR, false );
+	INIT_NUM( "used_vehicle_reduction", sets->get_used_vehicle_reduction(), 1, 1000, gui_numberinput_t::AUTOLINEAR, false );
+	INIT_NUM( "max_rail_convoi_length", sets->get_max_rail_convoi_length(), 1, 254, gui_numberinput_t::AUTOLINEAR, false );
+	INIT_NUM( "max_road_convoi_length", sets->get_max_road_convoi_length(), 1, 254, gui_numberinput_t::AUTOLINEAR, false );
+	INIT_NUM( "max_ship_convoi_length", sets->get_max_ship_convoi_length(), 1, 254, gui_numberinput_t::AUTOLINEAR, false );
+	INIT_NUM( "max_air_convoi_length", sets->get_max_air_convoi_length(), 1, 254, gui_numberinput_t::AUTOLINEAR, false );
+	SEPERATOR
+
 	INIT_NUM( "toll_runningcost_percentage", sets->get_way_toll_runningcost_percentage(), 0, 100, gui_numberinput_t::AUTOLINEAR, false );
 	INIT_NUM( "toll_waycost_percentage", sets->get_way_toll_waycost_percentage(), 0, 100, gui_numberinput_t::AUTOLINEAR, false );
 	INIT_BOOL("disable_make_way_public", sets->get_disable_make_way_public());
 	SEPERATOR
 
-	INIT_NUM( "ai_construction_speed", sets->get_default_ai_construction_speed(), 0, 1000000000, 1000, false );
-	SEPERATOR
 	INIT_NUM( "just_in_time", sets->get_just_in_time(), 0, 2, gui_numberinput_t::AUTOLINEAR, false );
 	INIT_NUM( "maximum_intransit_percentage", sets->get_factory_maximum_intransit_percentage(), 0, 32767, gui_numberinput_t::AUTOLINEAR, false );
 	INIT_BOOL( "crossconnect_factories", sets->is_crossconnect_factories() );
@@ -349,9 +347,7 @@ void settings_economy_stats_t::init(settings_t const* const sets)
 	INIT_NUM( "citycar_level", sets->get_traffic_level(), 0, 16, 1, false );
 	INIT_NUM( "default_citycar_life", sets->get_stadtauto_duration(), 1, 1200, 12, false );
 
-	clear_dirty();
-	height = ypos;
-	set_size( settings_stats_t::get_size() );
+	INIT_END
 }
 
 void settings_economy_stats_t::read(settings_t* const sets)
@@ -360,6 +356,8 @@ void settings_economy_stats_t::read(settings_t* const sets)
 	sint64 start_money_temp;
 	READ_NUM_VALUE( sets->remove_dummy_player_months );
 	READ_NUM_VALUE( sets->unprotect_abandoned_player_months );
+	READ_NUM_VALUE( sets->default_ai_construction_speed );
+	env_t::default_ai_construction_speed = sets->get_default_ai_construction_speed();
 	READ_COST_VALUE( start_money_temp );
 	if(  sets->get_starting_money(sets->get_starting_year())!=start_money_temp  ) {
 		// because this will render the table based values invalid, we do this only when needed
@@ -369,14 +367,18 @@ void settings_economy_stats_t::read(settings_t* const sets)
 	READ_NUM_VALUE( sets->bonus_basefactor );
 	READ_BOOL_VALUE_NEW( sets->beginner_mode );
 	READ_NUM_VALUE( sets->beginner_price_factor );
+
 	READ_BOOL_VALUE( sets->allow_buying_obsolete_vehicles );
 	READ_NUM_VALUE( sets->used_vehicle_reduction );
+	READ_NUM_VALUE( sets->max_rail_convoi_length );
+	READ_NUM_VALUE( sets->max_road_convoi_length );
+	READ_NUM_VALUE( sets->max_ship_convoi_length );
+	READ_NUM_VALUE( sets->max_air_convoi_length );
+
 	READ_NUM_VALUE( sets->way_toll_runningcost_percentage );
 	READ_NUM_VALUE( sets->way_toll_waycost_percentage );
 	READ_BOOL_VALUE(sets->disable_make_way_public);
 
-	READ_NUM_VALUE( sets->default_ai_construction_speed );
-	env_t::default_ai_construction_speed = sets->get_default_ai_construction_speed();
 	READ_NUM_VALUE( env_t::just_in_time );
 	sets->just_in_time = env_t::just_in_time;
 	READ_NUM_VALUE( sets->factory_maximum_intransit_percentage );
@@ -444,9 +446,7 @@ void settings_costs_stats_t::init(settings_t const* const sets)
 	INIT_COST( "cost_transformer", -sets->cst_transformer, 1, 100000000, 10, false );
 	INIT_COST( "cost_maintain_transformer", -sets->cst_maintain_transformer, 1, 100000000, 10, false );
 	INIT_NUM("cost_make_public_months", sets->cst_make_public_months, 0, 36000, gui_numberinput_t::AUTOLINEAR, false );
-
-	height = ypos;
-	set_size( settings_stats_t::get_size() );
+	INIT_END
 }
 
 
@@ -477,13 +477,10 @@ void settings_costs_stats_t::read(settings_t* const sets)
 	READ_COST_VALUE( sets->cst_transformer )*(-1);
 	READ_COST_VALUE( sets->cst_maintain_transformer )*(-1);
 	READ_NUM_VALUE(sets->cst_make_public_months);
-
-	clear_dirty();
-	set_size( settings_stats_t::get_size() );
 }
 
 
-#include "../besch/grund_besch.h"
+#include "../descriptor/ground_desc.h"
 
 
 void settings_climates_stats_t::init(settings_t* const sets)
@@ -495,25 +492,26 @@ void settings_climates_stats_t::init(settings_t* const sets)
 	INIT_INIT
 	INIT_NUM_NEW( "height_map_conversion_version", env_t::pak_height_conversion_factor, 1, 2, 0, false );
 	SEPERATOR
-	INIT_NUM_NEW( "Water level", sets->get_grundwasser(), -10, 0, gui_numberinput_t::AUTOLINEAR, false );
+	INIT_NUM_NEW( "Water level", sets->get_groundwater(), sets->get_minimumheight()+10, 0, gui_numberinput_t::AUTOLINEAR, false );
 	INIT_NUM_NEW( "Mountain height", mountain_height_start, 0, min(1000,100*(11-mountain_roughness_start)), 10, false );
 	INIT_NUM_NEW( "Map roughness", mountain_roughness_start, 0, min(10, 11-((mountain_height_start+99)/100)), gui_numberinput_t::AUTOLINEAR, false );
 	SEPERATOR
 	INIT_LB( "Summer snowline" );
-	INIT_NUM( "Winter snowline", sets->get_winter_snowline(), sets->get_grundwasser(), 24, gui_numberinput_t::AUTOLINEAR, false );
+	summer = new_component<gui_label_buf_t>();
+
+	INIT_NUM( "Winter snowline", sets->get_winter_snowline(), sets->get_groundwater(), 24, gui_numberinput_t::AUTOLINEAR, false );
 	SEPERATOR
 	// other climate borders ...
 	sint16 arctic = 0;
 	for(  int i=desert_climate;  i!=arctic_climate;  i++  ) {
-		INIT_NUM( ground_besch_t::get_climate_name_from_bit((climate)i), sets->get_climate_borders()[i], sets->get_grundwasser(), 24, gui_numberinput_t::AUTOLINEAR, false );
+		INIT_NUM( ground_desc_t::get_climate_name_from_bit((climate)i), sets->get_climate_borders()[i], sets->get_groundwater(), 24, gui_numberinput_t::AUTOLINEAR, false );
 		if(sets->get_climate_borders()[i]>arctic) {
 			arctic = sets->get_climate_borders()[i];
 		}
-	}
-	numinp.at(3)->set_limits( 0, arctic );
-	buf.clear();
-	buf.printf( "%s %i", translator::translate( "Summer snowline" ), arctic );
-	label.at(3)->set_text( buf );
+	}	cbuffer_t buf;
+
+	summer->buf().printf("%s %i", translator::translate( "Summer snowline" ), arctic );
+	summer->update();
 	SEPERATOR
 	INIT_BOOL( "lake", sets->get_lake() );
 	INIT_NUM_NEW( "Number of rivers", sets->get_river_number(), 0, 1024, gui_numberinput_t::AUTOLINEAR, false );
@@ -534,9 +532,7 @@ void settings_climates_stats_t::init(settings_t* const sets)
 	INIT_NUM_NEW( "tree_climates", sets->get_tree_climates(), 0, 255, 1, false );
 	INIT_NUM_NEW( "no_tree_climates", sets->get_no_tree_climates(), 0, 255, 1, false );
 
-	clear_dirty();
-	height = ypos;
-	set_size( settings_stats_t::get_size() );
+	INIT_END
 }
 
 
@@ -544,9 +540,9 @@ void settings_climates_stats_t::read(settings_t* const sets)
 {
 	READ_INIT
 	READ_NUM_VALUE_NEW( env_t::pak_height_conversion_factor );
-	READ_NUM_VALUE_NEW( sets->grundwasser );
+	READ_NUM_VALUE_NEW( sets->groundwater );
 	READ_NUM_VALUE_NEW( sets->max_mountain_height );
-	double n;
+	double n = 0;
 	READ_NUM_VALUE_NEW( n );
 	if(  new_world  ) {
 		sets->map_roughness = (n+8.0)/20.0;
@@ -562,10 +558,8 @@ void settings_climates_stats_t::read(settings_t* const sets)
 			arctic = ch;
 		}
 	}
-	numinp.at(3)->set_limits( 0, arctic );
-	buf.clear();
-	buf.printf( "%s %i", translator::translate( "Summer snowline" ), arctic );
-	label.at(3)->set_text( buf );
+	summer->buf().printf("%s %i", translator::translate( "Summer snowline" ), arctic );
+	summer->update();
 	READ_BOOL_VALUE( sets->lake );
 	READ_NUM_VALUE_NEW( sets->river_number );
 	READ_NUM_VALUE_NEW( sets->min_river_length );
@@ -581,13 +575,13 @@ void settings_climates_stats_t::read(settings_t* const sets)
 }
 
 
-bool settings_climates_stats_t::action_triggered(gui_action_creator_t *komp, value_t)
+bool settings_climates_stats_t::action_triggered(gui_action_creator_t *comp, value_t)
 {
 	welt_gui_t *welt_gui = dynamic_cast<welt_gui_t *>(win_get_magic( magic_welt_gui_t ));
 	read( local_sets );
 	uint i = 0;
 	FORX(slist_tpl<gui_numberinput_t*>, const n, numinp, ++i) {
-		if (n == komp && i < 3 && welt_gui) {
+		if (n == comp && i < 3 && welt_gui) {
 			// update world preview
 			welt_gui->update_preview();
 		}

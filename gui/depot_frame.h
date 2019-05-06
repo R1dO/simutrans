@@ -28,6 +28,8 @@
 #include "components/gui_speedbar.h"
 #include "../simtypes.h"
 #include "../utils/cbuffer_t.h"
+#include "../linehandle_t.h"
+#include "../convoihandle_t.h"
 
 class depot_t;
 class vehicle_desc_t;
@@ -42,7 +44,7 @@ private:
 public:
 	depot_convoi_capacity_t();
 	void set_totals(uint32 pax, uint32 mail, uint32 goods);
-	void draw(scr_coord offset);
+	void draw(scr_coord offset) OVERRIDE;
 };
 
 
@@ -93,6 +95,9 @@ private:
 	button_t line_button;	// goto line ...
 
 	gui_label_t lb_convoi_count;
+
+	gui_label_t lb_convoi_number;
+
 	gui_label_t lb_convoi_speed;
 	gui_label_t lb_convoi_cost;
 	gui_label_t lb_convoi_value;
@@ -113,8 +118,16 @@ private:
 	button_t bt_obsolete;
 	button_t bt_show_all;
 
+	gui_label_t lb_sort_by;
+	gui_combobox_t sort_by;
+
+	gui_label_t lb_name_filter_input;
+	static char name_filter_value[64];
+	gui_textinput_t name_filter_input;
+
 	gui_tab_panel_t tabs;
 	gui_divider_t div_tabbottom;
+	gui_divider_t div_action_bottom;
 
 	gui_label_t lb_veh_action;
 	button_t bt_veh_action;
@@ -130,6 +143,9 @@ private:
 
 	vector_tpl<gui_image_list_t::image_data_t*> convoi_pics;
 	gui_image_list_t convoi;
+
+	gui_container_t cont_convoi;
+	gui_scrollpane_t scrolly_convoi;
 
 	/// image list of passenger cars
 	vector_tpl<gui_image_list_t::image_data_t*> pas_vec;
@@ -148,10 +164,6 @@ private:
 	gui_scrollpane_t scrolly_electrics;
 	gui_scrollpane_t scrolly_loks;
 	gui_scrollpane_t scrolly_waggons;
-	gui_container_t cont_pas;
-	gui_container_t cont_electrics;
-	gui_container_t cont_loks;
-	gui_container_t cont_waggons;
 
 	/// contains the current translation of "<no schedule set>"
 	const char* no_schedule_text;
@@ -178,6 +190,7 @@ private:
 	cbuffer_t txt_convois;
 
 	cbuffer_t txt_convoi_count;
+	cbuffer_t txt_convoi_number;
 	cbuffer_t txt_convoi_value;
 	cbuffer_t txt_convoi_speed;
 	cbuffer_t txt_convoi_cost;
@@ -185,6 +198,7 @@ private:
 	cbuffer_t txt_convoi_weight;
 
 	scr_coord_val second_column_x; // x position of the second text column
+	scr_coord_val second_column_w;
 
 	enum { va_append, va_insert, va_sell };
 	uint8 veh_action;
@@ -219,7 +233,7 @@ private:
 	 * @return true if such a button is needed
 	 * @author Hj. Malthaner
 	 */
-	bool has_min_sizer() const {return true;}
+	bool has_min_sizer() const OVERRIDE {return true;}
 
 	// true if already stored here
 	bool is_in_vehicle_list(const vehicle_desc_t *info);
@@ -233,6 +247,20 @@ private:
 	void image_from_storage_list(gui_image_list_t::image_data_t *image_data);
 
 public:
+	// sorting categories
+	enum {
+		sb_name,
+		sb_capacity,
+		sb_price,
+		sb_cost,
+		sb_cost_per_unit,
+		sb_speed, sb_power,
+		sb_weight,
+		sb_intro_date,
+		sb_retire_date,
+		sb_length
+	};
+
 	// the next two are only needed for depot_t update notifications
 	void activate_convoi( convoihandle_t cnv );
 
@@ -262,7 +290,7 @@ public:
 	 * @author (Mathew Hounsell)
 	 * @date   11-Mar-2003
 	 */
-	void set_windowsize(scr_size size);
+	void set_windowsize(scr_size size) OVERRIDE;
 
 	/**
 	 * Create and fill loks_vec and waggons_vec.
@@ -283,17 +311,17 @@ public:
 	 * @return the filename for the helptext, or NULL
 	 * @author Hj. Malthaner
 	 */
-	const char * get_help_filename() const {return "depot.txt";}
+	const char * get_help_filename() const OVERRIDE {return "depot.txt";}
 
 	/**
 	 * Does this window need a next button in the title bar?
 	 * @return true if such a button is needed
 	 * @author Volker Meyer
 	 */
-	bool has_next() const {return true;}
+	bool has_next() const OVERRIDE {return true;}
 
-	virtual koord3d get_weltpos(bool);
-	virtual bool is_weltpos();
+	koord3d get_weltpos(bool) OVERRIDE;
+	bool is_weltpos() OVERRIDE;
 
 	/**
 	 * Open dialog for schedule entry.
@@ -307,7 +335,7 @@ public:
 	 * Draw the Frame
 	 * @author Hansjörg Malthaner
 	 */
-	void draw(scr_coord pos, scr_size size);
+	void draw(scr_coord pos, scr_size size) OVERRIDE;
 
 	// @author hsiegeln
 	void apply_line();

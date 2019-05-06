@@ -8,7 +8,7 @@
 #ifndef HAUSBAUER_H
 #define HAUSBAUER_H
 
-#include "../besch/haus_besch.h"
+#include "../descriptor/building_desc.h"
 #include "../dataobj/koord3d.h"
 #include "../simtypes.h"
 #include "../tpl/vector_tpl.h"
@@ -30,12 +30,14 @@ class tool_selector_t;
 class hausbauer_t
 {
 private:
+	static sint16 largest_city_building_area;
+
 	static vector_tpl<const building_desc_t*> attractions_land;  ///< Sights outside of cities
 	static vector_tpl<const building_desc_t*> attractions_city;  ///< Sights within cities
 	static vector_tpl<const building_desc_t*> townhalls;         ///< Town halls
 	static vector_tpl<const building_desc_t*> monuments;         ///< All monuments
 	static vector_tpl<const building_desc_t*> unbuilt_monuments; ///< All unbuilt monuments
-	static vector_tpl<const building_desc_t*> headquarter;       ///< Company headquarters
+	static vector_tpl<const building_desc_t*> headquarters;       ///< Company headquarters
 	static vector_tpl<const building_desc_t*> station_building;  ///< All station buildings
 
 	/// @returns a random entry from @p list
@@ -45,6 +47,8 @@ private:
 	static karte_ptr_t welt;
 
 public:
+	static sint16 get_largest_city_building_area() { return largest_city_building_area; }
+
 	/// description for elevated monorail (mandatory description)
 	static const building_desc_t* elevated_foundation_desc;
 
@@ -78,16 +82,16 @@ public:
 	static void fill_menu(tool_selector_t* tool_selector, building_desc_t::btype, waytype_t wt, sint16 sound_ok);
 
 	/// @returns a random commercial building matching the requirements.
-	static const building_desc_t* get_commercial(int level, uint16 time, climate c, uint32 clusters = 0l);
+	static const building_desc_t* get_commercial(int level, uint16 time, climate c, uint32 clusters, koord minsize, koord maxsize );
 
 	/// @returns a random industrial building matching the requirements.
-	static const building_desc_t* get_industrial(int level, uint16 time, climate cl, uint32 clusters = 0);
+	static const building_desc_t* get_industrial(int level, uint16 time, climate cl, uint32 clusters, koord minsize, koord maxsize );
 
 	/// @returns a random residential building matching the requirements.
-	static const building_desc_t* get_residential(int level, uint16 time, climate cl, uint32 clusters = 0);
+	static const building_desc_t* get_residential(int level, uint16 time, climate cl, uint32 clusters, koord minsize, koord maxsize );
 
 	/// @returns headquarters with level @p level (takes the first matching one)
-	static const building_desc_t* get_headquarter(int level, uint16 time);
+	static const building_desc_t* get_headquarters(int level, uint16 time);
 
 	/// @returns a random tourist attraction matching the requirements.
 	static const building_desc_t* get_random_attraction(uint16 time, bool ignore_retire, climate cl)

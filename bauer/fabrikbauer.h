@@ -11,10 +11,8 @@
 #include "../tpl/stringhashtable_tpl.h"
 #include "../tpl/weighted_vector_tpl.h"
 #include "../dataobj/koord3d.h"
+#include "../descriptor/factory_desc.h"
 
-class building_desc_t;
-class ware_besch_t;
-class factory_desc_t;
 class stadt_t;
 class karte_ptr_t;
 class player_t;
@@ -52,13 +50,13 @@ private:
 	static stringhashtable_tpl<const factory_desc_t *> desc_table;
 
 	/// @returns the number of producers producing @p ware
-	static int count_producers(const ware_besch_t *ware, uint16 timeline);
+	static int count_producers(const goods_desc_t *ware, uint16 timeline);
 
 	/**
 	 * Finds a random producer producing @p ware.
 	 * @param timeline the current time (months)
 	 */
-	static void find_producer(weighted_vector_tpl<const factory_desc_t *> &producer, const ware_besch_t *ware, uint16 timeline );
+	static void find_producer(weighted_vector_tpl<const factory_desc_t *> &producer, const goods_desc_t *ware, uint16 timeline );
 
 public:
 	/// Registers the factory description so the factory can be built in-game.
@@ -110,7 +108,7 @@ public:
 	 * (meaning there are no unfinished factory chains).
 	 * @returns number of factories built
 	 */
-	static int build_link(koord3d* parent, const factory_desc_t* info, sint32 initial_prod_base, int rotate, koord3d* pos, player_t* player, int number_of_chains );
+	static int build_link(koord3d* parent, const factory_desc_t* info, sint32 initial_prod_base, int rotate, koord3d* pos, player_t* player, int number_of_chains, bool ignore_climates );
 
 	/**
 	 * Helper function for baue_hierachie(): builds the connections (chain) for one single product)
@@ -134,14 +132,14 @@ private:
 	 * @param water true to search on water
 	 * @param cl allowed climates
 	 */
-	static bool check_construction_site(koord pos, koord size, bool water, bool is_factory, climate_bits cl);
+	static bool check_construction_site(koord pos, koord size, factory_desc_t::site_t site, bool is_factory, climate_bits cl);
 
 	/**
 	 * Find a random site to place a factory.
 	 * @param radius Radius of the search circle around @p pos
 	 * @param size size of the building site
 	 */
-	static koord3d find_random_construction_site(koord pos, int radius, koord size,bool on_water, const building_desc_t *desc, bool ignore_climates, uint32 max_iterations);
+	static koord3d find_random_construction_site(koord pos, int radius, koord size, factory_desc_t::site_t site, const building_desc_t *desc, bool ignore_climates, uint32 max_iterations);
 
 	/**
 	 * Checks if all factories in this factory tree can be rotated.

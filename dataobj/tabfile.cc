@@ -10,11 +10,13 @@
 #include <ctype.h>
 
 #ifdef MAKEOBJ
-#include "../besch/writer/obj_writer.h"
+#include "../descriptor/writer/obj_writer.h"
+#define dr_fopen fopen
 #endif
 
+#include "../simsys.h"
 #include "../simdebug.h"
-#include "../besch/bild_besch.h"
+#include "../descriptor/image.h"
 #include "koord.h"
 #include "tabfile.h"
 
@@ -22,7 +24,7 @@
 bool tabfile_t::open(const char *filename)
 {
 	close();
-	file = fopen(filename, "r");
+	file = dr_fopen(filename, "r");
 	return file != NULL;
 }
 
@@ -87,7 +89,8 @@ void tabfileobj_t::clear()
 
 
 // private helps to get x y value pairs needed for koord etc.
-bool tabfileobj_t::get_x_y( const char *key, sint16 &x, sint16 &y )
+template<class I>
+bool tabfileobj_t::get_x_y( const char *key, I &x, I &y )
 {
 	const char *value = get_string(key,NULL);
 	const char *tmp;
@@ -114,14 +117,6 @@ const koord &tabfileobj_t::get_koord(const char *key, koord def)
 	return ret;
 }
 
-const scr_coord &tabfileobj_t::get_scr_coord(const char *key, scr_coord def)
-{
-	static scr_coord ret;
-	ret = def;
-	get_x_y( key, ret.x, ret.y );
-	return ret;
-}
-
 const scr_size &tabfileobj_t::get_scr_size(const char *key, scr_size def)
 {
 	static scr_size ret;
@@ -130,7 +125,7 @@ const scr_size &tabfileobj_t::get_scr_size(const char *key, scr_size def)
 	return ret;
 }
 
-uint8 tabfileobj_t::get_color(const char *key, uint8 def)
+PIXVAL tabfileobj_t::get_color(const char *key, PIXVAL def, uint32 *color_rgb)
 {
 	const char *value = get_string(key,NULL);
 
@@ -142,14 +137,30 @@ uint8 tabfileobj_t::get_color(const char *key, uint8 def)
 		while ( *value>0  &&  *value<=32  ) {
 			value ++;
 		}
+#ifndef MAKEOBJ
 		if(  *value=='#'  ) {
 			uint32 rgb = strtoul( value+1, NULL, 16 ) & 0XFFFFFFul;
-			return image_t::get_index_from_rgb( rgb>>16, (rgb>>8)&0xFF, rgb&0xFF );
+			// we save in settings as RGB888
+			if (color_rgb) {
+				*color_rgb = rgb;
+			}
+			// but the functions expect in the system colour (like RGB565)
+			return get_system_color( rgb>>16, (rgb>>8)&0xFF, rgb&0xFF );
 		}
 		else {
 			// this inputs also hex correct
-			return (uint8)strtol( value, NULL, 0 );
+			uint8 index = (uint8)strtoul( value, NULL, 0 );
+			// we save in settings as RGB888
+			if (color_rgb) {
+				*color_rgb = get_color_rgb(index);
+			}
+			// but the functions expect in the system colour (like RGB565)
+			return color_idx_to_rgb(index);
 		}
+#else
+		(void)color_rgb;
+		return (uint8)strtoul( value, NULL, 0 );
+#endif
 	}
 }
 
@@ -302,31 +313,66 @@ bool tabfile_t::read(tabfileobj_t &objinfo)
 
 				int parameters = 0;
 				int expansions = 0;
+				/*
+				@line, the whole parameter text (everything before =)
+				@delim, the whole value text (everything after =)
+				@parameters, number of fields enclosed by square brackets []
+				@expansions, number of expansions included in the value (text inside angle brackets <>)
+				@param, array containing the text inside each [] field
+				@expansion, array containing the text inside each <> field
+				 */
 				if(find_parameter_expansion(line, delim, &parameters, &expansions, param, expansion) > 0) {
 					int parameter_value[10][256];
 					int parameter_length[10];
-					int parameter_values[10];
-					int combinations=1;
+					int parameter_values[10]; // number of possible 'values' inside each [] field | e.g. [0-4]=5 / [n,s,w]=3
+					char parameter_name[256][6]; // non-numeric ribis strings for all parameter fields consecutively
+					bool parameter_ribi[10]; // true if parameters are ribi strings
 
+					int combinations=1;
+					int names = 0; // total number of ribi parameters
+
+					// analyse and obtain all parameter expansions
 					for(int i=0; i<parameters; i++) {
 						char *token_ptr;
 						parameter_length[i] = strcspn(param[i],"]");
 						parameter_values[i] = 0;
-						sprintf(buffer, "%.*s", parameter_length[i], param[i]);
+						parameter_ribi[i] = false;
 
-						parameter_value[i][parameter_values[i]++] = atoi(buffer);
+						sprintf(buffer, "%.*s", parameter_length[i], param[i]);
+						int name_length = strcspn(buffer,",");
+
+						int value = atoi(buffer);
+						if (value == 0 && (tolower(buffer[0]) == 'n' || tolower(buffer[0]) == 's' || tolower(buffer[0]) == 'e' || tolower(buffer[0]) == 'w')) {
+							sprintf(parameter_name[ names++ ], "%.*s", name_length, buffer);
+							parameter_ribi[i] = true;
+						}
+						parameter_value[i][parameter_values[i]++] = value;
 
 						token_ptr = strtok(buffer,"-,");
 						while (token_ptr != NULL && parameter_values[i]<256) {
 							switch(param[i][token_ptr-buffer-1]) {
 								case ',':
-									parameter_value[i][parameter_values[i]++] = atoi(token_ptr);
+									value = atoi(token_ptr);
+									if (parameter_ribi[i]) {
+										value = parameter_values[i];
+										sprintf(parameter_name[ names++ ], "%.*s", (int)strcspn(buffer+name_length+1,","), buffer+name_length+1);
+										name_length += strcspn(buffer+name_length+1,",") + 1;
+									}
+									parameter_value[i][parameter_values[i]++] = value;
 								break;
 								case '-':
-									int start_range = parameter_value[i][parameter_values[i]-1];
-									int end_range = atoi(token_ptr);
-									for(int range=start_range; range<end_range; range++) {
-										parameter_value[i][parameter_values[i]++] = range+1;
+									if (parameter_ribi[i]) {
+										value = parameter_values[i];
+										sprintf(parameter_name[value], "%.*s", (int)strcspn(buffer+name_length+1,","), buffer+name_length+1);
+										name_length += strcspn(buffer+name_length+1,",") + 1;
+										parameter_value[i][parameter_values[i]++] = value;
+									}
+									else {
+										int start_range = parameter_value[i][parameter_values[i]-1];
+										int end_range = atoi(token_ptr);
+										for(int range=start_range; range<end_range; range++) {
+											parameter_value[i][parameter_values[i]++] = range+1;
+										}
 									}
 							}
 							token_ptr = strtok(NULL, "-,");
@@ -334,21 +380,33 @@ bool tabfile_t::read(tabfileobj_t &objinfo)
 						combinations*=parameter_values[i];
 					}
 
-					for(int i=0; i<combinations; i++) {
+					// start expansion of the parameter
+					for(int c=0; c<combinations; c++) {
+						int names = 0;
 						int combination[10];
 						if(parameters>0) {
+							// warp values around the number of parameters the expansion has
 							for(int j=0; j<parameters; j++) {
-								combination[j] = i;
+								combination[j] = c;
 								for(int k=0; k<j; k++) {
 									combination[j]/=parameter_values[k];
 								}
 								combination[j]%=parameter_values[j];
 							}
-							sprintf(line_expand, "%.*s%d", (int)(param[0]-line), line, parameter_value[0][combination[0]]);
-							for(int i=1; i<parameters; i++) {
-								char *prev_end = param[i-1]+parameter_length[i-1];
-								sprintf(buffer, "%.*s%d", (int)(param[i]-prev_end), prev_end, parameter_value[i][combination[i]]);
+							char* prev_end = line;
+							line_expand[0] = 0;
+							for (int i=0; i<parameters; i++) {
+								// if expanding non-numerical parameters
+								if (parameter_ribi[i]) {
+									sprintf(buffer, "%.*s%s", (int)(param[i]-prev_end), prev_end, parameter_name[ names + combination[i]]);
+									names += parameter_values[i];
+								}
+								// if expanding numerical parameters
+								else {
+									sprintf(buffer, "%.*s%d", (int)(param[i]-prev_end), prev_end, parameter_value[i][combination[i]]);
+								}
 								strcat(line_expand, buffer);
+								prev_end = param[i]+parameter_length[i];
 							}
 							strcat(line_expand, param[parameters-1]+parameter_length[parameters-1]);
 						}
@@ -356,6 +414,7 @@ bool tabfile_t::read(tabfileobj_t &objinfo)
 							strcpy(line_expand, line);
 						}
 
+						// expand the value
 						if(expansions>0) {
 							int expansion_length[10];
 							int expansion_value[10];
@@ -379,6 +438,7 @@ bool tabfile_t::read(tabfileobj_t &objinfo)
 							strcpy(delim_expand, delim);
 						}
 
+						printf("%s = %s\n", line_expand, delim_expand);
 						objinfo.put(line_expand, delim_expand);
 					}
 				}
@@ -693,23 +753,4 @@ void tabfile_t::format_key(char *key)
 		}
 	}
 	*t = '\0';
-}
-
-
-void tabfile_t::format_value(char *value)
-{
-	size_t len = strlen(value);
-
-	// trim right
-	while(len && value[len - 1] == ' ') {
-		value[--len] = '\0';
-	}
-	// trim left
-	if(*value == ' ') {
-		char *from;
-		for(from = value; *from == ' '; from++) {}
-		while(*value) {
-			*value++ = *from++;
-		}
-	}
 }

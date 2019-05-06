@@ -1,23 +1,25 @@
 #include "api.h"
 
-/** @file api_obj_desc.cc exports goods descriptors - *_besch_t. */
+/** @file api_obj_desc.cc exports goods descriptors - *_desc_t. */
 
 #include "api_obj_desc_base.h"
 #include "api_simple.h"
-#include "export_besch.h"
+#include "export_desc.h"
 #include "get_next.h"
 #include "../api_class.h"
 #include "../api_function.h"
-#include "../../besch/bruecke_besch.h"
-#include "../../besch/haus_besch.h"
-#include "../../besch/vehikel_besch.h"
-#include "../../besch/ware_besch.h"
+#include "../../descriptor/bridge_desc.h"
+#include "../../descriptor/building_desc.h"
+#include "../../descriptor/vehicle_desc.h"
+#include "../../descriptor/goods_desc.h"
+#include "../../descriptor/roadsign_desc.h"
 #include "../../bauer/brueckenbauer.h"
 #include "../../bauer/hausbauer.h"
 #include "../../bauer/tunnelbauer.h"
 #include "../../bauer/vehikelbauer.h"
-#include "../../bauer/warenbauer.h"
+#include "../../bauer/goods_manager.h"
 #include "../../bauer/wegbauer.h"
+#include "../../obj/roadsign.h"
 #include "../../simhalt.h"
 #include "../../simware.h"
 #include "../../simworld.h"
@@ -32,17 +34,17 @@ using namespace script_api;
 
 SQInteger get_next_ware_desc(HSQUIRRELVM vm)
 {
-	return generic_get_next(vm, warenbauer_t::get_count());
+	return generic_get_next(vm, goods_manager_t::get_count());
 }
 
 
-SQInteger get_ware_besch_index(HSQUIRRELVM vm)
+SQInteger get_goods_desc_index(HSQUIRRELVM vm)
 {
 	uint32 index = param<uint32>::get(vm, -1);
 
 	const char* name = "None"; // fall-back
-	if (index < warenbauer_t::get_count()) {
-		name = warenbauer_t::get_info(index)->get_name();
+	if (index < goods_manager_t::get_count()) {
+		name = goods_manager_t::get_info(index)->get_name();
 	}
 	return push_instance(vm, "good_desc_x",  name);
 }
@@ -75,6 +77,17 @@ bool building_enables(const building_desc_t* desc, uint8 which)
 	return desc ? desc->get_enabled() & which : 0;
 }
 
+SQInteger building_get_size(HSQUIRRELVM vm)
+{
+	const building_desc_t* desc = param<const building_desc_t*>::get(vm, 1);
+	uint8 rotation = param<uint8>::get(vm, 2);
+	if (desc) {
+		koord size = desc->get_size(rotation);
+		// no automatic coordinate transform please
+		return push_instance(vm, "coord", size.x, size.y);
+	}
+	return -1;
+}
 
 mytime_t get_intro_retire(const obj_desc_timelined_t* desc, bool intro)
 {
@@ -106,26 +119,32 @@ const vector_tpl<const building_desc_t*>& get_building_list(building_desc_t::bty
 }
 
 
-const vector_tpl<const building_desc_t*>& get_available_stations(building_desc_t::btype type, waytype_t wt, const ware_besch_t *freight)
+const vector_tpl<const building_desc_t*>& get_available_stations(building_desc_t::btype type, waytype_t wt, const goods_desc_t *freight)
 {
 	static vector_tpl<const building_desc_t*> dummy;
 	dummy.clear();
 
-	if (freight == NULL  ||  (type != building_desc_t::depot  &&  type != building_desc_t::generic_stop  &&  type != building_desc_t::generic_extension) ) {
-		return dummy;
+	switch(type) {
+		case building_desc_t::depot:
+		case building_desc_t::generic_stop:
+		case building_desc_t::generic_extension:
+		case building_desc_t::dock:
+		case building_desc_t::flat_dock:
+			break;
+		default:
+			return dummy;
 	}
 
 	const vector_tpl<const building_desc_t*>* p = hausbauer_t::get_list(type);
 
 	// translate freight to enables-flags
-	uint8 enables = haltestelle_t::WARE;
-	switch(freight->get_catg_index()) {
-		case warenbauer_t::INDEX_PAS:  enables = haltestelle_t::PAX;  break;
-		case warenbauer_t::INDEX_MAIL: enables = haltestelle_t::POST; break;
-		default: ;
-	}
-	if (type == building_desc_t::depot) {
-		enables = 0;
+	uint8 enables = 0;
+	if (freight  &&  type != building_desc_t::depot) {
+		switch(freight->get_catg_index()) {
+			case goods_manager_t::INDEX_PAS:  enables = haltestelle_t::PAX;  break;
+			case goods_manager_t::INDEX_MAIL: enables = haltestelle_t::POST; break;
+			default:                          enables = haltestelle_t::WARE;
+		}
 	}
 
 	uint16 time = welt->get_timeline_year_month();
@@ -157,9 +176,9 @@ bool can_be_last(const vehicle_desc_t *desc)
 	return desc->can_lead(NULL);
 }
 
-bool is_coupling_allowed(const vehicle_desc_t *besch1, const vehicle_desc_t *besch2)
+bool is_coupling_allowed(const vehicle_desc_t *desc1, const vehicle_desc_t *desc2)
 {
-	return besch1->can_lead(besch2)  &&  besch2->can_follow(besch1);
+	return desc1->can_lead(desc2)  &&  desc2->can_follow(desc1);
 }
 
 const vector_tpl<const vehicle_desc_t*>& get_predecessors(const vehicle_desc_t *desc)
@@ -213,18 +232,13 @@ uint32 get_power(const vehicle_desc_t *desc)
 
 // export of building_desc_t::btype only here
 namespace script_api {
-	declare_specialized_param(building_desc_t::btype, "i", "building_desc_x::building_type");
-
-	SQInteger param<building_desc_t::btype>::push(HSQUIRRELVM vm, const building_desc_t::btype & u)
-	{
-		return param<uint16>::push(vm, u);
-	}
-
-	building_desc_t::btype param<building_desc_t::btype>::get(HSQUIRRELVM vm, SQInteger index)
-	{
-		return (building_desc_t::btype)param<uint16>::get(vm, index);
-	}
+	declare_enum_param(building_desc_t::btype, uint16, "building_desc_x::building_type");
 };
+
+bool is_traffic_light(const roadsign_desc_t *d)
+{
+	return !d->is_signal_type()  &&  d->is_traffic_light();
+}
 
 
 void export_goods_desc(HSQUIRRELVM vm)
@@ -245,6 +259,10 @@ void export_goods_desc(HSQUIRRELVM vm)
 	 * @return true if this==other
 	 */
 	register_method(vm, &are_equal, "is_equal", true);
+	/**
+	 * @returns if object is still valid.
+	 */
+	export_is_valid<const obj_named_desc_t*>(vm); //register_function("is_valid")
 	end_class(vm);
 
 	/**
@@ -288,7 +306,7 @@ void export_goods_desc(HSQUIRRELVM vm)
 	/**
 	 * @returns cost [in 1/100 credits] to buy or build on piece or tile of this thing.
 	 */
-	register_method(vm, &obj_desc_transport_related_t::get_preis, "get_cost");
+	register_method(vm, &obj_desc_transport_related_t::get_price, "get_cost");
 	/**
 	 * @returns way type, can be @ref wt_invalid.
 	 */
@@ -303,7 +321,7 @@ void export_goods_desc(HSQUIRRELVM vm)
 	/**
 	 * Vehicle descriptors
 	 */
-	begin_besch_class(vm, "vehicle_desc_x", "obj_desc_transport_x", (GETBESCHFUNC)param<const vehicle_desc_t*>::getfunc());
+	begin_desc_class(vm, "vehicle_desc_x", "obj_desc_transport_x", (GETDESCFUNC)param<const vehicle_desc_t*>::getfunc());
 	/**
 	 * @returns true if this vehicle can lead a convoy
 	 */
@@ -331,7 +349,7 @@ void export_goods_desc(HSQUIRRELVM vm)
 	/**
 	 * @returns freight that can be transported (or null)
 	 */
-	register_method(vm, &vehicle_desc_t::get_ware, "get_freight");
+	register_method(vm, &vehicle_desc_t::get_freight_type, "get_freight");
 	/**
 	 * @returns capacity
 	 */
@@ -364,13 +382,13 @@ void export_goods_desc(HSQUIRRELVM vm)
 	/**
 	 * Object descriptors for trees.
 	 */
-	begin_besch_class(vm, "tree_desc_x", "obj_desc_x", (GETBESCHFUNC)param<const tree_desc_t*>::getfunc());
+	begin_desc_class(vm, "tree_desc_x", "obj_desc_x", (GETDESCFUNC)param<const tree_desc_t*>::getfunc());
 	end_class(vm);
 
 	/**
 	 * Object descriptors for buildings: houses, attractions, stations and extensions, depots, harbours.
 	 */
-	begin_besch_class(vm, "building_desc_x", "obj_desc_time_x", (GETBESCHFUNC)param<const building_desc_t*>::getfunc());
+	begin_desc_class(vm, "building_desc_x", "obj_desc_time_x", (GETDESCFUNC)param<const building_desc_t*>::getfunc());
 
 	/**
 	 * @returns whether building is an attraction
@@ -379,8 +397,9 @@ void export_goods_desc(HSQUIRRELVM vm)
 	/**
 	 * @param rotation
 	 * @return size of building in the given @p rotation
+	 * @typemask coord(integer)
 	 */
-	register_method(vm, &building_desc_t::get_size, "get_size");
+	register_function(vm, building_get_size, "get_size", 2,  "x i");
 	/**
 	 * @return monthly maintenance cost
 	 */
@@ -426,8 +445,8 @@ void export_goods_desc(HSQUIRRELVM vm)
 	enum_slot(vm, "factory", (uint8)building_desc_t::factory, true);
 	/// townhall
 	enum_slot(vm, "townhall", (uint8)building_desc_t::townhall, true);
-	/// company headquarter
-	enum_slot(vm, "headquarter", (uint8)building_desc_t::headquarter, true);
+	/// company headquarters
+	enum_slot(vm, "headquarter", (uint8)building_desc_t::headquarters, true);
 	/// harbour
 	enum_slot(vm, "harbour", (uint8)building_desc_t::dock, true);
 	/// harbour without a slope (buildable on flat ground beaches)
@@ -452,7 +471,7 @@ void export_goods_desc(HSQUIRRELVM vm)
 	/**
 	 * @returns headquarter level (or -1 if building is not headquarter)
 	 */
-	register_method(vm, &building_desc_t::get_headquarter_level, "get_headquarter_level");
+	register_method(vm, &building_desc_t::get_headquarters_level, "get_headquarter_level");
 
 	/**
 	 * Returns an array with all buildings of the given type.
@@ -465,7 +484,7 @@ void export_goods_desc(HSQUIRRELVM vm)
 	 * Entries are of type @ref building_desc_x.
 	 * @param type building type from @ref building_desc_x::building_type
 	 * @param wt waytype
-	 * @param freight station should accept this freight
+	 * @param freight station should accept this freight (if null then return all buildings)
 	 * @returns the list
 	 */
 	STATIC register_method(vm, &get_available_stations, "get_available_stations", false, true);
@@ -480,7 +499,7 @@ void export_goods_desc(HSQUIRRELVM vm)
 	/**
 	 * Object descriptors for ways.
 	 */
-	begin_besch_class(vm, "way_desc_x", "obj_desc_transport_x", (GETBESCHFUNC)param<const way_desc_t*>::getfunc());
+	begin_desc_class(vm, "way_desc_x", "obj_desc_transport_x", (GETDESCFUNC)param<const way_desc_t*>::getfunc());
 	/**
 	 * @returns true if this way can be build on the steeper (double) slopes.
 	 */
@@ -503,7 +522,7 @@ void export_goods_desc(HSQUIRRELVM vm)
 	/**
 	 * Object descriptors for tunnels.
 	 */
-	begin_besch_class(vm, "tunnel_desc_x", "obj_desc_transport_x", (GETBESCHFUNC)param<const tunnel_desc_t*>::getfunc());
+	begin_desc_class(vm, "tunnel_desc_x", "obj_desc_transport_x", (GETDESCFUNC)param<const tunnel_desc_t*>::getfunc());
 	/**
 	 * Returns a list with available tunnel types.
 	 */
@@ -513,7 +532,7 @@ void export_goods_desc(HSQUIRRELVM vm)
 	/**
 	 * Object descriptors for bridges.
 	 */
-	begin_besch_class(vm, "bridge_desc_x", "obj_desc_transport_x", (GETBESCHFUNC)param<const bridge_desc_t*>::getfunc());
+	begin_desc_class(vm, "bridge_desc_x", "obj_desc_transport_x", (GETDESCFUNC)param<const bridge_desc_t*>::getfunc());
 	/**
 	 * @return true if this bridge can raise two level from flat terrain
 	 */
@@ -556,14 +575,14 @@ void export_goods_desc(HSQUIRRELVM vm)
 	/**
 	 * Meta-method to be used in foreach loops. Do not call them directly.
 	 */
-	register_function(vm, get_ware_besch_index, "_get",    2, "xi");
+	register_function(vm, get_goods_desc_index, "_get",    2, "xi");
 
 	end_class(vm);
 
 	/**
 	 * Descriptor of goods and freight types.
 	 */
-	begin_besch_class(vm, "good_desc_x", "obj_desc_x", (GETBESCHFUNC)param<const ware_besch_t*>::getfunc());
+	begin_desc_class(vm, "good_desc_x", "obj_desc_x", (GETDESCFUNC)param<const goods_desc_t*>::getfunc());
 
 	// dummy entry to create documentation of constructor
 	/**
@@ -573,8 +592,8 @@ void export_goods_desc(HSQUIRRELVM vm)
 	 */
 	// register_function( .., "constructor", .. )
 
-	create_slot(vm, "passenger", warenbauer_t::passagiere, true);
-	create_slot(vm, "mail",      warenbauer_t::post,       true);
+	create_slot(vm, "passenger", goods_manager_t::passengers, true);
+	create_slot(vm, "mail",      goods_manager_t::mail,       true);
 #ifdef DOXYGEN
 	static good_desc_x passenger; ///< descriptor for passenger
 	static good_desc_x mail;      ///< descriptor for mail
@@ -582,17 +601,17 @@ void export_goods_desc(HSQUIRRELVM vm)
 	/**
 	 * @return freight category. 0=Passengers, 1=Mail, 2=None, >=3 anything else
 	 */
-	register_method(vm, &ware_besch_t::get_catg_index, "get_catg_index");
+	register_method(vm, &goods_desc_t::get_catg_index, "get_catg_index");
 
 	/**
 	 * Checks if this good can be interchanged with the other, in terms of
 	 * transportability.
 	 */
-	register_method(vm, &ware_besch_t::is_interchangeable, "is_interchangeable");
+	register_method(vm, &goods_desc_t::is_interchangeable, "is_interchangeable");
 	/**
 	 * @returns weight of one unit of this freight
 	 */
-	register_method(vm, &ware_besch_t::get_weight_per_unit, "get_weight_per_unit"); // in kg
+	register_method(vm, &goods_desc_t::get_weight_per_unit, "get_weight_per_unit"); // in kg
 
 	/**
 	 * Calculates transport revenue per tile and freight unit.
@@ -603,4 +622,54 @@ void export_goods_desc(HSQUIRRELVM vm)
 	 */
 	register_method(vm, &ware_t::calc_revenue, "calc_revenue", true);
 	end_class(vm);
+
+	/**
+	 * Descriptor of roadsigns and signals.
+	 */
+	begin_desc_class(vm, "sign_desc_x", "obj_desc_transport_x", (GETDESCFUNC)param<const roadsign_desc_t*>::getfunc());
+
+	/**
+	 * @returns true if sign is one-way sign
+	 */
+	register_method(vm, &roadsign_desc_t::is_single_way, "is_one_way");
+	/**
+	 * @returns true if sign is private-way sign
+	 */
+	register_method(vm, &roadsign_desc_t::is_private_way, "is_private_way");
+	/**
+	 * @returns true if sign is traffic light
+	 */
+	register_method(vm, &is_traffic_light, "is_traffic_light", true);
+	/**
+	 * @returns true if sign is choose sign
+	 */
+	register_method(vm, &roadsign_desc_t::is_choose_sign, "is_choose_sign");
+	/**
+	 * @returns true if sign is signal
+	 */
+	register_method(vm, &roadsign_desc_t::is_signal, "is_signal");
+	/**
+	 * @returns true if sign is pre signal (distant signal)
+	 */
+	register_method(vm, &roadsign_desc_t::is_pre_signal, "is_pre_signal");
+	/**
+	 * @returns true if sign is priority signal
+	 */
+	register_method(vm, &roadsign_desc_t::is_priority_signal, "is_priority_signal");
+	/**
+	 * @returns true if sign is long-block signal
+	 */
+	register_method(vm, &roadsign_desc_t::is_longblock_signal, "is_longblock_signal");
+	/**
+	 * @returns true if sign is end-of-choose sign
+	 */
+	register_method(vm, &roadsign_desc_t::is_end_choose_signal, "is_end_choose_signal");
+	/**
+	 * Returns a list with available bridge types.
+	 * @param wt waytype
+	 */
+	STATIC register_method(vm, roadsign_t::get_available_signs, "get_available_signs", false, true);
+
+	end_class(vm);
+
 }

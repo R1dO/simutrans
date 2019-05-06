@@ -69,16 +69,16 @@ function recursive_save(table, indent, table_stack)
 					str += "null"
 				}
 				break
+			case "generator":
+				str += "null"
+				break
 			case "instance":
+			default:
 				if ("_save" in val) {
 					str += val._save()
 					break
 				}
-			case "generator":
-				str += "null"
-				break
-			default:
-				str += "\"unknown\""
+				str += "\"unknown(" + typeof(val) + ")\""
 		}
 		if (str.slice(-1) != "\n") {
 			str += ",\n"
@@ -482,6 +482,21 @@ class dir {
 	static nsew = [1, 4, 2, 8]
 }
 
+class slope {
+	static flat=0
+	static north = 3+1     ///< North slope
+	static west = 9+3      ///< West slope
+	static east = 27+1     ///< East slope
+	static south = 27+9    ///< South slope
+	static northwest = 27  ///< NW corner
+	static northeast = 9   ///< NE corner
+	static southeast = 3   ///< SE corner
+	static southwest = 1   ///< SW corner
+	static raised = 80     ///< special meaning: used as slope of bridgeheads
+	static all_up_slope   = 82 ///< used for terraforming tools
+	static all_down_slope = 83 ///< used for terraforming tools
+}
+
 class time_x {
 	raw = 1
 	year = 0
@@ -541,3 +556,7 @@ table_with_extend_get <- {
  */
 world <- {}
 world.setdelegate(table_with_extend_get)
+
+
+// table to hold routines for gui access
+gui <- {}

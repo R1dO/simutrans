@@ -11,25 +11,8 @@
  */
 
 #include "factorylist_frame_t.h"
-
 #include "../dataobj/translator.h"
 
-/**
- * This variable defines the sort order (ascending or descending)
- * Values: 1 = ascending, 2 = descending)
- * @author Markus Weber
- */
-bool factorylist_frame_t::sortreverse = false;
-
-/**
- * This variable defines by which column the table is sorted
- * Values: 0 = Station number
- *         1 = Station name
- *         2 = Waiting goods
- *         3 = Station type
- * @author Markus Weber
- */
-factorylist::sort_mode_t factorylist_frame_t::sortby = factorylist::by_name;
 
 const char *factorylist_frame_t::sort_text[factorylist::SORT_MODES] = {
 	"Fabrikname",
@@ -42,69 +25,65 @@ const char *factorylist_frame_t::sort_text[factorylist::SORT_MODES] = {
 
 factorylist_frame_t::factorylist_frame_t() :
 	gui_frame_t( translator::translate("fl_title") ),
-	sort_label(translator::translate("hl_txt_sort")),
-	stats(sortby,sortreverse),
-	scrolly(&stats)
+	scrolly(gui_scrolled_list_t::windowskin, factorylist_stats_t::compare)
 {
-	sort_label.set_pos(scr_coord(BUTTON1_X, 2));
-	add_component(&sort_label);
+	set_table_layout(1,0);
+	new_component<gui_label_t>("hl_txt_sort");
 
-	sortedby.init(button_t::roundbox, "", scr_coord(BUTTON1_X, 14));
+	add_table(2,0);
+	sortedby.init(button_t::roundbox, sort_text[factorylist_stats_t::sort_mode]);
 	sortedby.add_listener(this);
 	add_component(&sortedby);
 
-	sorteddir.init(button_t::roundbox, "", scr_coord(BUTTON2_X, 14));
+	sorteddir.init(button_t::roundbox, factorylist_stats_t::reverse ? "hl_btn_sort_desc" : "hl_btn_sort_asc");
 	sorteddir.add_listener(this);
 	add_component(&sorteddir);
+	end_table();
 
-	// name buttons
-	sortedby.set_text(sort_text[get_sortierung()]);
-	sorteddir.set_text(get_reverse() ? "hl_btn_sort_desc" : "hl_btn_sort_asc");
-
-	scrolly.set_pos(scr_coord(0, 14+D_BUTTON_HEIGHT+2));
-	scrolly.set_scroll_amount_y(LINESPACE+1);
 	add_component(&scrolly);
+	fill_list();
 
-	set_windowsize(scr_size(D_DEFAULT_WIDTH, D_DEFAULT_HEIGHT));
-	set_min_windowsize(scr_size(D_DEFAULT_WIDTH, D_TITLEBAR_HEIGHT+4*(LINESPACE+1)+14+D_BUTTON_HEIGHT+2+1));
-
+	reset_min_windowsize();
 	set_resizemode(diagonal_resize);
-	resize(scr_coord(0,0));
 }
-
 
 
 /**
  * This method is called if an action is triggered
  * @author Markus Weber/Volker Meyer
  */
-bool factorylist_frame_t::action_triggered( gui_action_creator_t *komp,value_t /* */)
+bool factorylist_frame_t::action_triggered( gui_action_creator_t *comp,value_t /* */)
 {
-	if(komp == &sortedby) {
-		set_sortierung((factorylist::sort_mode_t)((get_sortierung() + 1) % factorylist::SORT_MODES));
-		sortedby.set_text(sort_text[get_sortierung()]);
-		stats.sort(get_sortierung(),get_reverse());
-		stats.recalc_size();
+	if(comp == &sortedby) {
+		factorylist_stats_t::sort_mode = (factorylist_stats_t::sort_mode + 1) % factorylist::SORT_MODES;
+		sortedby.set_text(sort_text[factorylist_stats_t::sort_mode]);
+		scrolly.sort(0);
 	}
-	else if(komp == &sorteddir) {
-		set_reverse(!get_reverse());
-		sorteddir.set_text(get_reverse() ? "hl_btn_sort_desc" : "hl_btn_sort_asc");
-		stats.sort(get_sortierung(),get_reverse());
-		stats.recalc_size();
+	else if(comp == &sorteddir) {
+		factorylist_stats_t::reverse = !factorylist_stats_t::reverse;
+		sorteddir.set_text( factorylist_stats_t::reverse ? "hl_btn_sort_desc" : "hl_btn_sort_asc");
+		scrolly.sort(0);
 	}
 	return true;
 }
 
 
-/**
- * resize window in response to a resize event
- * @author Hj. Malthaner
- * @date   16-Oct-2003
- */
-void factorylist_frame_t::resize(const scr_coord delta)
+void factorylist_frame_t::fill_list()
 {
-	gui_frame_t::resize(delta);
-	// window size - titlebar - offset (header)
-	scr_size size = get_windowsize()-scr_size(0,D_TITLEBAR_HEIGHT+14+D_BUTTON_HEIGHT+2+1);
-	scrolly.set_size(size);
+	scrolly.clear_elements();
+	FOR(const slist_tpl<fabrik_t *>,fab,world()->get_fab_list()) {
+		scrolly.new_component<factorylist_stats_t>(fab) ;
+	}
+	scrolly.sort(0);
+	scrolly.set_size( scrolly.get_size());
+}
+
+
+void factorylist_frame_t::draw(scr_coord pos, scr_size size)
+{
+	if(  world()->get_fab_list().get_count() != (uint32)scrolly.get_count()  ) {
+		fill_list();
+	}
+
+	gui_frame_t::draw(pos,size);
 }

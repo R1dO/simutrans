@@ -19,8 +19,8 @@
 #include "../simtool.h"
 #include "../simworld.h"
 
-#include "../besch/roadsign_besch.h"
-#include "../besch/skin_besch.h"
+#include "../descriptor/roadsign_desc.h"
+#include "../descriptor/skin_desc.h"
 
 #include "../boden/grund.h"
 #include "../boden/wege/strasse.h"
@@ -139,7 +139,11 @@ void roadsign_t::set_dir(ribi_t::ribi dir)
 		if(  desc->get_wtyp()!=track_wt  &&  desc->get_wtyp()!=monorail_wt  &&  desc->get_wtyp()!=maglev_wt  &&  desc->get_wtyp()!=narrowgauge_wt  ) {
 			weg->count_sign();
 		}
-		if(  desc->is_single_way()  ||  desc->is_signal()  ||  desc->is_pre_signal()  ||  desc->is_longblock_signal()  ) {
+		if(desc->is_single_way() ||
+           desc->is_signal() ||
+           desc->is_pre_signal() ||
+           desc->is_priority_signal() ||
+           desc->is_longblock_signal()) {
 			// set mask, if it is a single way ...
 			weg->count_sign();
 			weg->set_ribi_maske(calc_mask());
@@ -187,10 +191,7 @@ void roadsign_t::info(cbuffer_t & buf) const
 {
 	obj_t::info( buf );
 
-	if(  desc->is_private_way()  ) {
-		buf.append( "\n\n\n\n\n\n\n\n\n\n\n\n\n\n" );
-	}
-	else {
+	if(  !desc->is_private_way()  ) {
 		buf.append(translator::translate("Roadsign"));
 		buf.append("\n");
 		if(desc->is_single_way()) {
@@ -202,9 +203,12 @@ void roadsign_t::info(cbuffer_t & buf) const
 		buf.printf("%s%u\n", translator::translate("\ndirection:"), dir);
 		if(  automatic  ) {
 			buf.append(translator::translate("\nSet phases:"));
-			buf.append("\n");
-			buf.append("\n");
 		}
+	}
+
+	if (char const* const maker = desc->get_copyright()) {
+		buf.append("\n");
+		buf.printf(translator::translate("Constructed by %s"), maker);
 	}
 }
 
@@ -468,9 +472,10 @@ sync_result roadsign_t::sync_step(uint32 /*delta_t*/)
 	}
 	else {
 		// change every ~32s
-		uint32 ticks = ((welt->get_zeit_ms()>>10)+ticks_offset) % (ticks_ns+ticks_ow);
+		// Must not overflow if ticks_ns+ticks_ow=256
+		uint32 ticks = ((welt->get_ticks()>>10)+ticks_offset) % ((uint32)ticks_ns+(uint32)ticks_ow);
 
-		uint8 new_state = (ticks >= ticks_ns) ^ (welt->get_settings().get_rotation() & 1);
+		uint8 new_state = (ticks >= ticks_ns);
 		if(state!=new_state) {
 			state = new_state;
 			dir = (new_state==0) ? ribi_t::northsouth : ribi_t::eastwest;
@@ -487,6 +492,11 @@ void roadsign_t::rotate90()
 	obj_t::rotate90();
 	if(automatic  &&  !desc->is_private_way()) {
 		state = (state+1)&1;
+		if (ticks_offset >= ticks_ns) {
+			ticks_offset -= ticks_ns;
+		} else {
+			ticks_offset += ticks_ow;
+		}
 		uint8 temp = ticks_ns;
 		ticks_ns = ticks_ow;
 		ticks_ow = temp;
@@ -514,7 +524,7 @@ void roadsign_t::display_after(int xpos, int ypos, bool ) const
 		// draw with owner
 		if(  get_player_nr() != PLAYER_UNOWNED  ) {
 			if(  obj_t::show_owner  ) {
-				display_blend( foreground_image, xpos, ypos, 0, (get_owner()->get_player_color1()+2) | OUTLINE_FLAG | TRANSPARENT75_FLAG, 0, dirty  CLIP_NUM_PAR);
+				display_blend( foreground_image, xpos, ypos, 0, color_idx_to_rgb(get_owner()->get_player_color1()+2) | OUTLINE_FLAG | TRANSPARENT75_FLAG, 0, dirty  CLIP_NUM_PAR);
 			}
 			else {
 				display_color( foreground_image, xpos, ypos, get_player_nr(), true, get_flag(obj_t::dirty)  CLIP_NUM_PAR);
@@ -593,7 +603,7 @@ void roadsign_t::rdwr(loadsave_t *file)
 
 void roadsign_t::cleanup(player_t *player)
 {
-	player_t::book_construction_costs(player, -desc->get_preis(), get_pos().get_2d(), get_waytype());
+	player_t::book_construction_costs(player, -desc->get_price(), get_pos().get_2d(), get_waytype());
 }
 
 
@@ -651,10 +661,8 @@ bool roadsign_t::successfully_loaded()
 bool roadsign_t::register_desc(roadsign_desc_t *desc)
 {
 	// avoid duplicates with same name
-	const roadsign_desc_t *old_desc = table.get(desc->get_name());
-	if(old_desc) {
-		dbg->warning( "roadsign_t::register_desc()", "Object %s was overlaid by addon!", desc->get_name() );
-		table.remove(desc->get_name());
+	if(const roadsign_desc_t *old_desc = table.remove(desc->get_name())) {
+		dbg->doubled( "roadsign", desc->get_name() );
 		tool_t::general_tool.remove( old_desc->get_builder() );
 		delete old_desc->get_builder();
 		delete old_desc;
@@ -724,4 +732,19 @@ const roadsign_desc_t *roadsign_t::roadsign_search(roadsign_desc_t::types const 
 		}
 	}
 	return NULL;
+}
+
+
+const vector_tpl<const roadsign_desc_t*>& roadsign_t::get_available_signs(const waytype_t wt)
+{
+	static vector_tpl<const roadsign_desc_t*> dummy;
+	dummy.clear();
+	const uint16 time = welt->get_timeline_year_month();
+	FOR(stringhashtable_tpl<roadsign_desc_t const*>, const& i, table) {
+		roadsign_desc_t const* const desc = i.value;
+		if(  desc->is_available(time)  &&  desc->get_wtyp()==wt) {
+			dummy.append(desc);
+		}
+	}
+	return dummy;
 }

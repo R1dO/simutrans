@@ -30,8 +30,8 @@
 #include "../bauer/hausbauer.h"
 #include "../bauer/tunnelbauer.h"
 
-#include "../besch/tunnel_besch.h"
-#include "../besch/weg_besch.h"
+#include "../descriptor/tunnel_desc.h"
+#include "../descriptor/way_desc.h"
 
 #include "../boden/grund.h"
 
@@ -78,7 +78,7 @@ player_t::player_t(uint8 nr) :
 	headquarter_level = 0;
 
 
-	welt->get_settings().set_default_player_color(this);
+	welt->get_settings().set_player_color_to_default(this);
 
 	// we have different AI, try to find out our type:
 	sprintf(player_name_buf,"player %i",player_nr-1);
@@ -107,7 +107,7 @@ void player_t::book_construction_costs(player_t * const player, const sint64 amo
 }
 
 
-sint32 player_t::add_maintenance(sint32 change, waytype_t const wt)
+sint64 player_t::add_maintenance(sint64 change, waytype_t const wt)
 {
 	int tmp = 0;
 #ifdef MULTI_THREAD
@@ -226,7 +226,7 @@ void player_t::display_messages()
 
 		const scr_coord scr_pos = vp->get_screen_coord(koord3d(m->pos,welt->lookup_hgt(m->pos)),koord(0,m->alter >> 4));
 
-		display_shadow_proportional( scr_pos.x, scr_pos.y, PLAYER_FLAG|(player_color_1+3), COL_BLACK, m->str, true);
+		display_shadow_proportional_rgb( scr_pos.x, scr_pos.y, PLAYER_FLAG|color_idx_to_rgb(player_color_1+3), color_idx_to_rgb(COL_BLACK), m->str, true);
 		if(  m->pos.x < 3  ||  m->pos.y < 3  ) {
 			// very close to border => renew background
 			welt->set_background_dirty();
@@ -460,7 +460,7 @@ void player_t::ai_bankrupt()
 
 		cnv->self_destruct();
 		// convois not in depots must step to really get rid of them
-		if(  cnv->get_state() != convoi_t::INITIAL  ) {
+		if(  cnv.is_bound()  &&  cnv->get_state() != convoi_t::INITIAL  ) {
 			cnv->step();
 		}
 
@@ -499,7 +499,7 @@ void player_t::ai_bankrupt()
 					if(  w  &&  w->get_owner()==this  ) {
 						// tunnels and bridges are handled later? (logic needs to be checked for correct maintenance costs)
 						if (!gr->ist_bruecke()  &&  !gr->ist_tunnel()) {
-							sint32 const costs = w->get_desc()->get_wartung();
+							sint32 const costs = w->get_desc()->get_maintenance();
 							waytype_t const wt = w->get_desc()->get_finance_waytype();
 							player_t::add_maintenance(this, -costs, wt);
 							player_t::add_maintenance(psplayer, costs, wt);
@@ -562,7 +562,7 @@ void player_t::ai_bankrupt()
 							case obj_t::leitung:
 								// do not remove powerline from bridges
 								if(gr->ist_bruecke()) {
-									costs = ((leitung_t*)obj)->get_desc()->get_wartung();
+									costs = ((leitung_t*)obj)->get_desc()->get_maintenance();
 									add_maintenance(-costs, powerline_wt);
 									psplayer->add_maintenance(costs, powerline_wt);
 									obj->set_owner(psplayer);
@@ -584,7 +584,7 @@ void player_t::ai_bankrupt()
 								}
 								// roads and water ways also made public
 								else if(w->get_waytype()==road_wt  ||  w->get_waytype()==water_wt) {
-									costs = w->get_desc()->get_wartung();
+									costs = w->get_desc()->get_maintenance();
 									wt = w->get_waytype();
 									add_maintenance(-costs, wt);
 									psplayer->add_maintenance(costs, wt);
@@ -596,14 +596,14 @@ void player_t::ai_bankrupt()
 								break;
 							}
 							case obj_t::bruecke:
-								costs = ((bruecke_t*)obj)->get_desc()->get_wartung();
+								costs = ((bruecke_t*)obj)->get_desc()->get_maintenance();
 								wt = obj->get_waytype();
 								add_maintenance(-costs, wt);
 								psplayer->add_maintenance(costs, wt);
 								obj->set_owner(psplayer);
 								break;
 							case obj_t::tunnel:
-								costs = ((tunnel_t*)obj)->get_desc()->get_wartung();
+								costs = ((tunnel_t*)obj)->get_desc()->get_maintenance();
 								wt = ((tunnel_t*)obj)->get_desc()->get_finance_waytype();
 								add_maintenance(-costs, wt);
 								psplayer->add_maintenance(costs, wt);
@@ -868,8 +868,8 @@ sint64 player_t::undo()
 						if(!aircraft->is_on_ground()) {
 							break;
 						}
-						// fall through !
 					}
+					/* FALLTHROUGH */
 					// all other are forbidden => no undo any more
 					default:
 						last_built.clear();
@@ -888,7 +888,7 @@ sint64 player_t::undo()
 		}
 		else {
 			if (leitung_t* lt = gr->get_leitung()) {
-				cost += lt->get_desc()->get_preis();
+				cost += lt->get_desc()->get_price();
 				lt->cleanup(NULL);
 				delete lt;
 			}
@@ -917,13 +917,7 @@ void player_t::tell_tool_result(tool_t *tool, koord3d, const char *err)
 			sound_play(SFX_FAILURE);
 			// look for coordinate in error message
 			// syntax: either @x,y or (x,y)
-			koord pos = message_t::get_coord_from_text(err);
-			if (pos != koord::invalid) {
-				create_win( new news_loc(err, pos), w_time_delete, magic_none);
-			}
-			else {
-				create_win( new news_img(err), w_time_delete, magic_none);
-			}
+			open_error_msg_win(err);
 		}
 	}
 }

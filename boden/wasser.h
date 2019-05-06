@@ -4,7 +4,7 @@
 #include "grund.h"
 
 /**
- * Der Water-Untergrund modelliert Fluesse und Seen in Simutrans.
+ * The water ground models rivers and lakes in Simutrans.
  *
  * @author Hj. Malthaner
  */
@@ -12,25 +12,34 @@
 class wasser_t : public grund_t
 {
 protected:
+	/// cache ribis to tiles connected by water
 	ribi_t::ribi ribi;
+	/// helper variable, ribis to canal tiles, where ships cannot turn left or right
+	ribi_t::ribi canal_ribi;
 
-	void calc_image_internal(const bool calc_only_snowline_change);
+	/**
+	 * This method also recalculates ribi and cache_ribi!
+	 */
+	void calc_image_internal(const bool calc_only_snowline_change) OVERRIDE;
 
 public:
-	wasser_t(loadsave_t *file, koord pos ) : grund_t(koord3d(pos,0) ), ribi(ribi_t::none) { rdwr(file); }
-	wasser_t(koord3d pos) : grund_t(pos), ribi(ribi_t::none) {}
 
-	inline bool ist_wasser() const { return true; }
+	wasser_t(loadsave_t *file, koord pos ) : grund_t(koord3d(pos,0) ), ribi(ribi_t::none), canal_ribi(ribi_t::none) { rdwr(file); }
+	wasser_t(koord3d pos);
+
+	inline bool is_water() const OVERRIDE { return true; }
 
 	// returns correct directions for water and none for the rest ...
-	ribi_t::ribi get_weg_ribi(waytype_t typ) const { return (typ==water_wt) ? ribi : (ribi_t::ribi)ribi_t::none; }
-	ribi_t::ribi get_weg_ribi_unmasked(waytype_t typ) const  { return (typ==water_wt) ? ribi : (ribi_t::ribi)ribi_t::none; }
+	ribi_t::ribi get_weg_ribi(waytype_t typ) const OVERRIDE { return (typ==water_wt) ? ribi : (ribi_t::ribi)ribi_t::none; }
+	ribi_t::ribi get_weg_ribi_unmasked(waytype_t typ) const OVERRIDE  { return (typ==water_wt) ? ribi : (ribi_t::ribi)ribi_t::none; }
 
-	const char *get_name() const {return "Water";}
-	grund_t::typ get_typ() const {return wasser;}
+	const char *get_name() const OVERRIDE {return "Water";}
+	grund_t::typ get_typ() const OVERRIDE {return wasser;}
 
 	// map rotation
-	void rotate90();
+	void rotate90() OVERRIDE;
+
+	ribi_t::ribi get_canal_ribi() const { return canal_ribi; }
 
 	// static stuff from here on for water animation
 	static int stage;

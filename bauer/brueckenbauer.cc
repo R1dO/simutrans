@@ -24,7 +24,7 @@
 #include "../gui/tool_selector.h"
 #include "../gui/karte.h"
 
-#include "../besch/bruecke_besch.h"
+#include "../descriptor/bridge_desc.h"
 
 #include "../dataobj/marker.h"
 #include "../dataobj/scenario.h"
@@ -47,9 +47,8 @@ static stringhashtable_tpl<const bridge_desc_t *> desc_table;
 void bridge_builder_t::register_desc(bridge_desc_t *desc)
 {
 	// avoid duplicates with same name
-	if( const bridge_desc_t *old_desc = desc_table.get(desc->get_name()) ) {
-		dbg->warning( "bridge_builder_t::register_desc()", "Object %s was overlaid by addon!", desc->get_name() );
-		desc_table.remove(desc->get_name());
+	if(  const bridge_desc_t *old_desc = desc_table.remove(desc->get_name())  ) {
+		dbg->doubled( "bridge", desc->get_name() );
 		tool_t::general_tool.remove( old_desc->get_builder() );
 		delete old_desc->get_builder();
 		delete old_desc;
@@ -81,7 +80,7 @@ const bridge_desc_t *bridge_builder_t::find_bridge(const waytype_t wtyp, const s
 		if(  desc->get_waytype()==wtyp  &&  desc->is_available(time)  ) {
 			if(  find_desc==NULL  ||
 				(find_desc->get_topspeed()<min_speed  &&  find_desc->get_topspeed()<desc->get_topspeed())  ||
-				(desc->get_topspeed()>=min_speed  &&  desc->get_wartung()<find_desc->get_wartung())
+				(desc->get_topspeed()>=min_speed  &&  desc->get_maintenance()<find_desc->get_maintenance())
 			) {
 				find_desc = desc;
 			}
@@ -163,6 +162,7 @@ const char *check_tile( const grund_t *gr, const player_t *player, waytype_t wt,
 	}
 
 	if(  !slope_t::is_way(gr->get_weg_hang())  ) {
+		// it's not a straight slope
 		return "Bruecke muss an\neinfachem\nHang beginnen!\n";
 	}
 
@@ -214,8 +214,8 @@ const char *check_tile( const grund_t *gr, const player_t *player, waytype_t wt,
 			return "A bridge must start on a way!";
 		}
 
-		// same waytype, any direction, no stop or depot or any other stuff */
-		if(  w->get_waytype() == wt  ) {
+		// same waytype, check direction
+		if(  w->get_waytype() == wt   &&  ribi_check(ribi, check_ribi ) ) {
 			// ok too
 			return NULL;
 		}
@@ -232,13 +232,13 @@ const char *check_tile( const grund_t *gr, const player_t *player, waytype_t wt,
 			return "A bridge must start on a way!";
 		}
 	}
-	// somethign here which we cannot remove => fail too
+	// something here which we cannot remove => fail too
 	if(  obj_t *obj=gr->obj_bei(0)  ) {
 		if(  const char *err_msg = obj->is_deletable(player)  ) {
 			return err_msg;
 		}
 	}
-	return "";	// could end here by must not end here
+	return "";	// could end here but need not end here
 }
 
 bool bridge_builder_t::is_blocked(koord3d pos, ribi_t::ribi check_ribi, const char *&error_msg)
@@ -753,12 +753,21 @@ void bridge_builder_t::build_bridge(player_t *player, const koord3d start, const
 			// builds new way
 			weg_t * const weg = weg_t::alloc( desc->get_waytype() );
 			weg->set_desc( way_desc );
-			player_t::book_construction_costs( player, -start_gr->neuen_weg_bauen( weg, ribi, player ) -weg->get_desc()->get_preis(), end.get_2d(), weg->get_waytype());
+			player_t::book_construction_costs( player, -start_gr->neuen_weg_bauen( weg, ribi, player ) -weg->get_desc()->get_price(), end.get_2d(), weg->get_waytype());
 		}
 		start_gr->calc_image();
 	}
 
 	koord3d pos = start+koord3d( zv.x, zv.y, add_height );
+
+	// update limits
+	if(  welt->min_height > pos.z  ) {
+		welt->min_height = pos.z;
+	}
+	else if(  welt->max_height < pos.z  ) {
+		welt->max_height = pos.z;
+	}
+
 	while(  pos.get_2d() != end.get_2d()  ) {
 		brueckenboden_t *bruecke = new brueckenboden_t( pos, 0, 0 );
 		welt->access(pos.get_2d())->boden_hinzufuegen(bruecke);
@@ -774,7 +783,7 @@ void bridge_builder_t::build_bridge(player_t *player, const koord3d start, const
 		}
 		grund_t *gr = welt->lookup_kartenboden(pos.get_2d());
 		sint16 height = pos.z - gr->get_pos().z;
-		bruecke_t *br = new bruecke_t(bruecke->get_pos(), player, desc, desc->get_simple(ribi,height-slope_t::max_diff(gr->get_grund_hang())));
+		bruecke_t *br = new bruecke_t(bruecke->get_pos(), player, desc, desc->get_straight(ribi,height-slope_t::max_diff(gr->get_grund_hang())));
 		bruecke->obj_add(br);
 		bruecke->calc_image();
 		br->finish_rd();
@@ -817,7 +826,7 @@ void bridge_builder_t::build_bridge(player_t *player, const koord3d start, const
 				// builds new way
 				weg_t * const weg = weg_t::alloc( desc->get_waytype() );
 				weg->set_desc( way_desc );
-				player_t::book_construction_costs( player, -gr->neuen_weg_bauen( weg, ribi, player ) -weg->get_desc()->get_preis(), end.get_2d(), weg->get_waytype());
+				player_t::book_construction_costs( player, -gr->neuen_weg_bauen( weg, ribi, player ) -weg->get_desc()->get_price(), end.get_2d(), weg->get_waytype());
 			}
 			gr->calc_image();
 		}
@@ -825,7 +834,7 @@ void bridge_builder_t::build_bridge(player_t *player, const koord3d start, const
 			leitung_t *lt = gr->get_leitung();
 			if(  lt==NULL  ) {
 				lt = new leitung_t(end, player );
-				player_t::book_construction_costs(player, -way_desc->get_preis(), gr->get_pos().get_2d(), powerline_wt);
+				player_t::book_construction_costs(player, -way_desc->get_price(), gr->get_pos().get_2d(), powerline_wt);
 				gr->obj_add(lt);
 				lt->set_desc(way_desc);
 				lt->finish_rd();
@@ -844,8 +853,10 @@ void bridge_builder_t::build_bridge(player_t *player, const koord3d start, const
 				grund_t *to = NULL;
 				if(  ribi_t::is_single(ribi)  &&  gr->get_neighbour(to, invalid_wt, ribi_t::backward(ribi))) {
 					// connect to open sea, calc_image will recompute ribi at to.
-					if (to->ist_wasser()) {
+					if (desc->get_waytype() == water_wt  &&  to->is_water()) {
+						gr->weg_erweitern(water_wt, ribi_t::backward(ribi));
 						to->calc_image();
+						continue;
 					}
 					// only single tile under bridge => try to connect to next tile
 					way_builder_t bauigel(player);
@@ -900,7 +911,7 @@ void bridge_builder_t::build_ramp(player_t* player, koord3d end, ribi_t::ribi ri
 		}
 		else {
 			// remove maintenance - it will be added in leitung_t::finish_rd
-			player_t::add_maintenance( player, -lt->get_desc()->get_wartung(), powerline_wt);
+			player_t::add_maintenance( player, -lt->get_desc()->get_maintenance(), powerline_wt);
 		}
 		// connect to neighbor tiles and networks, add maintenance
 		lt->finish_rd();

@@ -12,7 +12,7 @@
 #include "../tpl/stringhashtable_tpl.h"
 #include "../tpl/vector_tpl.h"
 #include "../tpl/weighted_vector_tpl.h"
-#include "../besch/baum_besch.h"
+#include "../descriptor/tree_desc.h"
 #include "../simcolor.h"
 #include "../dataobj/environment.h"
 
@@ -24,12 +24,12 @@
 class baum_t : public obj_t
 {
 private:
-	static PLAYER_COLOR_VAL outline_color;
+	static FLAGGED_PIXVAL outline_color;
 
 	/** month of birth */
 	uint16 geburt;
 
-	/** type of tree (was 9 but for more compact saves now only 254 different ree types are allowed) */
+	/** type of tree (was 9 but for more compact saves now only 254 different tree types are allowed) */
 	uint8 tree_id;
 
 	uint8 season:3;
@@ -65,47 +65,47 @@ public:
 	baum_t(koord3d pos, uint8 type, sint32 age, uint8 slope );
 	baum_t(koord3d pos, const tree_desc_t *desc);
 
-	void rdwr(loadsave_t *file);
+	void rdwr(loadsave_t *file) OVERRIDE;
 
-	void finish_rd();
+	void finish_rd() OVERRIDE;
 
-	image_id get_image() const;
+	image_id get_image() const OVERRIDE;
 
 	/**
 	 * hide trees eventually with transparency
 	 */
-	PLAYER_COLOR_VAL get_outline_colour() const { return outline_color; }
-	image_id get_outline_image() const;
+	FLAGGED_PIXVAL get_outline_colour() const OVERRIDE { return outline_color; }
+	image_id get_outline_image() const OVERRIDE;
 
-	static void recalc_outline_color() { outline_color = (env_t::hide_trees  &&  env_t::hide_with_transparency) ? (TRANSPARENT25_FLAG | OUTLINE_FLAG | COL_BLACK) : 0; }
+	static void recalc_outline_color() { outline_color = (env_t::hide_trees  &&  env_t::hide_with_transparency) ? (TRANSPARENT25_FLAG | OUTLINE_FLAG | color_idx_to_rgb(COL_BLACK)) : 0; }
 
 	/**
 	 * Calculates tree image dependent on tree age
 	 * @author Hj. Malthaner
 	 */
-	void calc_image();
+	void calc_image() OVERRIDE;
 
 	/**
 	 * Called whenever the season or snowline height changes
 	 * return false and the obj_t will be deleted
 	 */
-	bool check_season(const bool);
+	bool check_season(const bool) OVERRIDE;
 
-	void rotate90();
+	void rotate90() OVERRIDE;
 
 	/**
 	 * re-calculate z-offset if slope of the tile has changed
 	 */
 	void recalc_off();
 
-	const char *get_name() const {return "Baum";}
-	typ get_typ() const { return baum; }
+	const char *get_name() const OVERRIDE {return "Baum";}
+	typ get_typ() const OVERRIDE { return baum; }
 
-	void show_info();
+	void show_info() OVERRIDE;
 
-	void info(cbuffer_t & buf) const;
+	void info(cbuffer_t & buf) const OVERRIDE;
 
-	void cleanup(player_t *player);
+	void cleanup(player_t *player) OVERRIDE;
 
 	void * operator new(size_t s);
 	void operator delete(void *p);
@@ -129,7 +129,7 @@ public:
 	static uint32 create_forest(koord center, koord size );
 	static void fill_trees(int dichte);
 
-	// return list to beschs
+	// return list to descriptors
 	static vector_tpl<tree_desc_t const*> const& get_all_desc() { return tree_list; }
 
 	static const tree_desc_t *random_tree_for_climate(climate cl) { uint16 b = random_tree_for_climate_intern(cl);  return b!=0xFFFF ? tree_list[b] : NULL; }

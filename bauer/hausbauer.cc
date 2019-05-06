@@ -7,9 +7,9 @@
 
 #include <string.h>
 
-#include "../besch/haus_besch.h"
-#include "../besch/skin_besch.h"
-#include "../besch/spezial_obj_tpl.h"
+#include "../descriptor/building_desc.h"
+#include "../descriptor/skin_desc.h"
+#include "../descriptor/spezial_obj_tpl.h"
 
 #include "../boden/boden.h"
 #include "../boden/wasser.h"
@@ -58,13 +58,16 @@ static stringhashtable_tpl<const building_desc_t*> desc_table;
 
 const building_desc_t *hausbauer_t::elevated_foundation_desc = NULL;
 vector_tpl<const building_desc_t *> hausbauer_t::station_building;
-vector_tpl<const building_desc_t *> hausbauer_t::headquarter;
+vector_tpl<const building_desc_t *> hausbauer_t::headquarters;
 
 /// special objects directly needed by the program
-static spezial_obj_tpl<building_desc_t> const special_objects[] = {
+static special_obj_tpl<building_desc_t> const special_objects[] = {
 	{ &hausbauer_t::elevated_foundation_desc,   "MonorailGround" },
 	{ NULL, NULL }
 };
+
+
+sint16 hausbauer_t::largest_city_building_area = 1;
 
 
 /**
@@ -141,12 +144,30 @@ bool hausbauer_t::successfully_loaded()
 		// now insert the desc into the correct list.
 		switch(desc->get_type()) {
 			case building_desc_t::city_res:
+				if(  desc->get_x()*desc->get_y() > 9  ) {
+					dbg->fatal( "hausbauer_t::successfully_loaded()", "maximum city building size (3x3) but %s is (%sx%i)", desc->get_name(), desc->get_x(), desc->get_y() );
+				}
+				if(  desc->get_x()*desc->get_y() > largest_city_building_area  ) {
+					largest_city_building_area = desc->get_x()*desc->get_y();
+				}
 				city_residential.insert_ordered(desc,compare_building_desc);
 				break;
 			case building_desc_t::city_ind:
+				if(  desc->get_x()*desc->get_y() > 9  ) {
+					dbg->fatal( "hausbauer_t::successfully_loaded()", "maximum city building size (3x3) but %s is (%sx%i)", desc->get_name(), desc->get_x(), desc->get_y() );
+				}
+				if(  desc->get_x()*desc->get_y() > largest_city_building_area  ) {
+					largest_city_building_area = desc->get_x()*desc->get_y();
+				}
 				city_industry.insert_ordered(desc,compare_building_desc);
 				break;
 			case building_desc_t::city_com:
+				if(  desc->get_x()*desc->get_y() > 9  ) {
+					dbg->fatal( "hausbauer_t::successfully_loaded()", "maximum city building size (3x3) but %s is (%sx%i)", desc->get_name(), desc->get_x(), desc->get_y() );
+				}
+				if(  desc->get_x()*desc->get_y() > largest_city_building_area  ) {
+					largest_city_building_area = desc->get_x()*desc->get_y();
+				}
 				city_commercial.insert_ordered(desc,compare_building_desc);
 				break;
 
@@ -156,8 +177,8 @@ bool hausbauer_t::successfully_loaded()
 				case building_desc_t::attraction_land:
 					attractions_land.insert_ordered(desc,compare_building_desc);
 					break;
-				case building_desc_t::headquarter:
-					headquarter.insert_ordered(desc,compare_hq_desc);
+				case building_desc_t::headquarters:
+					headquarters.insert_ordered(desc,compare_hq_desc);
 					break;
 				case building_desc_t::townhall:
 					townhalls.insert_ordered(desc,compare_building_desc);
@@ -183,7 +204,7 @@ bool hausbauer_t::successfully_loaded()
 						elevated_foundation_desc = desc;
 						break;
 					}
-					/* no break */
+					/* FALLTHROUGH */
 
 				default:
 					// obsolete object, usually such pak set will not load properly anyway (old objects should be caught before!)
@@ -205,12 +226,12 @@ bool hausbauer_t::register_desc(building_desc_t *desc)
 	const building_desc_t *old_desc = desc_table.get(desc->get_name());
 	if(old_desc) {
 		// do not overlay existing factories if the new one is not a factory
+		dbg->doubled( "building", desc->get_name() );
 		if (old_desc->is_factory()  &&  !desc->is_factory()) {
-			dbg->warning( "hausbauer_t::register_desc()", "Object %s could not be registered since it would overlay an existing factory building!", desc->get_name() );
+			dbg->error( "hausbauer_t::register_desc()", "Object %s could not be registered since it would overlay an existing factory building!", desc->get_name() );
 			delete desc;
 			return false;
 		}
-		dbg->warning( "hausbauer_t::register_desc()", "Object %s was overlaid by addon!", desc->get_name() );
 		desc_table.remove(desc->get_name());
 		tool_t::general_tool.remove( old_desc->get_builder() );
 		delete old_desc->get_builder();
@@ -218,13 +239,13 @@ bool hausbauer_t::register_desc(building_desc_t *desc)
 	}
 
 	// probably needs a tool if it has a cursor
-	const skin_besch_t *sb = desc->get_cursor();
-	if(  sb  &&  sb->get_image_id(1)!=IMG_EMPTY) {
+	const skin_desc_t *sd = desc->get_cursor();
+	if(  sd  &&  sd->get_image_id(1)!=IMG_EMPTY) {
 		tool_t *tool;
 		if(  desc->get_type()==building_desc_t::depot  ) {
 			tool = new tool_build_depot_t();
 		}
-		else if(  desc->get_type()==building_desc_t::headquarter  ) {
+		else if(  desc->get_type()==building_desc_t::headquarters  ) {
 			tool = new tool_headquarter_t();
 		}
 		else {
@@ -280,7 +301,7 @@ void hausbauer_t::fill_menu(tool_selector_t* tool_selector, building_desc_t::bty
 
 	FOR(  vector_tpl<building_desc_t const*>,  const desc,  station_building  ) {
 //		DBG_DEBUG("hausbauer_t::fill_menu()", "try to add %s (%p)", desc->get_name(), desc);
-		if(  desc->get_type()==btype  &&  desc->get_builder()  &&  (btype==building_desc_t::headquarter  ||  desc->get_extra()==(uint16)wt)  ) {
+		if(  desc->get_type()==btype  &&  desc->get_builder()  &&  (btype==building_desc_t::headquarters  ||  desc->get_extra()==(uint16)wt)  ) {
 			if(  desc->is_available(time)  ) {
 				tool_selector->add_tool_selector( desc->get_builder() );
 			}
@@ -309,7 +330,7 @@ void hausbauer_t::remove( player_t *player, gebaeude_t *gb )
 	koord size = tile->get_desc()->get_size( layout );
 	koord k;
 
-	if(  tile->get_desc()->get_type() == building_desc_t::headquarter  ) {
+	if(  tile->get_desc()->get_type() == building_desc_t::headquarters  ) {
 		gb->get_owner()->add_headquarter( 0, koord::invalid );
 	}
 	if(tile->get_desc()->get_type()==building_desc_t::monument) {
@@ -432,7 +453,7 @@ void hausbauer_t::remove( player_t *player, gebaeude_t *gb )
 								ground_recalc = false;
 							}
 							welt->access(newk)->kartenboden_setzen( new boden_t( koord3d( newk, new_hgt ), new_slope ) );
-							welt->calc_climate( newk, true );
+							// climate is stored in planquadrat, and hence automatically preserved
 						}
 						// there might be walls from foundations left => thus some tiles may need to be redrawn
 						if(ground_recalc) {
@@ -451,7 +472,7 @@ void hausbauer_t::remove( player_t *player, gebaeude_t *gb )
 }
 
 
-gebaeude_t* hausbauer_t::build(player_t* player_, koord3d pos, int org_layout, const building_desc_t* desc, void* param)
+gebaeude_t* hausbauer_t::build(player_t* player, koord3d pos, int org_layout, const building_desc_t* desc, void* param)
 {
 	gebaeude_t* first_building = NULL;
 	koord k;
@@ -476,7 +497,7 @@ gebaeude_t* hausbauer_t::build(player_t* player_, koord3d pos, int org_layout, c
 						DBG_MESSAGE("hausbauer_t::build()","get_tile() empty at %i,%i",k.x,k.y);
 				continue;
 			}
-			gebaeude_t *gb = new gebaeude_t(pos + k, player_, tile);
+			gebaeude_t *gb = new gebaeude_t(pos + k, player, tile);
 			if (first_building == NULL) {
 				first_building = gb;
 			}
@@ -485,13 +506,13 @@ gebaeude_t* hausbauer_t::build(player_t* player_, koord3d pos, int org_layout, c
 				gb->set_fab((fabrik_t *)param);
 			}
 			// try to fake old building
-			else if(welt->get_zeit_ms() < 2) {
+			else if(welt->get_ticks() < 2) {
 				// Hajo: after staring a new map, build fake old buildings
 				gb->add_alter(10000);
 			}
 
 			grund_t *gr = welt->lookup_kartenboden(pos.get_2d() + k);
-			if(gr->ist_wasser()) {
+			if(gr->is_water()) {
 				gr->obj_add(gb);
 			}
 			else if(  desc->get_type() == building_desc_t::dock  ||  desc->get_type() == building_desc_t::flat_dock  ) {
@@ -515,7 +536,7 @@ gebaeude_t* hausbauer_t::build(player_t* player_, koord3d pos, int org_layout, c
 					}
 
 					// delete everything except vehicles
-					gr->obj_loesche_alle(player_);
+					gr->obj_loesche_alle(player);
 				}
 
 				// build new foundation
@@ -539,7 +560,7 @@ gebaeude_t* hausbauer_t::build(player_t* player_, koord3d pos, int org_layout, c
 			}
 			gb->set_pos( gr->get_pos() );
 			if(desc->is_attraction()) {
-				welt->add_ausflugsziel( gb );
+				welt->add_attraction( gb );
 			}
 			if (!desc->is_city_building()) {
 				if(station_building.is_contained(desc)) {
@@ -714,7 +735,7 @@ gebaeude_t *hausbauer_t::build_station_extension_depot(player_t *player, koord3d
 	}
 
 	if(desc->is_attraction()) {
-		welt->add_ausflugsziel( gb );
+		welt->add_attraction( gb );
 	}
 
 	// update minimap
@@ -792,7 +813,7 @@ const building_desc_t* hausbauer_t::get_special(uint32 bev, building_desc_t::bty
 			if(  cl==MAX_CLIMATES  ||  desc->is_allowed_climate(cl)  ) {
 				// ok, now check timeline
 				if(  time==0  ||  (desc->get_intro_year_month()<=time  &&  (ignore_retire  ||  desc->get_retire_year_month() > time)  )  ) {
-					auswahl.append(desc, desc->get_chance());
+					auswahl.append(desc, desc->get_distribution_weight());
 				}
 			}
 		}
@@ -814,15 +835,20 @@ const building_desc_t* hausbauer_t::get_special(uint32 bev, building_desc_t::bty
  * @param level the minimum level of the house/station
  * @param cl allowed climates
  */
-static const building_desc_t* get_city_building_from_list(const vector_tpl<const building_desc_t*>& list, int level, uint16 time, climate cl, uint32 clusters )
+static const building_desc_t* get_city_building_from_list(const vector_tpl<const building_desc_t*>& list, int level, uint16 time, climate cl, uint32 clusters, koord minsize, koord maxsize )
 {
 	weighted_vector_tpl<const building_desc_t *> selections(16);
+	sint16 area = maxsize.x*maxsize.y;
+	sint16 minarea = minsize.x*minsize.y;
 
 //	DBG_MESSAGE("hausbauer_t::get_aus_liste()","target level %i", level );
-	const building_desc_t *besch_at_least=NULL;
+	const building_desc_t *desc_at_least=NULL;
 	FOR(vector_tpl<building_desc_t const*>, const desc, list) {
-		if(  desc->is_allowed_climate(cl)  &&  desc->get_chance()>0  &&  desc->is_available(time)  ) {
-				besch_at_least = desc;
+		if(  desc->is_allowed_climate(cl)  &&  desc->get_distribution_weight()>0  &&  desc->is_available(time)  &&  desc->get_x()*desc->get_y()<=area  &&  desc->get_x()*desc->get_y()>=minarea  ) {
+			// size check
+			if(  (desc->get_x() <= maxsize.x  ||  desc->get_y() <= maxsize.x)  &&   (desc->get_x() >= minsize.x  ||  desc->get_y() >= minsize.x)  ) {
+				desc_at_least = desc;
+			}
 		}
 
 		const int thislevel = desc->get_level();
@@ -837,25 +863,31 @@ static const building_desc_t* get_city_building_from_list(const vector_tpl<const
 			}
 		}
 
-		if(  thislevel == level  &&  desc->get_chance() > 0  ) {
+		if(  thislevel == level  &&  desc->get_distribution_weight() > 0  ) {
 			if(  cl==MAX_CLIMATES  ||  desc->is_allowed_climate(cl)  ) {
 				if(  desc->is_available(time)  ) {
-//					DBG_MESSAGE("hausbauer_t::get_city_building_from_list()","appended %s at %i", desc->get_name(), thislevel );
-					/* Level, time period, and climate are all OK.
-					 * Now modify the chance rating by a factor based on the clusters.
-					 */
-					// FIXME: the factor should be configurable by the pakset/
-					int chance = desc->get_chance();
-					if(  clusters  ) {
-						uint32 my_clusters = desc->get_clusters();
-						if(  my_clusters & clusters  ) {
-							chance *= stadt_t::get_cluster_factor();
-						}
-						else {
-							chance /= stadt_t::get_cluster_factor();
+					// not too big?
+					if(  desc->get_x()*desc->get_y()<=area  &&  (  desc->get_x() <= maxsize.x  ||  desc->get_y() <= maxsize.x  )  ) {
+						// or too small
+						if(  desc->get_x()*desc->get_y()>=area  &&  (  desc->get_x() >= minsize.x  ||  desc->get_y() >= minsize.x  )  ) {
+		//					DBG_MESSAGE("hausbauer_t::get_city_building_from_list()","appended %s at %i", desc->get_name(), thislevel );
+							/* Level, time period, and climate are all OK.
+							 * Now modify the chance rating by a factor based on the clusters.
+							 */
+							// FIXME: the factor should be configurable by the pakset/
+							int chance = desc->get_distribution_weight();
+							if(  clusters  ) {
+								uint32 my_clusters = desc->get_clusters();
+								if(  my_clusters & clusters  ) {
+									chance *= stadt_t::get_cluster_factor();
+								}
+								else {
+									chance /= stadt_t::get_cluster_factor();
+								}
+							}
+							selections.append(desc, chance);
 						}
 					}
-					selections.append(desc, chance);
 				}
 			}
 		}
@@ -863,7 +895,7 @@ static const building_desc_t* get_city_building_from_list(const vector_tpl<const
 
 	if(selections.get_sum_weight()==0) {
 		// this is some level below, but at least it is something
-		return besch_at_least;
+		return desc_at_least;
 	}
 	if(selections.get_count()==1) {
 		return selections.front();
@@ -873,30 +905,30 @@ static const building_desc_t* get_city_building_from_list(const vector_tpl<const
 }
 
 
-const building_desc_t* hausbauer_t::get_commercial(int level, uint16 time, climate cl, uint32 clusters)
+const building_desc_t* hausbauer_t::get_commercial(int level, uint16 time, climate cl, uint32 clusters, koord minsize, koord maxsize )
 {
-	return get_city_building_from_list(city_commercial, level, time, cl, clusters);
+	return get_city_building_from_list(city_commercial, level, time, cl, clusters, minsize, maxsize );
 }
 
 
-const building_desc_t* hausbauer_t::get_industrial(int level, uint16 time, climate cl, uint32 clusters)
+const building_desc_t* hausbauer_t::get_industrial(int level, uint16 time, climate cl, uint32 clusters, koord minsize, koord maxsize )
 {
-	return get_city_building_from_list(city_industry, level, time, cl, clusters);
+	return get_city_building_from_list(city_industry, level, time, cl, clusters, minsize, maxsize );
 }
 
 
-const building_desc_t* hausbauer_t::get_residential(int level, uint16 time, climate cl, uint32 clusters)
+const building_desc_t* hausbauer_t::get_residential(int level, uint16 time, climate cl, uint32 clusters, koord minsize, koord maxsize )
 {
-	return get_city_building_from_list(city_residential, level, time, cl, clusters);
+	return get_city_building_from_list(city_residential, level, time, cl, clusters, minsize, maxsize );
 }
 
 
-const building_desc_t* hausbauer_t::get_headquarter(int level, uint16 time)
+const building_desc_t* hausbauer_t::get_headquarters(int level, uint16 time)
 {
 	if(  level<0  ) {
 		return NULL;
 	}
-	FOR(vector_tpl<building_desc_t const*>, const desc, hausbauer_t::headquarter) {
+	FOR(vector_tpl<building_desc_t const*>, const desc, hausbauer_t::headquarters) {
 		if(  desc->get_extra()==(uint32)level  &&  desc->is_available(time)  ) {
 			return desc;
 		}
@@ -911,9 +943,9 @@ const building_desc_t *hausbauer_t::get_random_desc(vector_tpl<const building_de
 		// previously just returned a random object; however, now we look at the chance entry
 		weighted_vector_tpl<const building_desc_t *> auswahl(16);
 		FOR(vector_tpl<building_desc_t const*>, const desc, list) {
-			if((cl==MAX_CLIMATES  ||  desc->is_allowed_climate(cl))  &&  desc->get_chance()>0  &&  (time==0  ||  (desc->get_intro_year_month()<=time  &&  (ignore_retire  ||  desc->get_retire_year_month()>time)  )  )  ) {
+			if((cl==MAX_CLIMATES  ||  desc->is_allowed_climate(cl))  &&  desc->get_distribution_weight()>0  &&  (time==0  ||  (desc->get_intro_year_month()<=time  &&  (ignore_retire  ||  desc->get_retire_year_month()>time)  )  )  ) {
 //				DBG_MESSAGE("hausbauer_t::get_random_desc()","appended %s at %i", desc->get_name(), thislevel );
-				auswahl.append(desc, desc->get_chance());
+				auswahl.append(desc, desc->get_distribution_weight());
 			}
 		}
 		// now look what we have got ...
@@ -935,7 +967,7 @@ const vector_tpl<const building_desc_t*>* hausbauer_t::get_list(const building_d
 	switch (typ) {
 		case building_desc_t::monument:         return &unbuilt_monuments;
 		case building_desc_t::attraction_land: return &attractions_land;
-		case building_desc_t::headquarter:      return &headquarter;
+		case building_desc_t::headquarters:      return &headquarters;
 		case building_desc_t::townhall:         return &townhalls;
 		case building_desc_t::attraction_city: return &attractions_city;
 		case building_desc_t::dock:

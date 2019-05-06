@@ -37,7 +37,7 @@ static uint32 frame_time = 36*FRAME_TIME_MULTI;
 
 bool reduce_frame_time()
 {
-	if(frame_time > 25*FRAME_TIME_MULTI) {
+	if(frame_time > 10*FRAME_TIME_MULTI) {
 		frame_time -= 1;
 		if(  frame_time>150*FRAME_TIME_MULTI  ) {
 			frame_time -= 8;
@@ -45,7 +45,7 @@ bool reduce_frame_time()
 		return true;
 	}
 	else {
-		frame_time = 25*FRAME_TIME_MULTI;
+		frame_time = 10*FRAME_TIME_MULTI;
 		return false;
 	}
 }
@@ -86,20 +86,13 @@ void intr_refresh_display(bool dirty)
 }
 
 
-void interrupt_check()
-{
-	interrupt_check( "0" );
-}
-
-
-
 // debug version with caller information
 void interrupt_check(const char* caller_info)
 {
 	DBG_DEBUG4("interrupt_check", "called from (%s)", caller_info);
 	if(enabled) {
 		static uint32 last_ms = 0;
-		if(  !welt_modell->is_fast_forward()  ||  welt_modell->get_zeit_ms() != last_ms  ) {
+		if(  !welt_modell->is_fast_forward()  ||  welt_modell->get_ticks() != last_ms  ) {
 			const uint32 now = dr_time();
 			if((now-last_time)*FRAME_TIME_MULTI < frame_time) {
 				return;
@@ -112,7 +105,7 @@ void interrupt_check(const char* caller_info)
 				enabled = true;
 			}
 		}
-		last_ms = welt_modell->get_zeit_ms();
+		last_ms = welt_modell->get_ticks();
 	}
 	(void)caller_info;
 }
@@ -127,19 +120,12 @@ void intr_set(karte_t *welt, main_view_t *view)
 }
 
 /**
- * currently only used by the pause tool. Use with care!
  * @author Hj. Malthaner
  */
 void intr_set_last_time(uint32 time)
 {
 	last_time = time;
 }
-
-uint32 intr_get_last_time()
-{
-	return last_time;
-}
-
 
 void intr_disable()
 {
@@ -151,18 +137,21 @@ void intr_enable()
 	enabled = true;
 }
 
-
-// returns a time string in the desired format
 char const *tick_to_string( sint32 ticks, bool show_full )
 {
 	static sint32 tage_per_month[12]={31,28,31,30,31,30,31,31,30,31,30,31};
 	static char const* const seasons[] = { "q2", "q3", "q4", "q1" };
 	static char time [128];
 
+	time[0] = 0;
+
+	// World model might not be initalized if this is called while reading saved windows.
+	if (welt_modell == NULL) {
+		return time;
+	}
+
 	sint32 month = welt_modell->get_last_month();
 	sint32 year = welt_modell->get_last_year();
-
-	time[0] = 0;
 
 	// calculate right month first
 	const uint32 ticks_this_month = ticks % welt_modell->ticks_per_world_month;
@@ -194,57 +183,32 @@ char const *tick_to_string( sint32 ticks, bool show_full )
 		//DBG_MESSAGE("env_t::show_month","%d",env_t::show_month);
 		// @author hsiegeln - updated to show month
 		// @author prissi - also show date if desired
-		// since seaons 0 is always summer for backward compatibility
-		char const* const season = translator::translate(seasons[welt_modell->get_season()]);
-		char const* const month_ = translator::get_month_name(month % 12);
-		switch(env_t::show_month) {
-			case env_t::DATE_FMT_GERMAN_NO_SEASON:
-				sprintf(time, "%d. %s %d %2d:%02dh", tage, month_, year, hours, minuten);
-				break;
-
+		// since seasons 0 is always summer for backward compatibility
+		char const* const date = translator::get_date(year, month, tage, translator::translate(seasons[welt_modell->get_season()]));
+		switch (env_t::show_month) {
+			case env_t::DATE_FMT_US:
 			case env_t::DATE_FMT_US_NO_SEASON: {
 				uint32 hours_ = hours % 12;
 				if (hours_ == 0) hours_ = 12;
-				sprintf(time, "%s %d %d %2d:%02d%s", month_, tage, year, hours_, minuten, hours < 12 ? "am" : "pm");
+				sprintf(time, "%s %2d:%02d%s", date, hours_, minuten, hours < 12 ? "am" : "pm");
 				break;
 			}
-
-			case env_t::DATE_FMT_JAPANESE_NO_SEASON:
-				sprintf(time, "%d/%s/%d %2d:%02dh", year, month_, tage, hours, minuten);
-				break;
-
-			case env_t::DATE_FMT_GERMAN:
-				sprintf(time, "%s, %d. %s %d %2d:%02dh", season, tage, month_, year, hours, minuten);
-				break;
-
-			case env_t::DATE_FMT_US: {
-				uint32 hours_ = hours % 12;
-				if (hours_ == 0) hours_ = 12;
-				sprintf(time, "%s, %s %d %d %2d:%02d%s", season, month_, tage, year, hours_, minuten, hours < 12 ? "am" : "pm");
-				break;
-			}
-
-			case env_t::DATE_FMT_JAPANESE:
-				sprintf(time, "%s, %d/%s/%d %2d:%02dh", season, year, month_, tage, hours, minuten);
-				break;
-
-			case env_t::DATE_FMT_MONTH:
-				sprintf(time, "%s, %s %d %2d:%02dh", month_, season, year, hours, minuten);
-				break;
-
 			case env_t::DATE_FMT_SEASON:
-				sprintf(time, "%s %d", season, year);
+			sprintf(time, "%s", date);
 				break;
+			default:
+				sprintf(time, "%s %2d:%02dh", date, hours, minuten);
+			break;
 		}
 	}
 	else {
 		if(  ticks == 0  ) {
-			return "now";
+			return translator::translate("now");
 		}
 
 		// suppress as much as possible, assuming this is an relative offset to the current month
 		sint32 num_days = ( ticks * (env_t::show_month==env_t::DATE_FMT_MONTH? 3 : tage_per_month[month]) ) >> welt_modell->ticks_per_world_month_shift;
-		num_days -= ( (welt_modell->get_zeit_ms() % welt_modell->ticks_per_world_month) * (env_t::show_month==env_t::DATE_FMT_MONTH? 3 : tage_per_month[month]) ) >> welt_modell->ticks_per_world_month_shift;
+		num_days -= ( (welt_modell->get_ticks() % welt_modell->ticks_per_world_month) * (env_t::show_month==env_t::DATE_FMT_MONTH? 3 : tage_per_month[month]) ) >> welt_modell->ticks_per_world_month_shift;
 		char days[64];
 		days[0] = 0;
 		if(  num_days!=0  ) {
@@ -261,11 +225,11 @@ char const *tick_to_string( sint32 ticks, bool show_full )
 			minuten = ( (minuten + 30 ) / 60 ) * 60;
 			hours += minuten /60;
 			if(  switchtick < 18 ) {
-				// four hour inveralls
+				// four hour intervals
 				hours = (hours + 3 ) & 0xFFFFC;
 			}
 			else if(  switchtick == 18 ) {
-				// two hour inveralls
+				// two hour intervals
 				hours = (hours + 1 ) & 0xFFFFE;
 			}
 		}

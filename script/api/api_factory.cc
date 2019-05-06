@@ -7,7 +7,7 @@
 #include "../api_function.h"
 #include "../../dataobj/scenario.h"
 #include "../../simfab.h"
-#include "../../besch/fabrik_besch.h"
+#include "../../descriptor/factory_desc.h"
 
 using namespace script_api;
 
@@ -30,13 +30,13 @@ SQInteger exp_factory_constructor(HSQUIRRELVM vm)
 	for (int io=0; io<2; io++) {
 		sq_pushstring(vm, io==0 ? "input" : "output", -1);
 		sq_newtable(vm);
-		const array_tpl<ware_production_t> &prodslot = io==0 ? fab->get_eingang() :fab->get_ausgang();
+		const array_tpl<ware_production_t> &prodslot = io==0 ? fab->get_input() :fab->get_output();
 		for(uint32 p=0; p < prodslot.get_count(); p++) {
 			// create slots 'good name' <- {x,y,name}   //'factory_production'
 			sq_pushstring(vm, prodslot[p].get_typ()->get_name(), -1);
 			// create instance of factory_production_x
 			if(!SQ_SUCCEEDED(push_instance(vm, "factory_production_x",
-				x, y, prodslot[p].get_typ()->get_name(), p + (io > 0  ?  fab->get_eingang().get_count() : 0))))
+				x, y, prodslot[p].get_typ()->get_name(), p + (io > 0  ?  fab->get_input().get_count() : 0))))
 			{
 				// create empty table
 				sq_newtable(vm);
@@ -141,6 +141,11 @@ SQInteger world_get_factory_by_index(HSQUIRRELVM vm)
 	return param<fabrik_t*>::push(vm, fab);
 }
 
+SQInteger world_get_factory_count(HSQUIRRELVM vm)
+{
+	return param<uint32>::push(vm, welt->get_fab_list().get_count());
+}
+
 
 void export_factory(HSQUIRRELVM vm)
 {
@@ -164,6 +169,11 @@ void export_factory(HSQUIRRELVM vm)
 	 * Meta-method to be used in foreach loops. Do not call them directly.
 	 */
 	register_function(vm, world_get_factory_by_index, "_get",    2, "xi");
+	/**
+	 * Returns number of factories in the list.
+	 * @typemask integer()
+	 */
+	register_function(vm, world_get_factory_count, "get_count",  1, "x");
 
 	end_class(vm);
 
@@ -172,7 +182,7 @@ void export_factory(HSQUIRRELVM vm)
 	 * Class to access information about factories.
 	 * Identified by coordinate.
 	 */
-	begin_class(vm, "factory_x", "extend_get,coord");
+	begin_class(vm, "factory_x", "extend_get,coord,ingame_object");
 
 	/**
 	 * Constructor.
@@ -211,6 +221,10 @@ void export_factory(HSQUIRRELVM vm)
 	 */
 	table<factory_production_x> output;
 #endif
+	/**
+	 * @returns if object is still valid.
+	 */
+	export_is_valid<fabrik_t*>(vm); //register_function("is_valid")
 
 	/**
 	 * Get list of consumers of this factory.

@@ -1,8 +1,8 @@
 /*
- * Schienen für Simutrans
+ * Rails for Simutrans
  *
- * Überarbeitet Januar 2001
- * von Hj. Malthaner
+ * Revised January 2001
+ * Hj. Malthaner
  */
 
 #include <stdio.h>
@@ -16,7 +16,7 @@
 
 #include "../../utils/cbuffer_t.h"
 
-#include "../../besch/weg_besch.h"
+#include "../../descriptor/way_desc.h"
 #include "../../bauer/wegbauer.h"
 
 #include "schiene.h"
@@ -77,7 +77,7 @@ bool schiene_t::reserve(convoihandle_t c, ribi_t::ribi dir  )
 {
 	if(can_reserve(c)) {
 		reserved = c;
-		/* for threeway and forway switches we may need to alter graphic, if
+		/* for threeway and fourway switches we may need to alter graphic, if
 		 * direction is a diagonal (i.e. on the switching part)
 		 * and there are switching graphics
 		 */
@@ -115,28 +115,6 @@ bool schiene_t::unreserve(convoihandle_t c)
 	return false;
 }
 
-
-
-
-/**
-* releases previous reservation
-* @author prissi
-*/
-bool schiene_t::unreserve(vehicle_t *)
-{
-	// is this tile empty?
-	if(!reserved.is_bound()) {
-		return true;
-	}
-//	if(!welt->lookup(get_pos())->suche_obj(v->get_typ())) {
-		reserved = convoihandle_t();
-		if(schiene_t::show_reservations) {
-			set_flag( obj_t::dirty );
-		}
-		return true;
-//	}
-//	return false;
-}
 
 
 void schiene_t::rdwr(loadsave_t *file)

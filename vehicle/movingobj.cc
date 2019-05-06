@@ -17,7 +17,7 @@
 
 #include "../boden/grund.h"
 
-#include "../besch/groundobj_besch.h"
+#include "../descriptor/groundobj_desc.h"
 
 #include "../utils/cbuffer_t.h"
 #include "../utils/simrandom.h"
@@ -65,7 +65,7 @@ bool movingobj_t::register_desc(groundobj_desc_t *desc)
 {
 	// remove duplicates
 	if(  desc_table.remove( desc->get_name() )  ) {
-		dbg->warning( "movingobj_t::register_desc()", "Object %s was overlaid by addon!", desc->get_name() );
+		dbg->doubled( "movingobj", desc->get_name() );
 	}
 	desc_table.put(desc->get_name(), desc );
 	return true;
@@ -140,7 +140,7 @@ void movingobj_t::calc_image()
 			}
 			else {
 				// resolution 1/8th month (0..95)
-				const uint32 yearsteps = (welt->get_current_month()%12)*8 + ((welt->get_zeit_ms()>>(welt->ticks_per_world_month_shift-3))&7) + 1;
+				const uint32 yearsteps = (welt->get_current_month()%12)*8 + ((welt->get_ticks()>>(welt->ticks_per_world_month_shift-3))&7) + 1;
 				season = (seasons * yearsteps - 1) / 96;
 			}
 			break;
@@ -268,7 +268,7 @@ void movingobj_t::info(cbuffer_t & buf) const
 	buf.append("\n");
 	buf.append(translator::translate("cost for removal"));
 	char buffer[128];
-	money_to_string( buffer, get_desc()->get_preis()/100.0 );
+	money_to_string( buffer, get_desc()->get_price()/100.0 );
 	buf.append( buffer );
 }
 
@@ -276,7 +276,7 @@ void movingobj_t::info(cbuffer_t & buf) const
 
 void movingobj_t::cleanup(player_t *player)
 {
-	player_t::book_construction_costs(player, -get_desc()->get_preis(), get_pos().get_2d(), ignore_wt);
+	player_t::book_construction_costs(player, -get_desc()->get_price(), get_pos().get_2d(), ignore_wt);
 	mark_image_dirty( get_image(), 0 );
 }
 
@@ -318,7 +318,7 @@ bool movingobj_t::check_next_tile( const grund_t *gr ) const
 		if(gr->hat_wege()  &&  (!gr->hat_weg(road_wt)  ||  gr->get_weg(road_wt)->hat_gehweg())) {
 			return false;
 		}
-		if(!desc->can_built_trees_here()) {
+		if(!desc->can_build_trees_here()) {
 			return gr->find<baum_t>()==NULL;
 		}
 	}
@@ -335,7 +335,7 @@ bool movingobj_t::check_next_tile( const grund_t *gr ) const
 		if(!gr->ist_natur()  ||  !slope_t::is_way(gr->get_grund_hang())) {
 			return false;
 		}
-		if(!desc->can_built_trees_here()) {
+		if(!desc->can_build_trees_here()) {
 			return gr->find<baum_t>()==NULL;
 		}
 	}

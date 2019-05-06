@@ -1,8 +1,8 @@
 /*
- * Strassen für Simutrans
+ * Roads for Simutrans
  *
- * Überarbeitet Januar 2001
- * von Hj. Malthaner
+ * Revised January 2001
+ * Hj. Malthaner
  */
 
 #include <stdio.h>
@@ -10,7 +10,7 @@
 #include "strasse.h"
 #include "../../simworld.h"
 #include "../../dataobj/loadsave.h"
-#include "../../besch/weg_besch.h"
+#include "../../descriptor/way_desc.h"
 #include "../../bauer/wegbauer.h"
 #include "../../dataobj/translator.h"
 

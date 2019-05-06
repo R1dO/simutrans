@@ -1,8 +1,8 @@
 /*
  * Eine Sorte Water die zu einer Haltestelle gehört
  *
- * Überarbeitet Januar 2001
- * von Hj. Malthaner
+ * Revised January 2001
+ * Hj. Malthaner
  */
 
 #include <stdio.h>
@@ -10,8 +10,8 @@
 #include "../../simworld.h"
 #include "../../display/simimg.h"
 
-#include "../../besch/grund_besch.h"
-#include "../../besch/weg_besch.h"
+#include "../../descriptor/ground_desc.h"
+#include "../../descriptor/way_desc.h"
 
 #include "../../bauer/wegbauer.h"
 #include "../../dataobj/translator.h"

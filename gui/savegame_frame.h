@@ -22,7 +22,7 @@
 #include "components/gui_label.h"
 #include "components/gui_button.h"
 
-
+class loadfont_frame_t;
 
 /**
  * Base class from which all GUI dialogs to load/save generics can inherit from
@@ -34,13 +34,14 @@
  */
 class savegame_frame_t : public gui_frame_t, action_listener_t
 {
-private:
+friend class loadfont_frame_t;
 
+private:
 	vector_tpl<std::string> paths;     //@< Paths in which this dialog will search for
 
 	const char *suffix;                //@< Extension of the files this dialog will use, can be NULL Can include or not the "." at start, will work on both cases
-	char        ibuf[1024];            //@< Input buffer for the text input component
-	char        searchpath[1024];      //@< Default search path
+	char        ibuf[PATH_MAX];        //@< Input buffer for the text input component
+	char        searchpath[PATH_MAX];      //@< Default search path
 	bool        in_action;             //@< To avoid double mouse action
 	bool        only_directories;      //@< Search for directories (used in pak_selector)
 	bool        searchpath_defined;    //@< Is default path defined?
@@ -96,11 +97,13 @@ protected:
 
 	// Standard GUI controls in dialogue
 	gui_textinput_t  input;         //@< Filename input field
-	gui_divider_t    divider1;      //@< Filename input field   (Added 30-Oct-2001 Markus Weber)
 	button_t         savebutton;    //@< Save button            (Added 29-Oct-2001 Markus Weber)
 	button_t         cancelbutton;  //@< Cancel button          (Added 29-Oct-2001 Markus Weber)
 	gui_label_t      fnlabel;       //@< Static file name label (Added 31-Oct-2001 Markus Weber)
-	gui_container_t  button_frame;  //@< Gui container for all items
+	gui_aligned_container_t
+	                 top_frame,     //@< Contains input field
+					 bottom_left_frame, //@< container for elements on the left of the last row
+	                 button_frame;  //@< Gui container for all items
 	gui_scrollpane_t scrolly;       //@< Scroll panel for the GUI container
 
 	slist_tpl<dir_entry_t> entries;  //@< Internal list representing the file listing
@@ -112,11 +115,14 @@ protected:
 	void        add_file     ( const char *path, const char *filename, const char *pak, const bool no_cutting_suffix );
 	void        add_path     ( const char *path );
 	void        set_filename ( const char *file_name );
+	void        set_extension( const char *ext ) { suffix = ext; }
 	void        cleanup_path ( char *path );
 	void        shorten_path ( char *dest, const char *source, const size_t max_size );
 	std::string get_filename ( const char *fullpath, const bool with_extension = true );
 	std::string get_basename ( const char *fullpath );
 	void        list_filled  ( void );
+
+	virtual   void fill_list ( void );
 
 	// compare item to another with info and filename
 	virtual bool compare_items ( const dir_entry_t & entry, const char *info, const char *filename );
@@ -126,7 +132,6 @@ protected:
 	virtual bool del_action    ( const char *   fullpath   );                 // Callback for delete button click
 	virtual bool ok_action     ( const char * /*fullpath*/ ) { return true; } // Callback for ok button click
 
-	virtual void set_windowsize     ( scr_size size );
 	virtual bool check_file         ( const char *filename, const char *suffix );
 
 	// Pure virtual functions
@@ -141,8 +146,6 @@ public:
 
 	bool action_triggered  ( gui_action_creator_t*, value_t ) OVERRIDE;
 	bool infowin_event     ( event_t const* ) OVERRIDE;
-
-	virtual void fill_list ( void );
 };
 
 #endif

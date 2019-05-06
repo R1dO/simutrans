@@ -3,13 +3,14 @@
 
 #include "../simcity.h"
 #include "../simfab.h"
-#include "../bauer/warenbauer.h"
+#include "../bauer/goods_manager.h"
 #include "../dataobj/schedule.h"
 #include "../dataobj/loadsave.h"
 #include "../dataobj/scenario.h"
 #include "../player/simplay.h"
 #include "../utils/plainstring.h"
 #include "api/api_command.h" // script_api::my_tool_t
+#include "api/api_simple.h"  // my_ribi_t
 
 
 template<typename T> T clamp(T v, T l, T u) { return v < l ? l : (v > u ? u :v); }
@@ -44,20 +45,26 @@ namespace script_api {
 		}
 		switch( rotation ) {
 			// 0: do nothing
-			case 1: k = koord(k.y, welt->get_size().y-1 - k.x); break;
+			case 1: k = koord(k.y, welt->get_size().x-1 - k.x); break;
 			case 2: k = koord(welt->get_size().x-1 - k.x, welt->get_size().y-1 - k.y); break;
-			case 3: k = koord(welt->get_size().x-1 - k.y, k.x); break;
+			case 3: k = koord(welt->get_size().y-1 - k.y, k.x); break;
 			default: break;
 		}
 	}
 
 	void coordinate_transform_t::koord_sq2w(koord &k)
 	{
-		// just rotate back
-		rotation = 4 - rotation;
-		koord_w2sq(k);
-		// restore original rotation
-		rotation = 4 - rotation;
+		// do not transform koord::invalid
+		if (k.x == -1  &&  k.y == -1) {
+			return;
+		}
+		switch( rotation ) {
+			// 0: do nothing
+			case 1: k = koord(welt->get_size().x-1 - k.y, k.x); break;
+			case 2: k = koord(welt->get_size().x-1 - k.x, welt->get_size().y-1 - k.y); break;
+			case 3: k = koord(k.y, welt->get_size().y-1 - k.x); break;
+			default: break;
+		}
 	}
 
 	void coordinate_transform_t::ribi_w2sq(ribi_t::ribi &r)
@@ -71,6 +78,24 @@ namespace script_api {
 	{
 		if (rotation) {
 			r = ( ( (r << 4) | r) << rotation) >> 4 & 15;
+		}
+	}
+
+	void coordinate_transform_t::slope_w2sq(slope_t::type &s)
+	{
+		if (s < slope_t::raised) {
+			for(uint8 i=1; i <= 4-rotation; i++) {
+				s = slope_t::rotate90(s);
+			}
+		}
+	}
+
+	void coordinate_transform_t::slope_sq2w(slope_t::type &s)
+	{
+		if (s < slope_t::raised) {
+			for(uint8 i=1; i <= rotation; i++) {
+				s = slope_t::rotate90(s);
+			}
 		}
 	}
 
@@ -182,41 +207,6 @@ namespace script_api {
 		return 1;
 	}
 
-
-	waytype_t param<waytype_t>::get(HSQUIRRELVM vm, SQInteger index)
-	{
-		return (waytype_t)(param<sint16>::get(vm, index));
-	}
-	SQInteger param<waytype_t>::push(HSQUIRRELVM vm, waytype_t const& v)
-	{
-		return param<sint16>::push(vm, v);
-	}
-
-
-	systemtype_t param<systemtype_t>::get(HSQUIRRELVM vm, SQInteger index)
-	{
-		return (systemtype_t)(param<uint8>::get(vm, index));
-	}
-	SQInteger param<systemtype_t>::push(HSQUIRRELVM vm, systemtype_t const& v)
-	{
-		return param<uint8>::push(vm, v);
-	}
-
-
-	obj_t::typ param<obj_t::typ>::get(HSQUIRRELVM vm, SQInteger index)
-	{
-		return (obj_t::typ)(param<uint8>::get(vm, index));
-	}
-	SQInteger param<obj_t::typ>::push(HSQUIRRELVM vm, obj_t::typ const& v)
-	{
-		return param<uint8>::push(vm, v);
-	}
-
-
-	SQInteger param<climate>::push(HSQUIRRELVM vm, climate const& v)
-	{
-		return param<uint8>::push(vm, v);
-	}
 // floats
 	double param<double>::get(HSQUIRRELVM vm, SQInteger index)
 	{
@@ -310,8 +300,13 @@ namespace script_api {
 	SQInteger param<koord>::push(HSQUIRRELVM vm, koord const& v)
 	{
 		koord k(v);
-		// transform coordinates
-		coordinate_transform_t::koord_w2sq(k);
+		if (k.x != -1  &&  k.y != -1) {
+			// transform coordinates
+			coordinate_transform_t::koord_w2sq(k);
+		}
+		else {
+			k = koord::invalid;
+		}
 		return push_instance(vm, "coord", k.x, k.y);
 	}
 
@@ -329,9 +324,42 @@ namespace script_api {
 	SQInteger param<koord3d>::push(HSQUIRRELVM vm, koord3d const& v)
 	{
 		koord k(v.get_2d());
-		// transform coordinates
-		coordinate_transform_t::koord_w2sq(k);
+		if (k.x != -1  &&  k.y != -1) {
+			// transform coordinates
+			coordinate_transform_t::koord_w2sq(k);
+		}
+		else {
+			k = koord::invalid;
+		}
 		return push_instance(vm, "coord3d", k.x, k.y, v.z);
+	}
+// directions / ribis
+	SQInteger param<my_ribi_t>::push(HSQUIRRELVM vm, my_ribi_t const& v)
+	{
+		ribi_t::ribi ribi = v;
+		coordinate_transform_t::ribi_w2sq(ribi);
+		return param<uint8>::push(vm, ribi);
+	}
+
+	my_ribi_t param<my_ribi_t>::get(HSQUIRRELVM vm, SQInteger index)
+	{
+		ribi_t::ribi ribi = param<uint8>::get(vm, index) & ribi_t::all;
+		coordinate_transform_t::ribi_sq2w(ribi);
+		return ribi;
+	}
+// slopes
+	SQInteger param<my_slope_t>::push(HSQUIRRELVM vm, my_slope_t const& v)
+	{
+		slope_t::type slope = v;
+		coordinate_transform_t::slope_w2sq(slope);
+		return param<uint8>::push(vm, slope);
+	}
+
+	my_slope_t param<my_slope_t>::get(HSQUIRRELVM vm, SQInteger index)
+	{
+		slope_t::type slope = param<uint8>::get(vm, index);
+		coordinate_transform_t::slope_sq2w(slope);
+		return slope;
 	}
 
 // pointers to classes
@@ -375,13 +403,13 @@ namespace script_api {
 		SQInteger i = -1;
 		if (SQ_SUCCEEDED(get_slot(vm, "index", i, index))) {
 			if (i>=0) {
-				if ( (uint32)i<fab->get_eingang().get_count()) {
-					return &fab->get_eingang()[i];
+				if ( (uint32)i<fab->get_input().get_count()) {
+					return &fab->get_input()[i];
 				}
 				else {
-					i -= fab->get_eingang().get_count();
-					if ( (uint32)i<fab->get_ausgang().get_count()) {
-						return &fab->get_ausgang()[i];
+					i -= fab->get_input().get_count();
+					if ( (uint32)i<fab->get_output().get_count()) {
+						return &fab->get_output()[i];
 					}
 				}
 			}
@@ -399,11 +427,11 @@ namespace script_api {
 		// obtain index into wareproduction_t arrays
 		SQInteger i = -1;
 		if (SQ_SUCCEEDED(get_slot(vm, "index", i, index))) {
-			if (i>=0  &&  (uint32)i<fab->get_eingang().get_count()) {
-				const ware_production_t& in = fab->get_eingang()[i];
+			if (i>=0  &&  (uint32)i<fab->get_input().get_count()) {
+				const ware_production_t& in = fab->get_input()[i];
 				const factory_supplier_desc_t* desc = fab->get_desc()->get_supplier(i);
 				// sanity check
-				if (desc  &&  desc->get_ware() == in.get_typ()) {
+				if (desc  &&  desc->get_input_type() == in.get_typ()) {
 					return desc;
 				}
 			}
@@ -421,12 +449,12 @@ namespace script_api {
 		// obtain index into wareproduction_t arrays
 		SQInteger i = -1;
 		if (SQ_SUCCEEDED(get_slot(vm, "index", i, index))) {
-			i -= fab->get_eingang().get_count();
-			if (i>=0  &&  (uint32)i<fab->get_ausgang().get_count()) {
-				const ware_production_t& out = fab->get_ausgang()[i];
+			i -= fab->get_input().get_count();
+			if (i>=0  &&  (uint32)i<fab->get_output().get_count()) {
+				const ware_production_t& out = fab->get_output()[i];
 				const factory_product_desc_t* desc = fab->get_desc()->get_product(i);
 				// sanity check
-				if (desc  &&  desc->get_ware() == out.get_typ()) {
+				if (desc  &&  desc->get_output_type() == out.get_typ()) {
 					return desc;
 				}
 			}
@@ -565,7 +593,7 @@ namespace script_api {
 	stadt_t* param<stadt_t*>::get(HSQUIRRELVM vm, SQInteger index)
 	{
 		koord pos = param<koord>::get(vm, index);
-		return welt->suche_naechste_stadt(pos);
+		return welt->find_nearest_city(pos);
 	}
 
 	SQInteger param<stadt_t*>::push(HSQUIRRELVM vm, stadt_t* const& v)

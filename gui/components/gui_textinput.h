@@ -17,7 +17,7 @@
 #define gui_components_gui_textinput_h
 
 #include "gui_action_creator.h"
-#include "gui_komponente.h"
+#include "gui_component.h"
 #include "../../simcolor.h"
 #include "../../display/simgraph.h"
 #include "../../utils/cbuffer_t.h"
@@ -72,7 +72,7 @@ protected:
 	 */
 	uint8 align;
 
-	COLOR_VAL textcol;
+	PIXVAL textcol;
 
 	// true if there were changed but no notification was sent yet
 	bool text_dirty;
@@ -87,7 +87,7 @@ protected:
 	 * whether focus has been received
 	 * @author Knightly
 	 */
-	bool focus_recieved;
+	bool focus_received;
 
 	/**
 	 * determine new cursor position from event coordinates
@@ -129,7 +129,7 @@ public:
 	 * Draw the component
 	 * @author Hj. Malthaner
 	 */
-	virtual void draw(scr_coord offset);
+	void draw(scr_coord offset) OVERRIDE;
 
 	// x position of the current cursor (for IME purposes)
 	scr_coord_val get_current_cursor_x() { return calc_cursor_pos(head_cursor_pos); };
@@ -148,7 +148,11 @@ public:
 	void set_alignment(uint8 _align){ align = _align;}
 
 	// to set text color
-	void set_color(COLOR_VAL col){ textcol = col;}
+	void set_color(PIXVAL col){ textcol = col;}
+
+	scr_size get_max_size() const OVERRIDE;
+
+	scr_size get_min_size() const OVERRIDE;
 };
 
 
@@ -158,7 +162,7 @@ class gui_hidden_textinput_t : public gui_textinput_t
 	bool infowin_event(event_t const*) OVERRIDE;
 
 	// function that performs the actual display; just draw with stars ...
-	virtual void display_with_cursor(scr_coord offset, bool cursor_active, bool cursor_visible);
+	void display_with_cursor(scr_coord offset, bool cursor_active, bool cursor_visible) OVERRIDE;
 };
 
 

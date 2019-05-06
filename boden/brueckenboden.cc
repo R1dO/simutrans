@@ -4,8 +4,8 @@
 #include "../obj/bruecke.h"
 #include "../bauer/brueckenbauer.h"
 
-#include "../besch/grund_besch.h"
-#include "../besch/bruecke_besch.h"
+#include "../descriptor/ground_desc.h"
+#include "../descriptor/bridge_desc.h"
 
 #include "../dataobj/loadsave.h"
 #include "../dataobj/environment.h"
@@ -28,7 +28,7 @@ void brueckenboden_t::calc_image_internal(const bool calc_only_snowline_change)
 {
 	if(  ist_karten_boden()  ) {
 
-		set_image( ground_besch_t::get_ground_tile(this) );
+		set_image( ground_desc_t::get_ground_tile(this) );
 
 		if(  !calc_only_snowline_change  ) {
 			grund_t::calc_back_image( get_pos().z, slope );
@@ -84,7 +84,7 @@ void brueckenboden_t::rdwr(loadsave_t *file)
 			if(  kb && get_pos().z - kb->get_pos().z > 1 ) {
 				height = 2;
 			}
-			bruecke_t *br = new bruecke_t( get_pos(), welt->get_public_player(), br_desc, ist_karten_boden() ? br_desc->get_end( slope, get_grund_hang(), get_weg_hang() ) : br_desc->get_simple( w->get_ribi_unmasked(), height ) );
+			bruecke_t *br = new bruecke_t( get_pos(), welt->get_public_player(), br_desc, ist_karten_boden() ? br_desc->get_end( slope, get_grund_hang(), get_weg_hang() ) : br_desc->get_straight( w->get_ribi_unmasked(), height ) );
 			obj_add( br );
 		}
 	}

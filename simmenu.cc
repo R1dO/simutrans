@@ -26,7 +26,9 @@
 #include "bauer/brueckenbauer.h"
 #include "bauer/tunnelbauer.h"
 
-#include "besch/haus_besch.h"
+#include "descriptor/building_desc.h"
+#include "descriptor/bridge_desc.h"
+#include "descriptor/tunnel_desc.h"
 
 #include "boden/grund.h"
 #include "boden/wege/strasse.h"
@@ -46,7 +48,7 @@
 
 karte_ptr_t tool_t::welt;
 
-// for key loockup; is always sorted during the game
+// for key lookup; is always sorted during the game
 vector_tpl<tool_t *>tool_t::char_to_tool(0);
 
 // here are the default values, icons, cursor, sound definitions ...
@@ -117,6 +119,8 @@ tool_t *create_general_tool(int toolnr)
 		case TOOL_ERROR_MESSAGE: tool = new tool_error_message_t(); break;
 		case TOOL_CHANGE_WATER_HEIGHT: tool = new tool_change_water_height_t(); break;
 		case TOOL_SET_CLIMATE:      tool = new tool_set_climate_t(); break;
+		case TOOL_ROTATE_BUILDING:		tool = new tool_rotate_building_t(); break;
+		case TOOL_MERGE_STOP:		tool = new tool_merge_stop_t(); break;
 		default:                   dbg->error("create_general_tool()","cannot satisfy request for general_tool[%i]!",toolnr);
 		                           return NULL;
 	}
@@ -124,6 +128,7 @@ tool_t *create_general_tool(int toolnr)
 	assert(tool->get_id()  ==  (toolnr | GENERAL_TOOL)  ||  toolnr==TOOL_SLICED_AND_UNDERGROUND_VIEW);
 	return tool;
 }
+
 
 tool_t *create_simple_tool(int toolnr)
 {
@@ -207,6 +212,8 @@ tool_t *create_dialog_tool(int toolnr)
 		case DIALOG_SETTINGS:       tool = new dialog_settings_t(); break;
 		case DIALOG_GAMEINFO:       tool = new dialog_gameinfo_t(); break;
 		case DIALOG_THEMES:         tool = new dialog_themes_t(); break;
+		case DIALOG_SCENARIO:       tool = new dialog_scenario_t(); break;
+		case DIALOG_SCENARIO_INFO:  tool = new dialog_scenario_info_t(); break;
 		default:                 dbg->error("create_dialog_tool()","cannot satisfy request for dialog_tool[%i]!",toolnr);
 		                         return NULL;
 	}
@@ -233,7 +240,96 @@ tool_t *create_tool(int toolnr)
 }
 
 
-static uint16 str_to_key( const char *str )
+/**
+ * Returns desc and tool pointer corresponding to the
+ * general toolid with name @p param_str.
+ */
+void general_tool_get_desc_builder(uint16 id, const char *param_str, const obj_desc_timelined_t* &desc, tool_t* &tool)
+{
+	if (  id & (SIMPLE_TOOL | DIALOGE_TOOL) ) {
+		return;
+	}
+	id = id & (~GENERAL_TOOL);
+	const obj_desc_transport_infrastructure_t* desc1 = NULL;
+
+	if (param_str) {
+		switch (id) {
+			case TOOL_BUILD_WAY:
+				desc1 = way_builder_t::get_desc(param_str);
+				break;
+			case TOOL_BUILD_BRIDGE:
+				desc1 = bridge_builder_t::get_desc(param_str);
+				break;
+			case TOOL_BUILD_TUNNEL:
+				desc1 = tunnel_builder_t::get_desc(param_str);
+				break;
+			case TOOL_BUILD_ROADSIGN:
+				desc1 = roadsign_t::find_desc(param_str);
+				break;
+			case TOOL_BUILD_WAYOBJ:
+				desc1 = wayobj_t::find_desc(param_str);
+				break;
+				// The following 3's descriptions are registered by hausbauer_t.
+			case TOOL_BUILD_DEPOT:
+			case TOOL_BUILD_STATION:
+			case TOOL_HEADQUARTER: {
+				const building_desc_t* desc2 = hausbauer_t::get_desc(param_str);
+				desc = desc2;
+				tool = desc2->get_builder();
+				return;
+			}
+			default: ;
+		}
+	}
+	if (desc1) {
+		desc = desc1;
+		tool = desc1->get_builder();
+	}
+}
+
+
+/**
+ * Set the defaults of a newly created general tool.
+ */
+void set_defaults_general_tool(tool_t *tool, const char *param_str)
+{
+	if (  tool  ==  NULL  ) {
+		return;
+	}
+	tool_t* copy_from = NULL;
+	const obj_desc_timelined_t* desc = NULL;
+
+	general_tool_get_desc_builder(tool->get_id(), param_str, desc, copy_from);
+
+	if (copy_from) {
+		*tool = *copy_from;
+	}
+}
+
+
+/**
+ * Checks whether a tool is available in the current timeline.
+ *
+ * Note that this function would return true on error. It is done so
+ * if no description was found, the previous toolbar button logic
+ * will still be applied - show buttons with icons regardless of
+ * whether the objects they build are available or not.
+ */
+bool check_tool_availability(const tool_t *tool, uint64 time)
+{
+	if (  tool  ==  NULL  ) {
+		return true;
+	}
+	tool_t* dummy = NULL;
+	const obj_desc_timelined_t* desc = NULL;
+
+	general_tool_get_desc_builder(tool->get_id(), tool->get_default_param(), desc, dummy);
+
+	return desc ? desc->is_available(time) : true;
+}
+
+
+static utf32 str_to_key( const char *str )
 {
 	if(  str[1]==','  ||  str[1]<=' ') {
 		return (uint8)*str;
@@ -241,8 +337,8 @@ static uint16 str_to_key( const char *str )
 	else {
 		// check for utf8
 		if(  127<(uint8)*str  ) {
-			size_t len=0;
-			uint16 c = utf8_to_utf16( (const utf8 *)str, &len );
+			size_t len = 0;
+			utf32 const c = utf8_decoder_t::decode((utf8 const *)str, len);
 			if(str[len]==',') {
 				return c;
 			}
@@ -320,7 +416,7 @@ void tool_t::read_menu(const std::string &objfilename)
 {
 	char_to_tool.clear();
 	tabfile_t menuconf;
-	// only use pak sepcific menues, since otherwise images may missing
+	// only use pak specific menus, since otherwise images may be missing
 	if (!menuconf.open((objfilename+"config/menuconf.tab").c_str())) {
 		dbg->fatal("tool_t::init_menu()", "Can't read %sconfig/menuconf.tab", objfilename.c_str() );
 	}
@@ -333,8 +429,8 @@ void tool_t::read_menu(const std::string &objfilename)
 		const char* type;
 		uint16 count;
 		vector_tpl<tool_t *> &tools;
-		const skin_besch_t *icons;
-		const skin_besch_t *cursor;
+		const skin_desc_t *icons;
+		const skin_desc_t *cursor;
 		bool with_sound;
 
 	};
@@ -371,7 +467,7 @@ void tool_t::read_menu(const std::string &objfilename)
 					while(  str[i]!=0  &&  str[i]!=','  ) {
 						i++;
 					}
-					const skin_besch_t *s=skinverwaltung_t::get_extra(str,i-1);
+					const skin_desc_t *s=skinverwaltung_t::get_extra(str,i-1);
 					tool->icon = s ? s->get_image_id(0) : IMG_EMPTY;
 				}
 				else {
@@ -487,7 +583,7 @@ void tool_t::read_menu(const std::string &objfilename)
 						while(  str[i]!=0  &&  str[i]!=','  ) {
 							i++;
 						}
-						const skin_besch_t *s=skinverwaltung_t::get_extra(str,i-1);
+						const skin_desc_t *s=skinverwaltung_t::get_extra(str,i-1);
 						icon = s ? s->get_image_id(0) : IMG_EMPTY;
 					}
 					else {
@@ -537,6 +633,7 @@ void tool_t::read_menu(const std::string &objfilename)
 						addtool = create_general_tool( toolnr );
 						// copy defaults
 						*addtool = *(general_tool[toolnr]);
+						set_defaults_general_tool(addtool, param_str);
 
 						general_tool.append( addtool );
 					}
@@ -659,7 +756,7 @@ void tool_t::draw_after(scr_coord pos, bool dirty) const
 	// default action: grey corner if selected
 	image_id id = get_icon( welt->get_active_player() );
 	if(  id!=IMG_EMPTY  &&  is_selected()  ) {
-		display_img_blend( id, pos.x, pos.y, TRANSPARENT50_FLAG|OUTLINE_FLAG|COL_BLACK, false, dirty );
+		display_img_blend( id, pos.x, pos.y, TRANSPARENT50_FLAG|OUTLINE_FLAG|color_idx_to_rgb(COL_BLACK), false, dirty );
 	}
 }
 
@@ -810,6 +907,9 @@ void toolbar_t::update(player_t *player)
 			if(  scen->is_scripted()  &&  !scen->is_tool_allowed(player, w->get_id(), w->get_waytype())) {
 				continue;
 			}
+			if ( !check_tool_availability(w,  welt->get_timeline_year_month()) ) {
+				continue;
+			}
 			// now add it to the toolbar gui
 			tool_selector->add_tool_selector( w );
 		}
@@ -956,7 +1056,8 @@ bool two_click_tool_t::is_work_here_network_save(player_t *player, koord3d pos )
 	uint8 value = is_valid_pos( player, pos, error, koord3d::invalid );
 	DBG_MESSAGE("two_click_tool_t::is_work_here_network_save", "Position %s valid=%d", pos.get_str(), value );
 	if(  value == 0  ) {
-		return false;
+		// cannot work here at all -> safe
+		return true;
 	}
 
 	// work directly if possible and ctrl is NOT pressed
@@ -984,6 +1085,9 @@ const char *two_click_tool_t::work(player_t *player, koord3d pos )
 	uint8 value = is_valid_pos( player, pos, error, !is_first_click() ? start : koord3d::invalid );
 	DBG_MESSAGE("two_click_tool_t::work", "Position %s valid=%d", pos.get_str(), value );
 	if(  value == 0  ) {
+		if (error == NULL) {
+			error = ""; // propagate errors
+		}
 		flags &= ~(WFL_SHIFT | WFL_CTRL);
 		init( player );
 		return error;
@@ -1060,7 +1164,7 @@ const char *two_click_tool_t::move(player_t *player, uint16 buttonstate, koord3d
 }
 
 
-void two_click_tool_t::start_at(koord3d &new_start )
+void two_click_tool_t::start_at( koord3d &new_start )
 {
 	first_click_var = false;
 	start = new_start;
@@ -1093,7 +1197,7 @@ void two_click_tool_t::cleanup( bool delete_start_marker )
 		koord3d pos = z->get_pos();
 		grund_t *gr = welt->lookup( pos );
 		delete z;
-		// Remove dummy ground (placed by tool_tunnelbau_t and tool_wegebau_t):
+		// Remove dummy ground (placed by tool_build_tunnel_t and tool_build_way_t):
 		if(gr  &&   (gr->get_typ() == grund_t::tunnelboden  ||  gr->get_typ() == grund_t::monorailboden)  &&  gr->get_weg_nr(0) == NULL && !gr->get_leitung() ) {
 			welt->access(pos.get_2d())->boden_entfernen(gr);
 			delete gr;

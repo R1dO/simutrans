@@ -11,7 +11,7 @@
 #include "../../display/simimg.h"
 #include "../../simtypes.h"
 #include "../../simobj.h"
-#include "../../besch/weg_besch.h"
+#include "../../descriptor/way_desc.h"
 #include "../../dataobj/koord3d.h"
 
 
@@ -28,8 +28,8 @@ template <class T> class slist_tpl;
 #define MAX_WAY_STATISTICS 2
 
 enum way_statistics {
-	WAY_STAT_GOODS   = 0, ///< number of goods transported over this weg
-	WAY_STAT_CONVOIS = 1  ///< number of convois that passed this weg
+	WAY_STAT_GOODS   = 0, ///< number of goods transported over this way
+	WAY_STAT_CONVOIS = 1  ///< number of convois that passed this way
 };
 
 
@@ -90,7 +90,7 @@ private:
 	uint8 ribi:4;
 
 	/**
-	* Maske für Richtungsbits
+	* Mask for ribi (Richtungsbits => Direction Bits)
 	* @author Hj. Malthaner
 	*/
 	uint8 ribi_maske:4;
@@ -146,13 +146,13 @@ public:
 	/**
 	 * Actual image recalculation
 	 */
-	void calc_image();
+	void calc_image() OVERRIDE;
 
 	/**
 	 * Called whenever the season or snowline height changes
 	 * return false and the obj_t will be deleted
 	 */
-	bool check_season(const bool calc_only_season_change);
+	bool check_season(const bool calc_only_season_change) OVERRIDE;
 
 	/**
 	* Setzt die erlaubte Höchstgeschwindigkeit
@@ -180,40 +180,40 @@ public:
 	// returns a string with the "official name of the waytype"
 	static const char *waytype_to_string(waytype_t wt);
 
-	virtual void rdwr(loadsave_t *file);
+	void rdwr(loadsave_t *file) OVERRIDE;
 
 	/**
-	* Info-text für diesen Weg
+	* Info-text for this way
 	* @author Hj. Malthaner
 	*/
-	virtual void info(cbuffer_t & buf) const;
+	void info(cbuffer_t & buf) const OVERRIDE;
 
 	/**
 	 * @return NULL if OK, otherwise an error message
 	 * @author Hj. Malthaner
 	 */
-	virtual const char *is_deletable(const player_t *player);
+	const char *is_deletable(const player_t *player) OVERRIDE;
 
 	/**
 	* Wegtyp zurückliefern
 	*/
-	virtual waytype_t get_waytype() const = 0;
+	waytype_t get_waytype() const OVERRIDE = 0;
 
 	/**
 	* 'Jedes Ding braucht einen Typ.'
 	* @return Gibt den typ des Objekts zurück.
 	* @author Hj. Malthaner
 	*/
-	typ get_typ() const { return obj_t::way; }
+	typ get_typ() const OVERRIDE { return obj_t::way; }
 
 	/**
 	* Die Bezeichnung des Wegs
 	* @author Hj. Malthaner
 	*/
-	const char *get_name() const { return desc->get_name(); }
+	const char *get_name() const OVERRIDE { return desc->get_name(); }
 
 	/**
-	* Setzt neue Richtungsbits für einen Weg.
+	* Add direction bits (ribi) for a way.
 	*
 	* Nachdem die ribis geändert werden, ist das weg_image des
 	* zugehörigen Grundes falsch (Ein Aufruf von grund_t::calc_image()
@@ -223,7 +223,7 @@ public:
 	void ribi_add(ribi_t::ribi ribi) { this->ribi |= (uint8)ribi;}
 
 	/**
-	* Entfernt Richtungsbits von einem Weg.
+	* Remove direction bits (ribi) on a way.
 	*
 	* Nachdem die ribis geändert werden, ist das weg_image des
 	* zugehörigen Grundes falsch (Ein Aufruf von grund_t::calc_image()
@@ -233,7 +233,7 @@ public:
 	void ribi_rem(ribi_t::ribi ribi) { this->ribi &= (uint8)~ribi;}
 
 	/**
-	* Setzt Richtungsbits für den Weg.
+	* Set direction bits (ribi) for the way.
 	*
 	* Nachdem die ribis geändert werden, ist das weg_image des
 	* zugehörigen Grundes falsch (Ein Aufruf von grund_t::calc_image()
@@ -243,12 +243,12 @@ public:
 	void set_ribi(ribi_t::ribi ribi) { this->ribi = (uint8)ribi;}
 
 	/**
-	* Ermittelt die unmaskierten Richtungsbits für den Weg.
+	* Get the unmasked direction bits (ribi) for the way (without signals or other ribi changer).
 	*/
 	ribi_t::ribi get_ribi_unmasked() const { return (ribi_t::ribi)ribi; }
 
 	/**
-	* Ermittelt die (maskierten) Richtungsbits für den Weg.
+	* Get the masked direction bits (ribi) for the way (with signals or other ribi changer).
 	*/
 	ribi_t::ribi get_ribi() const { return (ribi_t::ribi)(ribi & ~ribi_maske); }
 
@@ -264,7 +264,7 @@ public:
 	 * called during map rotation
 	 * @author priss
 	 */
-	void rotate90();
+	void rotate90() OVERRIDE;
 
 	/**
 	* book statistics - is called very often and therefore inline
@@ -313,14 +313,14 @@ public:
 	void clear_sign_flag() { flags &= ~(HAS_SIGN | HAS_SIGNAL); }
 
 	inline void set_image( image_id b ) { image = b; }
-	image_id get_image() const {return image;}
+	image_id get_image() const OVERRIDE {return image;}
 
 	inline void set_foreground_image( image_id b ) { foreground_image = b; }
-	image_id get_front_image() const {return foreground_image;}
+	image_id get_front_image() const OVERRIDE {return foreground_image;}
 
 
-	// correct maintainace
-	void finish_rd();
+	// correct maintenance
+	void finish_rd() OVERRIDE;
 } GCC_PACKED;
 
 #endif

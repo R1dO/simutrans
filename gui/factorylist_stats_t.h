@@ -12,8 +12,11 @@
 #ifndef factorylist_stats_t_h
 #define factorylist_stats_t_h
 
-#include "../tpl/vector_tpl.h"
-#include "components/gui_komponente.h"
+#include "components/gui_colorbox.h"
+#include "components/gui_image.h"
+#include "components/gui_label.h"
+#include "components/gui_scrolled_list.h"
+#include "../simfab.h"
 
 class fabrik_t;
 
@@ -26,32 +29,30 @@ namespace factorylist {
  * Factory list stats display
  * @author Hj. Malthaner
  */
-class factorylist_stats_t : public gui_world_component_t
+class factorylist_stats_t : public gui_aligned_container_t, public gui_scrolled_list_t::scrollitem_t
 {
 private:
-	vector_tpl<fabrik_t*> fab_list;
-	uint32 line_selected;
+	fabrik_t *fab;
+	gui_colorbox_t indicator;
+	gui_image_t boost_electric, boost_passenger, boost_mail;
+	gui_label_buf_t label;
 
-	factorylist::sort_mode_t sortby;
-	bool sortreverse;
-
+	void update_label();
 public:
-	factorylist_stats_t(factorylist::sort_mode_t sortby, bool sortreverse);
+	static int sort_mode;
+	static bool reverse;
 
-	void sort(factorylist::sort_mode_t sortby, bool sortreverse);
+	factorylist_stats_t(fabrik_t *);
 
-	bool infowin_event(event_t const*) OVERRIDE;
+	void draw( scr_coord pos) OVERRIDE;
 
-	/**
-	 * Recalc the size required to display everything and set size (size).
-	 */
-	void recalc_size();
+	char const* get_text() const OVERRIDE { return fab->get_name(); }
+	bool infowin_event(const event_t *) OVERRIDE;
+	bool is_valid() const OVERRIDE;
+	void set_size(scr_size size) OVERRIDE;
 
-	/**
-	* Draw the component
-	* @author Hj. Malthaner
-	*/
-	void draw(scr_coord offset);
+	static bool compare(const gui_component_t *a, const gui_component_t *b );
 };
+
 
 #endif

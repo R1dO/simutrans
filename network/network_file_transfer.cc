@@ -1,6 +1,7 @@
 #include "network_file_transfer.h"
 #include "../simdebug.h"
 #include "../simloadingscreen.h"
+#include "../simsys.h"
 
 #include <string.h>
 #include <errno.h>
@@ -8,8 +9,12 @@
 
 #ifndef NETTOOL
 #include "../dataobj/translator.h"
+#else
+#define dr_remove remove
+#define dr_fopen fopen
 #endif
 #include "../simversion.h"
+
 
 /*
  * Functions required by both Simutrans and Nettool
@@ -18,7 +23,7 @@
 char const* network_receive_file( SOCKET const s, char const* const save_as, sint32 const length, sint32 const timeout )
 {
 	// ok, we have a socket to connect
-	remove(save_as);
+	dr_remove(save_as);
 
 	DBG_MESSAGE("network_receive_file", "File size %li", length );
 
@@ -30,7 +35,7 @@ char const* network_receive_file( SOCKET const s, char const* const save_as, sin
 		// good place to show a progress bar
 		char rbuf[4096];
 		sint32 length_read = 0;
-		if (FILE* const f = fopen(save_as, "wb")) {
+		if (FILE* const f = dr_fopen(save_as, "wb")) {
 			while(length_read < length) {
 				if(  timeout > 0  ) {
 					/** 10s for 4096 bytes:
@@ -89,6 +94,8 @@ char const* network_receive_file( SOCKET const s, char const* const save_as, sin
 #include "../simworld.h"
 #include "../utils/simstring.h"
 
+#include "../simsys.h"
+
 
 // connect to address (cp), receive gameinfo, close
 const char *network_gameinfo(const char *cp, gameinfo_t *gi)
@@ -97,6 +104,13 @@ const char *network_gameinfo(const char *cp, gameinfo_t *gi)
 	const char *err = NULL;
 	SOCKET const my_client_socket = network_open_address(cp, err);
 	if(  err==NULL  ) {
+		network_command_t *nwc;
+		nwc_gameinfo_t *nwgi;
+		uint32 len;
+		char filename[PATH_MAX];
+		loadsave_t fd;
+
+		socket_list_t::add_client( my_client_socket );
 		{
 			nwc_gameinfo_t nwgi;
 			nwgi.rdwr();
@@ -105,40 +119,40 @@ const char *network_gameinfo(const char *cp, gameinfo_t *gi)
 				goto end;
 			}
 		}
-		socket_list_t::add_client( my_client_socket );
 		// wait for join command (tolerate some wrong commands)
-		network_command_t *nwc = NULL;
 		nwc = network_check_activity( NULL, 10000 );	// 10s should be enough for reply ...
 		if (nwc==NULL) {
 			err = "Server did not respond!";
 			goto end;
 		}
-		nwc_gameinfo_t *nwgi = dynamic_cast<nwc_gameinfo_t*>(nwc);
+		nwgi = dynamic_cast<nwc_gameinfo_t*>(nwc);
 		if (nwgi==NULL) {
-			err = "Protocoll error (expected NWC_GAMEINFO)";
+			err = "Protocol error (expected NWC_GAMEINFO)";
 			goto end;
 		}
 		if (nwgi->len==0) {
 			err = "Server busy";
 			goto end;
 		}
-		uint32 len = nwgi->len;
-		char filename[1024];
+		len = nwgi->len;
 		sprintf( filename, "client%i-network.sve", nwgi->len );
 		err = network_receive_file( my_client_socket, filename, len );
 
 		// now into gameinfo
-		loadsave_t fd;
 		if(  fd.rd_open( filename )  ) {
 			gameinfo_t *pgi = new gameinfo_t( &fd );
 			*gi = *pgi;
 			delete pgi;
 			fd.close();
 		}
-		remove( filename );
+		else {
+			// some more insets, while things may have failed
+			err = fd.get_last_error() == loadsave_t::FILE_ERROR_FUTURE_VERSION ? "Server version too new" : "Server busy";
+		}
+		dr_remove( filename );
+end:
 		socket_list_t::remove_client( my_client_socket );
 	}
-end:
 	network_close_socket( my_client_socket );
 	if(err) {
 		dbg->warning("network_gameinfo", err);
@@ -242,7 +256,7 @@ end:
 
 const char *network_send_file( uint32 client_id, const char *filename )
 {
-	FILE *fp = fopen(filename,"rb");
+	FILE *fp = dr_fopen(filename,"rb");
 	if (fp == NULL) {
 		dbg->warning("network_send_file", "could not open file %s", filename);
 		return "Could not open file";
@@ -283,7 +297,7 @@ const char *network_send_file( uint32 client_id, const char *filename )
 	fclose(fp);
 	return NULL;
 error:
-	// an error occured: close file
+	// an error occurred: close file
 	fclose(fp);
 	return "Client closed connection during transfer";
 }
@@ -309,7 +323,7 @@ const char *network_http_post( const char *address, const char *name, const char
 				"Content-Length: %d\r\n\r\n%s";
 		if ((strlen(format) + strlen(name) + strlen(address) + strlen(poststr) + strlen(QUOTEME(REVISION))) > 4060) {
 			// We will get a buffer overwrite here if we continue
-			return "Error: String too long";
+			dbg->fatal( "network_http_post", "Error: String too long (>4096)" );
 		}
 		DBG_MESSAGE("network_http_post", "2");
 		char request[4096];
@@ -434,7 +448,7 @@ const char *network_http_get ( const char* address, const char* name, cbuffer_t&
 		}
 
 		// Make buffer to receive data into
-		char* buffer = new char[length];
+		char* buffer = new char[length+1];
 		uint16 bytesreceived = 0;
 
 		if (  !network_receive_data( my_client_socket, buffer, length, bytesreceived, 10000 )  ) {
@@ -444,6 +458,7 @@ const char *network_http_get ( const char* address, const char* name, cbuffer_t&
 			err = "Error: Bytes received does not match length!";
 		}
 		else {
+			buffer[length] = 0;
 			local.append( buffer, length );
 		}
 

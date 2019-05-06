@@ -7,12 +7,14 @@
 #include "../utils/plainstring.h"
 #include "../script/dynamic_string.h"
 #include "../dataobj/ribi.h"
+#include "../convoihandle_t.h"
 
 class loadsave_t;
 class stadt_t;
 class fabrik_t;
 class karte_t;
 class schedule_t;
+class depot_t;
 
 /**
  * @class scenario_t
@@ -39,7 +41,6 @@ private:
 
 	/// the world we are scripting in
 	karte_t *welt;
-
 
 	/// name of scenario, files are searched in scenario_path/scenario_name/...
 	/// e.g. my_scenario
@@ -229,6 +230,12 @@ public:
 	bool is_scripted() const { return what_scenario == SCRIPTED  ||  what_scenario == SCRIPTED_NETWORK; }
 
 	/**
+	 * compiles and executes given string
+	 * @returns error msg (or NULL if succeeded)
+	 */
+	const char* eval_string(const char* squirrel_string) const;
+
+	/**
 	 * Get percentage of scenario completion. Does not call script to update this value.
 	 * On clients: call server for update via dynamic_string logic.
 	 * Returns percentage of scenario completion.
@@ -277,9 +284,9 @@ public:
 	void update_scenario_texts();
 
 	/**
-	 * opens scenario info window at result tab
+	 * opens scenario info window at tab @p tab.
 	 */
-	bool open_info_win() const;
+	bool open_info_win(const char* tab = "result") const;
 
 
 	/**
@@ -408,6 +415,17 @@ public:
 	 */
 	const char* is_schedule_allowed(const player_t* player, const schedule_t* schedule);
 
+	/**
+	 * Checks if player can use this convoy.
+	 * Called when player wants to start convoy at depot.
+	 *
+	 * @param player player
+	 * @param cnv convoy
+	 * @param depot depot
+	 *
+	 * @return null if allowed, an error message otherwise
+	 */
+	const char* is_convoy_allowed(const player_t* player, convoihandle_t cnv, depot_t* depot);
 
 	/// @return debug dump of forbidden tools
 	const char* get_forbidden_text();

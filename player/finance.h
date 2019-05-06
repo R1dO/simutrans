@@ -45,7 +45,7 @@ enum transport_type {
 
 
 /**
- * ATC = accounting type commmon (common means data common for all transport types).
+ * ATC = accounting type common (common means data common for all transport types).
  *
  * Supersedes COST_ types, that CAN NOT be distinguished by type of transport-
  * - the data are concerning to whole company
@@ -173,13 +173,13 @@ class finance_t {
  	 * Monthly maintenance cost
  	 * @author Hj. Malthaner
  	 */
-	sint32 maintenance[TT_MAX];
+	sint64 maintenance[TT_MAX];
 
 	/**
 	 * Monthly vehicle maintenance cost per transport type.
  	 * @author jk271
  	 */
-	sint32 vehicle_maintenance[TT_MAX];
+	sint64 vehicle_maintenance[TT_MAX];
 
 public:
 	finance_t(player_t * _player, karte_t * _world);
@@ -188,7 +188,7 @@ public:
 	 * Adds construction cost to finance stats.
 	 * @param amount sum of money
 	 * @param wt way type, e.g. tram_wt
-	 * @param utyp used for distinguishing tranport type of building for accounting purposes, used with buildings only.
+	 * @param utyp used for distinguishing transport type of building for accounting purposes, used with buildings only.
 	 */
 	inline void book_construction_costs(const sint64 amount, const waytype_t wt) {
 		transport_type tt = translate_waytype_to_tt(wt);
@@ -213,7 +213,7 @@ public:
 	 * @param wt - waytype for accounting purposes
 	 * @param utyp - used for distinguishing of transport type of buildings. Used with buildings only.
 	 */
-	inline sint32 book_maintenance(sint32 change, waytype_t const wt)
+	inline sint64 book_maintenance(sint64 change, waytype_t const wt)
 	{
 		transport_type tt = translate_waytype_to_tt(wt);
 		maintenance[tt] += change;
@@ -389,7 +389,7 @@ public:
 	 * @returns maintenance
 	 * @param tt transport type (Truck, Ship Air, ...)
 	 */
-	sint32 get_maintenance(transport_type tt=TT_ALL) const { assert(tt<TT_MAX); return maintenance[tt]; }
+	sint64 get_maintenance(transport_type tt=TT_ALL) const { assert(tt<TT_MAX); return maintenance[tt]; }
 
 	/**
 	 * @returns maintenance scaled with bits_per_month
@@ -432,7 +432,7 @@ public:
 	void increase_account_overdrawn() { account_overdrawn++; }
 
 	/**
-	 * returns true if company bancrupted
+	 * returns true if company is bankrupt
 	 */
 	bool is_bancrupted() const;
 
@@ -488,11 +488,6 @@ public:
 	void update_assets(sint64 delta, waytype_t wt);
 
 private:
-	/// helper method to translate old COST_ constants
-	static int translate_index_cost_to_at(int cost_);
-
-	/// helper method to translate old COST_ constants
-	static int translate_index_cost_to_atc(int cost_index);
 
 	/**
 	 * Translates finance statistics from new format to old one.

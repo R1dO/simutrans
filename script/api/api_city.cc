@@ -34,7 +34,7 @@ vector_tpl<sint64> const& get_city_stat(stadt_t* city, bool monthly, sint32 INDE
 
 SQInteger world_get_next_city(HSQUIRRELVM vm)
 {
-	return generic_get_next(vm, welt->get_staedte().get_count());
+	return generic_get_next(vm, welt->get_cities().get_count());
 }
 
 namespace script_api {
@@ -43,7 +43,7 @@ namespace script_api {
 
 stadt_t* world_get_city_by_index(city_list_t, uint32 index)
 {
-	return index < welt->get_staedte().get_count()  ?  welt->get_staedte()[index] : NULL;
+	return index < welt->get_cities().get_count()  ?  welt->get_cities()[index] : NULL;
 }
 
 call_tool_init set_citygrowth(stadt_t *city, bool allow)
@@ -55,7 +55,7 @@ call_tool_init set_citygrowth(stadt_t *city, bool allow)
 
 call_tool_init city_set_name(stadt_t* city, const char* name)
 {
-	return command_rename(welt->get_public_player(), 't', welt->get_staedte().index_of(city), name);
+	return command_rename(welt->get_public_player(), 't', welt->get_cities().index_of(city), name);
 }
 
 
@@ -100,7 +100,7 @@ void export_city(HSQUIRRELVM vm)
 	/**
 	 * Class to access cities.
 	 */
-	begin_class(vm, "city_x", "extend_get,coord");
+	begin_class(vm, "city_x", "extend_get,coord,ingame_object");
 
 	/**
 	 * Constructor.
@@ -108,9 +108,13 @@ void export_city(HSQUIRRELVM vm)
 	 * @param y y-coordinate
 	 * @typemask (integer,integer)
 	 */
-	// actually defined simutrans/script/script_base.nut
+	// actually defined in simutrans/script/script_base.nut
 	// register_function(..., "constructor", ...);
 
+	/**
+	 * @returns if object is still valid.
+	 */
+	export_is_valid<stadt_t*>(vm); //register_function("is_valid")
 	/**
 	 * Return name of city
 	 * @returns name
@@ -209,8 +213,8 @@ void export_city(HSQUIRRELVM vm)
 	register_method(vm, &stadt_t::get_citygrowth,  "get_citygrowth_enabled");
 
 	/**
-	 * Position of townhall.
-	 * @returns townhall position
+	 * Position of town-hall.
+	 * @returns town-hall position
 	 */
 	register_method(vm, &stadt_t::get_pos,         "get_pos");
 

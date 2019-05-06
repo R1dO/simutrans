@@ -55,7 +55,7 @@ public:
 	/* Constants
 	 * @author prissi
 	 */
-	enum { max_vehicle=4, max_rail_vehicle = 24 };
+	enum { default_vehicle_length=4};
 
 	enum states {INITIAL,
 		EDIT_SCHEDULE,
@@ -146,7 +146,7 @@ private:
 	* Convoi owner
 	* @author Hj. Malthaner
 	*/
-	player_t *owner_p;
+	player_t *owner;
 
 	/**
 	* Current map
@@ -202,21 +202,21 @@ private:
 
 	/**
 	* Overall performance.
-	* Is not stored, but is calculated from individual functions
+	* Not stored, but calculated from individual parts
 	* @author Hj. Malthaner
 	*/
 	uint32 sum_power;
 
 	/**
 	* Overall performance with Gear.
-	* Is not stored, but is calculated from individual functions
+	* Not stored, but calculated from individual parts
 	* @author prissi
 	*/
 	sint32 sum_gear_and_power;
 
 	/* sum_weight: unloaded weight of all vehicles *
 	* sum_gesamtweight: total weight of all vehicles *
-	* Are not stored, but are calculated from individual weights
+	* Not stored, but calculated from individual weights
 	* when loading/driving.
 	* @author Hj. Malthaner, prissi
 	*/
@@ -496,7 +496,7 @@ public:
 	*/
 	convoi_t(loadsave_t *file);
 
-	convoi_t(player_t* player_);
+	convoi_t(player_t* player);
 
 	virtual ~convoi_t();
 
@@ -603,7 +603,7 @@ public:
 	 * all other stuff => convoi_t::step()
 	 * @author Hj. Malthaner
 	 */
-	sync_result sync_step(uint32 delta_t);
+	sync_result sync_step(uint32 delta_t) OVERRIDE;
 
 	/**
 	 * All things like route search or loading, that may take a little
@@ -691,7 +691,7 @@ public:
 	* @return Owner of this convoi
 	* @author Hj. Malthaner
 	*/
-	player_t * get_owner() const { return owner_p; }
+	player_t * get_owner() const { return owner; }
 
 	/**
 	* Opens an information window
@@ -856,7 +856,7 @@ public:
 	void set_next_reservation_index(uint16 n);
 
 	/* the current state of the convoi */
-	COLOR_VAL get_status_color() const;
+	PIXVAL get_status_color() const;
 
 	// returns tiles needed for this convoi
 	uint16 get_tile_length() const;
@@ -883,7 +883,7 @@ public:
 	uint32 get_average_kmh() const;
 
 	// Overtaking for convois
-	virtual bool can_overtake(overtaker_t *other_overtaker, sint32 other_speed, sint16 steps_other);
+	bool can_overtake(overtaker_t *other_overtaker, sint32 other_speed, sint16 steps_other) OVERRIDE;
 };
 
 #endif

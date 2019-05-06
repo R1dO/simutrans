@@ -27,7 +27,7 @@ private:
 		CHECK_CONVOI
 	};
 
-	// vars für die KI
+	// vars for the KI
 	state state;
 
 	// we will use this vehicle!
@@ -36,7 +36,7 @@ private:
 	// and the convoi will run on this track:
 	const way_desc_t *road_weg ;
 
-	// time to wait before next contruction
+	// time to wait before next construction
 	sint32 next_construction_steps;
 
 	/* start and end stop position (and their size) */
@@ -44,7 +44,7 @@ private:
 
 	const stadt_t *start_stadt;
 	const stadt_t *end_stadt;	// target is town
-	const gebaeude_t *end_ausflugsziel;
+	const gebaeude_t *end_attraction;
 	fabrik_t *ziel;
 
 	// marker field
@@ -55,7 +55,7 @@ private:
 	koord find_area_for_hub( const koord lo, const koord ru, const koord basis ) const;
 	koord find_place_for_hub( const stadt_t *s ) const;
 
-	/* builds harbours and ferrys
+	/* builds harbours and ferries
 	 * @author prissi
 	 */
 	koord find_harbour_pos(karte_t* welt, const stadt_t *s );
@@ -64,7 +64,7 @@ private:
 	// builds a simple 3x3 three stop airport with town connection road
 	halthandle_t build_airport(const stadt_t* city, koord pos, int rotate);
 
-	/* builts airports and planes
+	/* build airports and planes
 	 * @author prissi
 	 */
 	bool create_air_transport_vehikel(const stadt_t *start_stadt, const stadt_t *end_stadt);
@@ -81,18 +81,18 @@ public:
 	ai_passenger_t(uint8 nr);
 
 	// this type of AIs identifier
-	virtual uint8 get_ai_id() const { return AI_PASSENGER; }
+	uint8 get_ai_id() const OVERRIDE { return AI_PASSENGER; }
 
 	// cannot do rail
-	virtual void set_rail_transport( bool ) { rail_transport = false; }
+	void set_rail_transport( bool ) OVERRIDE { rail_transport = false; }
 
-	virtual void report_vehicle_problem(convoihandle_t cnv,const koord3d ziel);
+	void report_vehicle_problem(convoihandle_t cnv,const koord3d ziel) OVERRIDE;
 
-	virtual void rdwr(loadsave_t *file);
+	void rdwr(loadsave_t *file) OVERRIDE;
 
-	virtual void finish_rd();
+	void finish_rd() OVERRIDE;
 
-	bool set_active( bool b );
+	bool set_active( bool b ) OVERRIDE;
 
-	void step();
+	void step() OVERRIDE;
 };

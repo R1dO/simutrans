@@ -1,5 +1,5 @@
 /*
- * Header for system independant event handling routines
+ * Header for system independent event handling routines
  *
  * Hj. Malthaner
  */
@@ -53,6 +53,7 @@
 #define SYSTEM_QUIT                   1
 #define SYSTEM_RESIZE                 2
 #define SYSTEM_RELOAD_WINDOWS         3
+#define SYSTEM_THEME_CHANGED          4
 
 /* normal keys have range 0-255, special key follow above 255 */
 /* other would be better for true unicode support :( */
@@ -96,6 +97,7 @@
 
 
 /* macros */
+#define IS_MOUSE(ev) ((ev)->ev_class >= EVENT_CLICK && (ev)->ev_class <= EVENT_DRAG)
 
 #define IS_LEFTCLICK(ev) ((ev)->ev_class == EVENT_CLICK && (ev)->ev_code == MOUSE_LEFTBUTTON)
 #define IS_LEFTRELEASE(ev) ((ev)->ev_class == EVENT_RELEASE && (ev)->ev_code == MOUSE_LEFTBUTTON)
@@ -159,6 +161,11 @@ struct event_t {
 	 * position of last mouse click
 	 */
 	int cx, cy;
+
+	/**
+	 * new window size for SYSTEM_RESIZE
+	 */
+	int size_x, size_y;
 
 	/**
 	 * current mouse button state

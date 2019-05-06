@@ -16,17 +16,19 @@
 #include <wingdi.h>
 #include <mmsystem.h>
 #include <imm.h>
+#include <commdlg.h>
 
 #ifdef __CYGWIN__
 extern int __argc;
 extern char **__argv;
 #endif
 
+#include "simconst.h"
 #include "display/simgraph.h"
 #include "simdebug.h"
 #include "gui/simwin.h"
 #include "gui/gui_frame.h"
-#include "gui/components/gui_komponente.h"
+#include "gui/components/gui_component.h"
 #include "gui/components/gui_textinput.h"
 
 
@@ -38,15 +40,17 @@ extern char **__argv;
 #	define GET_WHEEL_DELTA_WPARAM(wparam) ((short)HIWORD(wparam))
 #endif
 
-// 16 Bit may be much slower than 15 unfourtunately on some hardware
-#define USE_16BIT_DIB
-
 #include "simmem.h"
 #include "simsys_w32_png.h"
 #include "simversion.h"
 #include "simsys.h"
 #include "simevent.h"
 #include "macros.h"
+
+/*
+ * The class name used to configure the main window.
+ */
+static const LPCWSTR WINDOW_CLASS_NAME = L"Simu";
 
 static volatile HWND hwnd;
 static bool is_fullscreen = false;
@@ -56,7 +60,7 @@ static RECT WindowSize = { 0, 0, 0, 0 };
 static RECT MaxSize;
 static HINSTANCE hInstance;
 
-static BITMAPINFO* AllDib;
+static BITMAPINFO* AllDib = NULL;
 static PIXVAL*     AllDibData;
 
 volatile HDC hdc = NULL;
@@ -67,7 +71,7 @@ volatile HDC hdc = NULL;
 HANDLE	hFlushThread=0;
 CRITICAL_SECTION redraw_underway;
 
-// forward decleration
+// forward deceleration
 DWORD WINAPI dr_flush_screen(LPVOID lpParam);
 #endif
 
@@ -126,15 +130,14 @@ static void create_window(DWORD const ex_style, DWORD const style, int const x, 
 	RECT r = { 0, 0, w, h };
 	AdjustWindowRectEx(&r, style, false, ex_style);
 
-#if 0
-	// Try with a wide character window; need the title with full width
-	WCHAR *wSIM_TITLE = new wchar_t[lengthof(SIM_TITLE)];
-	size_t convertedChars = 0;
-	mbstowcs( wSIM_TITLE, SIM_TITLE, lengthof(SIM_TITLE) );
-	hwnd = CreateWindowExW(ex_style, L"Simu", wSIM_TITLE, style, x, y, r.right - r.left, r.bottom - r.top, 0, 0, hInstance, 0);
-#else
-	hwnd = CreateWindowExA(ex_style, "Simu", SIM_TITLE, style, x, y, r.right - r.left, r.bottom - r.top, 0, 0, hInstance, 0);
-#endif
+	// Convert UTF-8 to UTF-16.
+	int const size = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, SIM_TITLE, -1, NULL, 0);
+	LPWSTR const wSIM_TITLE = new WCHAR[size];
+	MultiByteToWideChar(CP_UTF8, 0, SIM_TITLE, -1, wSIM_TITLE, size);
+
+	hwnd = CreateWindowExW(ex_style, WINDOW_CLASS_NAME, wSIM_TITLE, style, x, y, r.right - r.left, r.bottom - r.top, 0, 0, hInstance, 0);
+
+	delete[] wSIM_TITLE;
 
 	ShowWindow(hwnd, SW_SHOW);
 	SetTimer( hwnd, 0, 1111, NULL );	// HACK: so windows thinks we are not dead when processing a timer every 1111 ms ...
@@ -145,7 +148,7 @@ static void create_window(DWORD const ex_style, DWORD const style, int const x, 
 int dr_os_open(int const w, int const h, int fullscreen)
 {
 	MaxSize.right = ((w*x_scale)/32+15) & 0x7FF0;
-	MaxSize.bottom = (h*y_scale)/32+1;
+	MaxSize.bottom = (h*y_scale)/32;
 
 #ifdef MULTI_THREAD
 	InitializeCriticalSection( &redraw_underway );
@@ -162,7 +165,7 @@ int dr_os_open(int const w, int const h, int fullscreen)
 		settings.dmFields = DM_BITSPERPEL | DM_PELSWIDTH | DM_PELSHEIGHT;
 		settings.dmBitsPerPel = COLOUR_DEPTH;
 		settings.dmPelsWidth  = MaxSize.right;
-		settings.dmPelsHeight = MaxSize.bottom-1;
+		settings.dmPelsHeight = MaxSize.bottom;
 		settings.dmDisplayFrequency = 0;
 
 		if(  ChangeDisplaySettings(&settings, CDS_TEST)!=DISP_CHANGE_SUCCESSFUL  ) {
@@ -182,20 +185,20 @@ int dr_os_open(int const w, int const h, int fullscreen)
 		is_fullscreen = fullscreen;
 	}
 	if(  fullscreen  ) {
-		create_window(WS_EX_TOPMOST, WS_POPUP, 0, 0, MaxSize.right, MaxSize.bottom-1);
+		create_window(WS_EX_TOPMOST, WS_POPUP, 0, 0, MaxSize.right, MaxSize.bottom);
 	}
 	else {
-		create_window(0, WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, MaxSize.right, MaxSize.bottom-1);
+		create_window(0, WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, MaxSize.right, MaxSize.bottom);
 	}
 
 	WindowSize.right  = MaxSize.right;
-	WindowSize.bottom = MaxSize.bottom-1;
+	WindowSize.bottom = MaxSize.bottom;
 
 	AllDib = MALLOCF(BITMAPINFO, bmiColors, 3);
 	BITMAPINFOHEADER& header = AllDib->bmiHeader;
 	header.biSize          = sizeof(BITMAPINFOHEADER);
 	header.biWidth         = (w+15) & 0x7FF0;
-	header.biHeight        = h+1;
+	header.biHeight        = h;
 	header.biPlanes        = 1;
 	header.biBitCount      = COLOUR_DEPTH;
 	header.biCompression   = BI_RGB;
@@ -205,15 +208,15 @@ int dr_os_open(int const w, int const h, int fullscreen)
 	header.biClrUsed       = 0;
 	header.biClrImportant  = 0;
 	DWORD* const masks = (DWORD*)AllDib->bmiColors;
-#ifdef USE_16BIT_DIB
+#ifdef RGB555
+	masks[0]               = 0x01;
+	masks[1]               = 0x02;
+	masks[2]               = 0x03;
+#else
 	header.biCompression   = BI_BITFIELDS;
 	masks[0]               = 0x0000F800;
 	masks[1]               = 0x000007E0;
 	masks[2]               = 0x0000001F;
-#else
-	masks[0]               = 0x01;
-	masks[1]               = 0x02;
-	masks[2]               = 0x03;
 #endif
 
 	return header.biWidth;
@@ -242,7 +245,7 @@ void dr_os_close()
 }
 
 
-// reiszes screen
+// resizes screen
 int dr_textur_resize(unsigned short** const textur, int w, int const h)
 {
 #ifdef MULTI_THREAD
@@ -255,23 +258,23 @@ int dr_textur_resize(unsigned short** const textur, int w, int const h)
 		w = 16;
 	}
 
-	int img_w = ((w*32)/x_scale+15)&0x7FF0;
-	int img_h = (h*32)/y_scale;
+	int img_w = w;
+	int img_h = h;
 
-	if(  w > MaxSize.right  ||  h >= MaxSize.bottom  ) {
+	if(  w > (MaxSize.right/x_scale)*32  ||  h >= (MaxSize.bottom/y_scale)*32  ) {
 		// since the query routines that return the desktop data do not take into account a change of resolution
 		free(AllDibData);
 		AllDibData = NULL;
-		MaxSize.right = w;
-		MaxSize.bottom = h+1;
+		MaxSize.right = (w*32)/x_scale;
+		MaxSize.bottom = ((h+1)*32)/y_scale;
 		AllDibData = MALLOCN(PIXVAL, img_w * img_h);
 		*textur = (unsigned short*)AllDibData;
 	}
 
 	AllDib->bmiHeader.biWidth  = img_w;
 	AllDib->bmiHeader.biHeight = img_h;
-	WindowSize.right           = w;
-	WindowSize.bottom          = h;
+	WindowSize.right           = (w*32)/x_scale;
+	WindowSize.bottom          = (h*32)/y_scale;
 
 #ifdef MULTI_THREAD
 	LeaveCriticalSection( &redraw_underway );
@@ -297,16 +300,16 @@ unsigned short *dr_textur_init()
  */
 unsigned int get_system_color(unsigned int r, unsigned int g, unsigned int b)
 {
-#ifdef USE_16BIT_DIB
-	return ((r & 0x00F8) << 8) | ((g & 0x00FC) << 3) | (b >> 3);
-#else
+#ifdef RGB555
 	return ((r & 0x00F8) << 7) | ((g & 0x00F8) << 2) | (b >> 3); // 15 Bit
+#else
+	return ((r & 0x00F8) << 8) | ((g & 0x00FC) << 3) | (b >> 3);
 #endif
 }
 
 
 #ifdef MULTI_THREAD
-// multhreaded screen copy ...
+// multithreaded screen copy ...
 DWORD WINAPI dr_flush_screen(LPVOID /*lpParam*/)
 {
 	while(1) {
@@ -351,13 +354,32 @@ void dr_flush()
 
 void dr_textur(int xp, int yp, int w, int h)
 {
-	// make really sure we are not beyond screen coordinates
-	int xscr = (xp*x_scale)/32;
-	int yscr = (yp*y_scale)/32;
-	w = min( xp+w, AllDib->bmiHeader.biWidth ) - xp;
-	h = min( yp+h, AllDib->bmiHeader.biHeight ) - yp;
-	if(  h>1  &&  w>0  ) {
-		StretchDIBits(hdc, xscr, yscr, (w*x_scale)/32, (h*y_scale)/32, xp, yp+h+1, w, -h, AllDibData, AllDib, DIB_RGB_COLORS, SRCCOPY);
+	if(   x_scale==32  &&  y_scale==32  ) {
+		// make really sure we are not beyond screen coordinates
+		w = min( xp+w, AllDib->bmiHeader.biWidth ) - xp;
+		h = min( yp+h, AllDib->bmiHeader.biHeight ) - yp;
+		if(  h>1  &&  w>0  ) {
+			StretchDIBits(hdc, xp, yp, w, h, xp, yp+h+1, w, -h, AllDibData, AllDib, DIB_RGB_COLORS, SRCCOPY);
+		}
+	}
+	else {
+		// align on 32 border to avoid rounding errors
+		w += (xp % 32);
+		h += (yp % 32);
+		w = (w+31) & 0xFFE0;
+		h = (h+31) & 0xFFE0;
+		xp &= 0xFFE0;
+		yp &= 0xFFE0;
+		int xscr = (xp/32)*x_scale;
+		int yscr = (yp/32)*y_scale;
+		// make really sure we are not beyond screen coordinates
+		w = min( xp+w, AllDib->bmiHeader.biWidth ) - xp;
+		h = min( yp+h, AllDib->bmiHeader.biHeight ) - yp;
+		if(  h>1  &&  w>0  ) {
+			SetStretchBltMode( hdc, HALFTONE );
+			SetBrushOrgEx( hdc, 0, 0, NULL );
+			StretchDIBits(hdc, xscr, yscr, (w*x_scale)/32, (h*y_scale)/32, xp, yp+h+1, w, -h, AllDibData, AllDib, DIB_RGB_COLORS, SRCCOPY);
+		}
 	}
 }
 
@@ -387,14 +409,14 @@ void set_pointer(int loading)
  */
 int dr_screenshot(const char *filename, int x, int y, int w, int h)
 {
-#if defined USE_16BIT_DIB
-	int const bpp = COLOUR_DEPTH;
-#else
+#if defined RGB555
 	int const bpp = 15;
+#else
+	int const bpp = COLOUR_DEPTH;
 #endif
 	if (!dr_screenshot_png(filename, w, h, AllDib->bmiHeader.biWidth, (unsigned short*)AllDibData+x+y*AllDib->bmiHeader.biWidth, bpp)) {
 		// not successful => save full screen as BMP
-		if (FILE* const fBmp = fopen(filename, "wb")) {
+		if (FILE* const fBmp = dr_fopen(filename, "wb")) {
 			BITMAPFILEHEADER bf;
 
 			// since the number of drawn pixel can be smaller than the actual width => only use the drawn pixel for bitmap
@@ -411,7 +433,7 @@ int dr_screenshot(const char *filename, int x, int y, int w, int h)
 			fwrite(AllDib, sizeof(AllDib->bmiHeader) + sizeof(*AllDib->bmiColors) * 3, 1, fBmp);
 
 			for (LONG i = 0; i < AllDib->bmiHeader.biHeight; ++i) {
-				// row must be alsway even number of pixel
+				// row must be always even number of pixel
 				fwrite(AllDibData + (AllDib->bmiHeader.biHeight - 1 - i) * old_width, (AllDib->bmiHeader.biWidth + 1) & 0xFFFE, 2, fBmp);
 			}
 			AllDib->bmiHeader.biWidth = old_width;
@@ -471,16 +493,16 @@ LRESULT WINAPI WindowProc(HWND this_hwnd, UINT msg, WPARAM wParam, LPARAM lParam
 					MEMZERO(settings);
 					settings.dmSize = sizeof(settings);
 					settings.dmFields = DM_BITSPERPEL | DM_PELSWIDTH | DM_PELSHEIGHT;
-#if defined USE_16BIT_DIB
-					settings.dmBitsPerPel = COLOUR_DEPTH;
-#else
+#ifdef RGB555
 					settings.dmBitsPerPel = 15;
+#else
+					settings.dmBitsPerPel = COLOUR_DEPTH;
 #endif
 					settings.dmPelsWidth  = MaxSize.right;
 					settings.dmPelsHeight = MaxSize.bottom;
 					settings.dmDisplayFrequency = 0;
 
-					// should be alsway sucessful, since it worked as least once ...
+					// should be always successful, since it worked as least once ...
 					ChangeDisplaySettings(&settings, CDS_FULLSCREEN);
 					is_not_top = false;
 
@@ -561,7 +583,7 @@ LRESULT WINAPI WindowProc(HWND this_hwnd, UINT msg, WPARAM wParam, LPARAM lParam
 			sys_event.code = GET_WHEEL_DELTA_WPARAM(wParam) > 0 ? SIM_MOUSE_WHEELUP : SIM_MOUSE_WHEELDOWN;
 			sys_event.key_mod = ModifierKeys();
 			/* the returned coordinate in LPARAM are absolute coordinates, which will deeply confuse simutrans
-			 * we just reuse the coordinates we used the last time by not chaning mx/my ...
+			 * we just reuse the coordinates we used the last time by not changing mx/my ...
 			 */
 			return 0;
 
@@ -581,26 +603,28 @@ LRESULT WINAPI WindowProc(HWND this_hwnd, UINT msg, WPARAM wParam, LPARAM lParam
 				sys_event.type = SIM_SYSTEM;
 				sys_event.code = SYSTEM_RESIZE;
 
-				sys_event.mx = ((LOWORD(lParam) + 1)*32)/x_scale;
-				if (sys_event.mx <= 0) {
-					sys_event.mx = 4;
+				sys_event.size_x = (LOWORD(lParam)*32)/x_scale;
+				if (sys_event.size_x <= 0) {
+					sys_event.size_x = 4;
 				}
 
-				sys_event.my = (HIWORD(lParam)*32)/y_scale;
-				if (sys_event.my <= 1) {
-					sys_event.my = 64;
+				sys_event.size_y = (HIWORD(lParam)*32)/y_scale;
+				if (sys_event.size_y <= 1) {
+					sys_event.size_y = 64;
 				}
 			}
 			break;
 
 		case WM_PAINT: {
-			PAINTSTRUCT ps;
-			HDC hdcp;
+			if (AllDib != NULL) {
+				PAINTSTRUCT ps;
+				HDC hdcp;
 
-			hdcp = BeginPaint(hwnd, &ps);
-			AllDib->bmiHeader.biHeight = (WindowSize.bottom*32)/y_scale;
-			StretchDIBits(hdcp, 0, 0, WindowSize.right, WindowSize.bottom, 0, AllDib->bmiHeader.biHeight + 1, AllDib->bmiHeader.biWidth, -AllDib->bmiHeader.biHeight, AllDibData, AllDib, DIB_RGB_COLORS, SRCCOPY);
-			EndPaint(this_hwnd, &ps);
+				hdcp = BeginPaint(hwnd, &ps);
+				AllDib->bmiHeader.biHeight = (WindowSize.bottom*32)/y_scale;
+				StretchDIBits(hdcp, 0, 0, WindowSize.right, WindowSize.bottom, 0, AllDib->bmiHeader.biHeight + 1, AllDib->bmiHeader.biWidth, -AllDib->bmiHeader.biHeight, AllDibData, AllDib, DIB_RGB_COLORS, SRCCOPY);
+				EndPaint(this_hwnd, &ps);
+			}
 			break;
 		}
 
@@ -662,7 +686,10 @@ LRESULT WINAPI WindowProc(HWND this_hwnd, UINT msg, WPARAM wParam, LPARAM lParam
 			break;
 
 		case WM_IME_SETCONTEXT:
-			return DefWindowProc( this_hwnd, msg, wParam, lParam&~ISC_SHOWUICOMPOSITIONWINDOW );
+			// attempt to avoid crash at windows 1809> just not call DefWinodwsProc seems to work for SDL2 ...
+//			DefWindowProc( this_hwnd, msg, wParam, lParam&~ISC_SHOWUICOMPOSITIONWINDOW );
+			lParam = 0;
+			return 0;
 
 		case WM_IME_STARTCOMPOSITION:
 			break;
@@ -976,7 +1003,6 @@ int CALLBACK WinMain(HINSTANCE const hInstance, HINSTANCE, LPSTR, int)
 	WNDCLASSW wc;
 	bool timer_is_set = false;
 
-	wc.lpszClassName = L"Simu";
 	wc.style = CS_HREDRAW | CS_VREDRAW;
 	wc.lpfnWndProc = WindowProc;
 	wc.cbClsExtra = 0;
@@ -986,11 +1012,12 @@ int CALLBACK WinMain(HINSTANCE const hInstance, HINSTANCE, LPSTR, int)
 	wc.hCursor = LoadCursor(NULL, IDC_ARROW);
 	wc.hbrBackground = (HBRUSH) (COLOR_BACKGROUND + 1);
 	wc.lpszMenuName = NULL;
+	wc.lpszClassName = WINDOW_CLASS_NAME;
 	RegisterClassW(&wc);
 
 	GetWindowRect(GetDesktopWindow(), &MaxSize);
 
-	// maybe set timer to 1ms intervall on Win2k upwards ...
+	// maybe set timer to 1ms interval on Win2k upwards ...
 	{
 		OSVERSIONINFO osinfo;
 		osinfo.dwOSVersionInfoSize = sizeof(OSVERSIONINFO);

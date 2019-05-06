@@ -2,7 +2,7 @@
 #define gui_image_list_h
 
 #include "gui_action_creator.h"
-#include "gui_komponente.h"
+#include "gui_component.h"
 #include "../../tpl/vector_tpl.h"
 #include "../../display/simimg.h"
 #include "../../simcolor.h"
@@ -32,10 +32,10 @@ public:
 		const char *text;  ///< can be NULL, used to store external data
 		image_id   image;  ///< the image
 		sint16     count;  ///< display this number as overlay
-		COLOR_VAL  lcolor; ///< color of left half of color bar, use EMPTY_IMAGE_BAR to display no bar
-		COLOR_VAL  rcolor; ///< color of right half of color bar, use EMPTY_IMAGE_BAR to display no bar
+		PIXVAL     lcolor; ///< color of left half of color bar, use EMPTY_IMAGE_BAR to display no bar
+		PIXVAL     rcolor; ///< color of right half of color bar, use EMPTY_IMAGE_BAR to display no bar
 
-		image_data_t(const char *text_, image_id image_, sint16 count_=0, COLOR_VAL lcolor_=EMPTY_IMAGE_BAR, COLOR_VAL rcolor_=EMPTY_IMAGE_BAR)
+		image_data_t(const char *text_, image_id image_, sint16 count_=0, PIXVAL lcolor_=EMPTY_IMAGE_BAR, PIXVAL rcolor_=EMPTY_IMAGE_BAR)
 		: text(text_), image(image_), count(count_), lcolor(lcolor_), rcolor(rcolor_) {}
 	};
 
@@ -98,7 +98,7 @@ public:
 	 * Draw/record the picture
 	 * @author Hj. Malthaner
 	 */
-	virtual void draw(scr_coord offset);
+	void draw(scr_coord offset) OVERRIDE;
 
 	/**
 	 * Looks for the image at given position.
@@ -110,6 +110,10 @@ public:
 	int index_at(scr_coord parent_pos, int xpos, int ypos) const;
 
 	void recalc_size();
+
+	// FIXME
+	scr_size get_min_size() const OVERRIDE { return get_size(); }
+	scr_size get_max_size() const OVERRIDE { return get_size(); }
 };
 
 #endif

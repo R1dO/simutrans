@@ -16,9 +16,9 @@
 #include "display/simgraph.h"
 #include "simtypes.h"
 
-#include "bauer/warenbauer.h"
+#include "bauer/goods_manager.h"
 
-#include "besch/ware_besch.h"
+#include "descriptor/goods_desc.h"
 
 #include "dataobj/koord.h"
 
@@ -107,10 +107,10 @@ private:
 	 */
 	void init_financial_history();
 
-	COLOR_VAL status_color, last_status_color;
+	PIXVAL status_color, last_status_color;
 	sint16 last_bar_count;
 	vector_tpl<KOORD_VAL> last_bar_height; // caches the last height of the station bar for each good type drawn in display_status(). used for dirty tile management
-	uint32 capacity[3]; // passenger, post, goods
+	uint32 capacity[3]; // passenger, mail, goods
 	uint8 overcrowded[256/8]; ///< bit field for each goods type (max 256)
 
 	static uint8 status_step;	// NONE or SCHEDULING or REROUTING
@@ -305,7 +305,7 @@ private:
 
 
 	// Array with different categories that contains all waiting goods at this stop
-	vector_tpl<ware_t> **waren;
+	vector_tpl<ware_t> **cargo;
 
 	/**
 	 * Liste der angeschlossenen Fabriken
@@ -313,7 +313,7 @@ private:
 	 */
 	slist_tpl<fabrik_t *> fab_list;
 
-	player_t *owner_p;
+	player_t *owner;
 	static karte_ptr_t welt;
 
 	/**
@@ -389,7 +389,7 @@ public:
 	 * Calculates a status color for status bars
 	 * @author Hj. Malthaner
 	 */
-	COLOR_VAL get_status_farbe() const { return status_color; }
+	PIXVAL get_status_farbe() const { return status_color; }
 
 	/**
 	 * Draws some nice colored bars giving some status information
@@ -422,15 +422,17 @@ public:
 
 	void rotate90( const sint16 y_size );
 
-	player_t *get_owner() const {return owner_p;}
+	player_t *get_owner() const {return owner;}
 
 	// just for info so far
 	sint64 calc_maintenance() const;
 
-	void make_public_and_join( player_t *player );
+	void merge_halt( halthandle_t halt_to_join );
 
-	vector_tpl<connection_t> const& get_pax_connections()  const { return all_links[warenbauer_t::INDEX_PAS].connections;  }
-	vector_tpl<connection_t> const& get_mail_connections() const { return all_links[warenbauer_t::INDEX_MAIL].connections; }
+	void change_owner( player_t *player );
+
+	vector_tpl<connection_t> const& get_pax_connections()  const { return all_links[goods_manager_t::INDEX_PAS].connections;  }
+	vector_tpl<connection_t> const& get_mail_connections() const { return all_links[goods_manager_t::INDEX_MAIL].connections; }
 
 	// returns the matching warenziele (goods objectives/destinations)
 	vector_tpl<connection_t> const& get_connections(uint8 const catg_index) const { return all_links[catg_index].connections; }
@@ -530,22 +532,22 @@ public:
 	void search_route_resumable( ware_t &ware );
 
 	bool get_pax_enabled()  const { return enables & PAX;  }
-	bool get_post_enabled() const { return enables & POST; }
+	bool get_mail_enabled() const { return enables & POST; }
 	bool get_ware_enabled() const { return enables & WARE; }
 
 	// check, if we accepts this good
 	// often called, thus inline ...
-	bool is_enabled( const ware_besch_t *wtyp ) const {
+	bool is_enabled( const goods_desc_t *wtyp ) const {
 		return is_enabled(wtyp->get_catg_index());
 	}
 
 	// a separate version for checking with goods category index
 	bool is_enabled( const uint8 catg_index ) const
 	{
-		if (catg_index == warenbauer_t::INDEX_PAS) {
+		if (catg_index == goods_manager_t::INDEX_PAS) {
 			return enables&PAX;
 		}
-		else if(catg_index == warenbauer_t::INDEX_MAIL) {
+		else if(catg_index == goods_manager_t::INDEX_MAIL) {
 			return enables&POST;
 		}
 		return enables&WARE;
@@ -594,6 +596,12 @@ public:
 	koord get_init_pos() const { return init_pos; }
 	koord get_basis_pos() const;
 	koord3d get_basis_pos3d() const;
+	
+public:
+	void recalc_basis_pos();
+
+	// returns ground closest to this coordinate
+	grund_t *get_ground_closest_to( const koord here ) const;
 
 	/* return the closest square that belongs to this halt
 	 * @author prissi
@@ -607,22 +615,22 @@ public:
 	 * gibt Gesamtmenge derware vom typ typ zurück
 	 * @author Hj. Malthaner
 	 */
-	uint32 get_ware_summe(const ware_besch_t *warentyp) const;
+	uint32 get_ware_summe(const goods_desc_t *warentyp) const;
 
 	/**
 	 * returns total number for a certain position (since more than one factory might connect to a stop)
 	 * @author Hj. Malthaner
 	 */
-	uint32 get_ware_fuer_zielpos(const ware_besch_t *warentyp, const koord zielpos) const;
+	uint32 get_ware_fuer_zielpos(const goods_desc_t *warentyp, const koord zielpos) const;
 
 	/**
 	 * total amount of freight with specified next hop
 	 * @author prissi
 	 */
-	uint32 get_ware_fuer_zwischenziel(const ware_besch_t *warentyp, const halthandle_t zwischenziel) const;
+	uint32 get_ware_fuer_zwischenziel(const goods_desc_t *warentyp, const halthandle_t zwischenziel) const;
 
 	// true, if we accept/deliver this kind of good
-	bool gibt_ab(const ware_besch_t *warentyp) const { return waren[warentyp->get_catg_index()] != NULL; }
+	bool gibt_ab(const goods_desc_t *warentyp) const { return cargo[warentyp->get_catg_index()] != NULL; }
 
 	/* retrieves a ware packet for any destination in the list
 	 * needed, if the factory in question wants to remove something
@@ -638,7 +646,7 @@ public:
 	 * @param sp Company that's requesting the fetch.
 	 * @author Dwachs
 	 */
-	void fetch_goods( slist_tpl<ware_t> &load, const ware_besch_t *good_category, uint32 requested_amount, const schedule_t *schedule, const player_t *player );
+	void fetch_goods( slist_tpl<ware_t> &load, const goods_desc_t *good_category, uint32 requested_amount, const vector_tpl<halthandle_t>& destination_halts);
 
 	/* liefert ware an. Falls die Ware zu wartender Ware dazugenommen
 	 * werden kann, kann ware_t gelöscht werden! D.h. man darf ware nach
@@ -674,8 +682,6 @@ public:
 	* @author prissi
 	*/
 	bool is_reservable(const grund_t *gr, convoihandle_t cnv) const;
-
-	void info(cbuffer_t & buf) const;
 
 	/**
 	 * @param buf the buffer to fill
@@ -791,7 +797,7 @@ public:
 	sint64 get_finance_history(int month, int cost_type) const { return financial_history[month][cost_type]; }
 
 	// flags station for a crowded message at the beginning of next month
-//	void bescheid_station_voll() { enables |= CROWDED; status_color = COL_RED; }  // for now report only serious overcrowding on transfer stops
+//	void bescheid_station_voll() { enables |= CROWDED; status_color = color_idx_to_rgb(COL_RED); }  // for now report only serious overcrowding on transfer stops
 
 	/* marks a coverage area
 	* @author prissi
@@ -809,6 +815,10 @@ public:
 	 */
 	static void init_markers();
 
+	/*
+	 * check if it is in the station coverage
+	 */
+	bool is_halt_covered (const halthandle_t &halt) const;
 };
 
 ENUM_BITSET(haltestelle_t::stationtyp)

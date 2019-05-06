@@ -204,6 +204,9 @@ loadsave_t::~loadsave_t()
 	set_buffered(false);
 	close();
 	delete fd;
+	if(  last_error != FILE_ERROR_OK  ) {
+		dbg->error( "loadsave_t()", "failed %s with error %i", (saving ? "saving" : "reading"), (int)last_error );
+	}
 }
 
 
@@ -267,13 +270,14 @@ void loadsave_t::set_buffered(bool enable)
 bool loadsave_t::rd_open(const char *filename_utf8 )
 {
 	close();
+	last_error = FILE_ERROR_OK; // no error
 
-	const char *filename = dr_utf8_to_system_filename( filename_utf8 );
 	version = 0;
 	mode = zipped;
-	fd->fp = fopen( filename, "rb");
+	fd->fp = dr_fopen(filename_utf8, "rb");
 	if(  fd->fp==NULL  ) {
 		// most likely not existing
+		last_error = FILE_ERROR_NOT_EXISTING;
 		return false;
 	}
 	// now check for BZ2 format
@@ -303,6 +307,7 @@ bool loadsave_t::rd_open(const char *filename_utf8 )
 		}
 		// BZ-Header but wrong data ...
 		if(  !ok  ) {
+			last_error = FILE_ERROR_BZ_CORRUPT;
 			close();
 			return false;
 		}
@@ -311,9 +316,10 @@ bool loadsave_t::rd_open(const char *filename_utf8 )
 	if(  mode!=bzip2  ) {
 		fclose(fd->fp);
 		// and now with zlib ...
-		fd->gzfp = gzopen(filename, "rb");
+		fd->gzfp = dr_gzopen(filename_utf8, "rb");
 		if(fd->gzfp==NULL) {
 			return false;
+			last_error = FILE_ERROR_GZ_CORRUPT;
 		}
 		gzgets(fd->gzfp, buf, 80);
 	}
@@ -321,12 +327,18 @@ bool loadsave_t::rd_open(const char *filename_utf8 )
 
 	if (strstart(buf, SAVEGAME_PREFIX)) {
 		version = int_version(buf + sizeof(SAVEGAME_PREFIX) - 1, &mode, pak_extension);
+		if(  version == 0  ) {
+			close();
+			last_error = FILE_ERROR_NO_VERSION;
+			return false;
+		}
 	}
 	else if (strstart(buf, XML_SAVEGAME_PREFIX)) {
 		mode |= xml;
 		while (lsgetc() != '<') { /* nothing */ }
 		read(buf, sizeof(SAVEGAME_PREFIX) - 1);
 		if (!strstart(buf, SAVEGAME_PREFIX)) {
+			last_error = FILE_ERROR_NO_VERSION;
 			close();
 			// not a simutrans XML file ...
 			return false;
@@ -345,6 +357,11 @@ bool loadsave_t::rd_open(const char *filename_utf8 )
 		*s = 0;
 		int dummy;
 		version = int_version(str, &dummy, pak_extension);
+		if(  version == 0  ) {
+			close();
+			last_error = FILE_ERROR_NO_VERSION;
+			return false;
+		}
 
 		read(buf, sizeof(" pak=\"") - 1);
 		if (version > 0) {
@@ -359,12 +376,29 @@ bool loadsave_t::rd_open(const char *filename_utf8 )
 			*s = 0;
 			while (lsgetc() != '>');
 		}
-	} else {
+
+		/*
+		 * reading future versions will almost certainly lead to exceptions
+		 * so we close here
+		 * It would be nice to give a detailed message what failed (like the fatal error does)
+		 * But this error may happening also in regular installations after running a nighly
+		 * so we just record the failure and return false
+		 */
+		if(  version > (SIM_VERSION_MAJOR*1000 + SIM_SERVER_MINOR)  ) {
+			close();
+			last_error = FILE_ERROR_FUTURE_VERSION;
+			return false;
+		}
+	}
+	else {
 		close();
+		last_error = FILE_ERROR_NO_VERSION;
 		return false;
 	}
+
 	if(mode==text) {
 		close();
+		last_error = FILE_ERROR_NO_VERSION;
 		dbg->error("loadsave_t::rd_open()","text mode no longer supported." );
 		return false;
 	}
@@ -372,7 +406,7 @@ bool loadsave_t::rd_open(const char *filename_utf8 )
 	if(*pak_extension==0) {
 		strcpy( pak_extension, "(unknown)" );
 	}
-	this->filename = filename;
+	this->filename = filename_utf8;
 	return true;
 }
 
@@ -380,20 +414,20 @@ bool loadsave_t::rd_open(const char *filename_utf8 )
 bool loadsave_t::wr_open(const char *filename_utf8, mode_t m, const char *pak_extension, const char *savegame_version)
 {
 	mode = m;
+	last_error = FILE_ERROR_OK; // no error
 	close();
 
-	const char *filename = dr_utf8_to_system_filename( filename_utf8, true );
 	if(  is_zipped()  ) {
 		// using zlib
-		fd->gzfp = gzopen(filename, "wb");
+		fd->gzfp = dr_gzopen(filename_utf8, "wb");
 	}
 	else if(  mode==binary  ) {
 		// no compression
-		fd->fp = fopen(filename, "wb");
+		fd->fp = dr_fopen(filename_utf8, "wb");
 	}
 	else if(  is_bzip2()  ) {
 		// XML or bzip ...
-		fd->fp = fopen(filename, "wb");
+		fd->fp = dr_fopen(filename_utf8, "wb");
 		// the additional magic for bzip2
 		fd->bse = BZ_OK+1;
 		fd->bzfp = NULL;
@@ -407,7 +441,7 @@ bool loadsave_t::wr_open(const char *filename_utf8, mode_t m, const char *pak_ex
 	else {
 		// uncompressed xml should be here ...
 		assert(  mode==xml  );
-		fd->fp = fopen(filename, "wb");
+		fd->fp = dr_fopen(filename_utf8, "wb");
 	}
 
 	// check whether we could open the file
@@ -452,7 +486,7 @@ bool loadsave_t::wr_open(const char *filename_utf8, mode_t m, const char *pak_ex
 		ident = 1;
 	}
 
-	this->filename = filename;
+	this->filename = filename_utf8;
 
 	return true;
 }
@@ -618,6 +652,9 @@ size_t loadsave_t::write(const void *buf, size_t len)
 
 void loadsave_t::flush_buffer(int buf_num)
 {
+#ifdef MULTI_THREAD
+	pthread_mutex_lock(&loadsave_mutex);
+#endif
 	int bse = fd->bse;
 	if(  is_zipped()  ) {
 		gzwrite(fd->gzfp, ls_buf[buf_num], buf_pos[buf_num]);
@@ -629,9 +666,6 @@ void loadsave_t::flush_buffer(int buf_num)
 	else {
 		fwrite(ls_buf[buf_num], 1, buf_pos[buf_num], fd->fp);
 	}
-#ifdef MULTI_THREAD
-	pthread_mutex_lock(&loadsave_mutex);
-#endif
 	if(  is_bzip2()  ) {
 		fd->bse = bse;
 	}
@@ -1315,7 +1349,6 @@ uint32 loadsave_t::int_version(const char *version_text, int * /*mode*/, char *p
 	while(*version_text  &&  *version_text++ != '.')
 		;
 	if(!*version_text) {
-		dbg->fatal( "loadsave_t::int_version()","Really broken version string!" );
 		return 0;
 	}
 
@@ -1324,7 +1357,6 @@ uint32 loadsave_t::int_version(const char *version_text, int * /*mode*/, char *p
 	while(*version_text  &&  *version_text++ != '.')
 		;
 	if(!*version_text) {
-		dbg->fatal( "loadsave_t::int_version()","Really broken version string!" );
 		return 0;
 	}
 

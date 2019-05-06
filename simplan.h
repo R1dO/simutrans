@@ -44,7 +44,7 @@ private:
 
 public:
 	/**
-	 * Constructs a planquadrat with initial capacity of one ground
+	 * Constructs a planquadrat (tile) with initial capacity of one ground
 	 * @author Hansjörg Malthaner
 	 */
 	planquadrat_t() { ground_size = 0; climate_data = 0; data.one = NULL; halt_list_count = 0;  halt_list = NULL; }
@@ -61,7 +61,7 @@ public:
 	* Setzen des "normalen" Bodens auf Kartenniveau
 	* @author V. Meyer
 	*/
-	void kartenboden_setzen(grund_t *bd);
+	void kartenboden_setzen(grund_t *bd, bool startup = false);
 
 	/**
 	* Ersetzt Boden alt durch neu, löscht Boden alt.
@@ -112,7 +112,7 @@ public:
 	inline grund_t *get_kartenboden() const { return (ground_size<=1) ? data.one : data.some[0]; }
 
 	/**
-	* find ground if thing is on this planquadrat
+	* find ground if thing is on this planquadrat (tile)
 	* @return grund_t * with thing or NULL
 	* @author V. Meyer
 	*/
@@ -210,18 +210,25 @@ private:
 	void halt_list_insert_at( halthandle_t halt, uint8 pos );
 
 public:
-	/*
-	* The following three functions takes about 4 bytes of memory per tile but speed up passenger generation
-	* @author prissi
-	*/
-	void add_to_haltlist(halthandle_t halt);
+	/**
+	 * The following three functions takes about 4 bytes of memory per tile but speed up passenger generation
+	 * @author prissi
+	 * @param unsorted if true then halt list will be sorted later by call to sort_haltlist, see karte_t::plans_finish_rd.
+	 */
+	void add_to_haltlist(halthandle_t halt, bool unsorted = false);
 
 	/**
 	* removes the halt from a ground
-	* however this funtion check, whether there is really no other part still reachable
+	* however this function check, whether there is really no other part still reachable
 	* @author prissi
 	*/
 	void remove_from_haltlist(halthandle_t halt);
+
+	/**
+	 * sort list of connected halts, ascending wrt distance to this tile
+	 */
+	void sort_haltlist();
+
 
 	bool is_connected(halthandle_t halt) const;
 
@@ -241,9 +248,20 @@ public:
 
 	void display_obj(const sint16 xpos, const sint16 ypos, const sint16 raster_tile_width, const bool is_global, const sint8 hmin, const sint8 hmax  CLIP_NUM_DEF) const;
 
-	void display_tileoverlay(sint16 xpos, sint16 ypos, const sint8 hmin, const sint8 hmax) const;
-
 	void display_overlay(sint16 xpos, sint16 ypos) const;
+
+	static void toggle_horizontal_clip(CLIP_NUM_DEF0);
+
+	/**
+	 * @brief Update this square for underground view.
+	 *
+	 * Updates this square for underground view. This includes calculating
+	 * calculating new back will images as well as water depth texture.
+	 *
+	 * This method does not modify this square object, but does modify the
+	 * grounds it references.
+	 */
+	void update_underground() const;
 };
 
 #endif

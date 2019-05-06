@@ -36,8 +36,20 @@ gui_textinput_t::gui_textinput_t() :
 	textcol(SYSCOL_EDIT_TEXT),
 	text_dirty(false),
 	cursor_reference_time(0),
-	focus_recieved(false)
+	focus_received(false)
 { }
+
+
+scr_size gui_textinput_t::get_min_size() const
+{
+	return scr_size(16*LINESPACE, LINESPACE+4);
+}
+
+
+scr_size gui_textinput_t::get_max_size() const
+{
+	return scr_size(scr_size::inf.w, LINESPACE+4);
+}
 
 
 /**
@@ -125,10 +137,12 @@ bool gui_textinput_t::infowin_event(const event_t *ev)
 						text_dirty = false;
 						call_listeners((long)1);
 					}
+					/* FALLTHROUGH */
 				case SIM_KEY_TAB:
 					// Knightly : focus is going to be lost -> reset cursor positions to select the whole text by default
 					head_cursor_pos = len;
 					tail_cursor_pos = 0;
+					/* FALLTHROUGH */
 				case SIM_KEY_ESCAPE:
 					return false;
 
@@ -359,8 +373,7 @@ bool gui_textinput_t::infowin_event(const event_t *ev)
 			}
 
 			while(  *in  ) {
-				in_pos = 0;
-				utf16 uc = utf8_to_utf16( in, &in_pos );
+				utf32 const uc = utf8_decoder_t::decode(in, in_pos);
 
 				text_dirty = true;
 
@@ -387,7 +400,7 @@ bool gui_textinput_t::infowin_event(const event_t *ev)
 				}
 
 				// insert into text?
-				if (head_cursor_pos < len) {
+				if(  len>0  &&  head_cursor_pos < len  ) {
 					for(  sint64 pos=len+num_letter;  pos>=(sint64)head_cursor_pos;  pos--  ) {
 						text[pos] = text[pos-num_letter];
 					}
@@ -405,6 +418,12 @@ bool gui_textinput_t::infowin_event(const event_t *ev)
 		}
 	}
 	else if(  IS_LEFTCLICK(ev)  ) {
+		// since now the focus could be received while the mouse  no there, we must release it
+		scr_rect this_comp( get_size() );
+		if(  !this_comp.contains(scr_coord(ev->cx,ev->cy) )  ) {
+			// not us, just in old focus from previous selection or tab
+			return false;
+		}
 		// acting on release causes unwanted recalculations of cursor position for long strings and (scroll_offset>0)
 		// moreover, only (click) or (release) event happened inside textinput, the other one could lie outside
 		// Knightly : use mouse *click* position; update both head and tail cursors
@@ -416,6 +435,12 @@ bool gui_textinput_t::infowin_event(const event_t *ev)
 		return true;
 	}
 	else if(  IS_LEFTDRAG(ev)  ) {
+		// since now the focus could be received while the mouse  no there, we must release it
+		scr_rect this_comp( get_size() );
+		if(  !this_comp.contains(scr_coord(ev->cx,ev->cy) )  ) {
+			// not us, just in old focus from previous selection or tab
+			return false;
+		}
 		// Knightly : use mouse *move* position; update head cursor only in order to enable text selection
 		head_cursor_pos = 0;
 		if(  text  ) {
@@ -425,6 +450,12 @@ bool gui_textinput_t::infowin_event(const event_t *ev)
 		return true;
 	}
 	else if(  IS_LEFTDBLCLK(ev)  ) {
+		// since now the focus could be received while the mouse  no there, we must release it
+		scr_rect this_comp( get_size() );
+		if(  !this_comp.contains(scr_coord(ev->cx,ev->cy) )  ) {
+			// not us, just in old focus from previous selection or tab
+			return false;
+		}
 		// Knightly : select a word as delimited by spaces
 		// for tail cursor pos -> skip over all contiguous non-space characters to the left
 		const char* tmp_text = text + tail_cursor_pos;
@@ -441,6 +472,12 @@ bool gui_textinput_t::infowin_event(const event_t *ev)
 		}
 	}
 	else if(  IS_LEFTTPLCLK(ev)  ) {
+		// since now the focus could be received while the mouse  no there, we must release it
+		scr_rect this_comp( get_size() );
+		if(  !this_comp.contains(scr_coord(ev->cx,ev->cy) )  ) {
+			// not us, just in old focus from previous selection or tab
+			return false;
+		}
 		// Knightly : select the whole text
 		head_cursor_pos = strlen(text);
 		tail_cursor_pos = 0;
@@ -473,7 +510,7 @@ void gui_textinput_t::draw(scr_coord offset)
 void gui_textinput_t::display_with_focus(scr_coord offset, bool has_focus)
 {
 	// check if focus state has changed
-	if(  focus_recieved!=has_focus  ) {
+	if(  focus_received!=has_focus  ) {
 		if(  has_focus  ) {
 			// update reference time for cursor blinking if focus has just been received
 			cursor_reference_time = dr_time();
@@ -488,7 +525,7 @@ void gui_textinput_t::display_with_focus(scr_coord offset, bool has_focus)
 		else {
 			dr_stop_textinput();
 		}
-		focus_recieved = has_focus;
+		focus_received = has_focus;
 	}
 
 	display_with_cursor( offset, has_focus, (has_focus  &&  ((dr_time()-cursor_reference_time)&512ul)==0) );
@@ -534,33 +571,25 @@ void gui_textinput_t::display_with_cursor(scr_coord offset, bool cursor_active, 
 		}
 
 		// set clipping to be within textinput button
-		const clip_dimension old_clip = display_get_clip_wh();
-
 		const int text_clip_x = pos.x + offset.x + 1;
 		const int text_clip_w = size.w - 2;
 		const int text_clip_y = pos.y + offset.y + 1;
 		const int text_clip_h = size.h - 2;
-		// something to draw?
-		if (  text_clip_x>=old_clip.xx  ||  text_clip_x+text_clip_w<=old_clip.x  ||  text_clip_w<=0  ||
-			  text_clip_y>=old_clip.yy  ||  text_clip_y+text_clip_h<=old_clip.y  ||  text_clip_h<=0     ) {
-				return;
-		}
-		const int clip_x = old_clip.x>text_clip_x ? old_clip.x : text_clip_x;
-		const int clip_y = old_clip.y>text_clip_y ? old_clip.y : text_clip_y;
-		display_set_clip_wh( clip_x, clip_y, min(old_clip.xx, text_clip_x+text_clip_w)-clip_x, min(old_clip.yy, text_clip_y+text_clip_h)-clip_y );
+
+		PUSH_CLIP_FIT(text_clip_x, text_clip_y, text_clip_w, text_clip_h);
 
 		const int x_base_offset = pos.x+offset.x+2-scroll_offset;
 		const int y_offset = pos.y+offset.y+D_GET_CENTER_ALIGN_OFFSET(LINESPACE,size.h);
 
 		// display text (before composition)
-		display_text_proportional_len_clip(x_base_offset, y_offset, text, ALIGN_LEFT, textcol, true, head_cursor_pos);
+		display_text_proportional_len_clip_rgb(x_base_offset, y_offset, text, ALIGN_LEFT | DT_CLIP, textcol, true, head_cursor_pos);
 		int x_offset = proportional_string_len_width(text, head_cursor_pos);
 
 		// IME text to display?
 		if(  composition.len()  ) {
-			assert(head_cursor_pos==tail_cursor_pos);
+//			assert(head_cursor_pos==tail_cursor_pos);
 
-			display_proportional_clip(x_base_offset+x_offset, y_offset, composition.get_str(), ALIGN_LEFT, textcol, true);
+			display_proportional_clip_rgb(x_base_offset+x_offset, y_offset, composition.get_str(), ALIGN_LEFT | DT_CLIP, textcol, true);
 
 			// draw underline
 			int composition_width = proportional_string_width(composition.get_str());
@@ -569,14 +598,14 @@ void gui_textinput_t::display_with_cursor(scr_coord offset, bool cursor_active, 
 			// mark targeted part in a similar manner to selected text
 			int start_offset = proportional_string_len_width(composition.get_str(), composition_target_start);
 			int highlight_width = proportional_string_len_width(composition.get_str()+composition_target_start, composition_target_length);
-			display_fillbox_wh_clip(x_base_offset+x_offset+start_offset, y_offset, highlight_width, LINESPACE, SYSCOL_EDIT_BACKGROUND_SELECTED, true);
-			display_text_proportional_len_clip(x_base_offset+x_offset+start_offset, y_offset, composition.get_str()+composition_target_start, ALIGN_LEFT|DT_CLIP, SYSCOL_EDIT_TEXT_SELECTED, false, composition_target_length);
+			display_fillbox_wh_clip_rgb(x_base_offset+x_offset+start_offset, y_offset, highlight_width, LINESPACE, SYSCOL_EDIT_BACKGROUND_SELECTED, true);
+			display_text_proportional_len_clip_rgb(x_base_offset+x_offset+start_offset, y_offset, composition.get_str()+composition_target_start, ALIGN_LEFT|DT_CLIP, SYSCOL_EDIT_TEXT_SELECTED, false, composition_target_length);
 
 			x_offset += composition_width;
 		}
 
 		// display text (after composition)
-		display_proportional_clip(x_base_offset+x_offset, y_offset, text+head_cursor_pos, ALIGN_LEFT, textcol, true);
+		display_proportional_clip_rgb(x_base_offset+x_offset, y_offset, text+head_cursor_pos, ALIGN_LEFT | DT_CLIP, textcol, true);
 
 		if(  cursor_active  ) {
 			// Knightly : display selected text block with light grey text on charcoal bounding box
@@ -585,18 +614,18 @@ void gui_textinput_t::display_with_cursor(scr_coord offset, bool cursor_active, 
 				const size_t end_pos = ::max(head_cursor_pos, tail_cursor_pos);
 				const scr_coord_val start_offset = proportional_string_len_width(text, start_pos);
 				const scr_coord_val highlight_width = proportional_string_len_width(text+start_pos, end_pos-start_pos);
-				display_fillbox_wh_clip(x_base_offset+start_offset, y_offset, highlight_width, LINESPACE, SYSCOL_EDIT_BACKGROUND_SELECTED, true);
-				display_text_proportional_len_clip(x_base_offset+start_offset, y_offset, text+start_pos, ALIGN_LEFT|DT_CLIP, SYSCOL_EDIT_TEXT_SELECTED, false, end_pos-start_pos);
+				display_fillbox_wh_clip_rgb(x_base_offset+start_offset, y_offset, highlight_width, LINESPACE, SYSCOL_EDIT_BACKGROUND_SELECTED, true);
+				display_text_proportional_len_clip_rgb(x_base_offset+start_offset, y_offset, text+start_pos, ALIGN_LEFT|DT_CLIP, SYSCOL_EDIT_TEXT_SELECTED, false, end_pos-start_pos);
 			}
 
 			// display blinking cursor
 			if(  cursor_visible  ) {
-				display_fillbox_wh_clip(x_base_offset+cursor_offset-1, y_offset, 1, LINESPACE, SYSCOL_CURSOR_BEAM, true);
+				display_fillbox_wh_clip_rgb(x_base_offset+cursor_offset-1, y_offset, 1, LINESPACE, SYSCOL_CURSOR_BEAM, true);
 			}
 		}
 
 		// reset clipping
-		display_set_clip_wh(old_clip.x, old_clip.y, old_clip.w, old_clip.h);
+		POP_CLIP();
 	}
 }
 
@@ -617,7 +646,13 @@ void gui_textinput_t::set_text(char *text, size_t max)
 // needed to set the cursor on the right position
 bool gui_hidden_textinput_t::infowin_event(const event_t *ev)
 {
-	if(  IS_LEFTCLICK(ev)  ) {
+	if(  IS_LEFTRELEASE(ev)  ) {
+		// since now the focus could be received while the mouse  no there, we must release it
+		scr_rect this_comp( get_size() );
+		if(  !this_comp.contains(scr_coord(ev->cx,ev->cy) )  ) {
+			// not us, just in old focus from previous selection or tab
+			return false;
+		}
 		// acting on release causes unwanted recalculations of cursor position for long strings and (cursor_offset>0)
 		// moreover, only (click) or (release) event happened inside textinput, the other one could lie outside
 		sint16 asterix_width = display_calc_proportional_string_len_width("*",1);
@@ -654,20 +689,21 @@ void gui_hidden_textinput_t::display_with_cursor(scr_coord const offset, bool, b
 		const int clip_x =  old_clip.x > text_clip_x ? old_clip.x : text_clip_x;
 		display_set_clip_wh( clip_x, old_clip.y, min(old_clip.xx, text_clip_x+text_clip_w)-clip_x, old_clip.h);
 
-		size_t text_pos=0;
+		utf8 const *text_pos = (utf8 const*)text;
+		utf8 const *end = (utf8 const*)text + max;
 		sint16 xpos = pos.x+offset.x+2;
-		utf16  c = 0;
+		utf32  c = 0;
 		do {
 			// cursor?
-			if(  cursor_visible  &&  text_pos==head_cursor_pos  ) {
-				display_fillbox_wh_clip( xpos, pos.y+offset.y+1+(size.h-LINESPACE)/2, 1, LINESPACE, SYSCOL_CURSOR_BEAM, true);
+			if(  cursor_visible  &&  text_pos == (utf8 const*)text + head_cursor_pos  ) {
+				display_fillbox_wh_clip_rgb( xpos, pos.y+offset.y+1+(size.h-LINESPACE)/2, 1, LINESPACE, SYSCOL_CURSOR_BEAM, true);
 			}
-			c = utf8_to_utf16((utf8 const*)text + text_pos, &text_pos);
+			c = utf8_decoder_t::decode((utf8 const *&)text_pos);
 			if(c) {
-				xpos += display_proportional_clip( xpos, pos.y+offset.y+1+(size.h-LINESPACE)/2, "*", ALIGN_LEFT, textcol, true);
+				xpos += display_proportional_clip_rgb( xpos, pos.y+offset.y+1+(size.h-LINESPACE)/2, "*", ALIGN_LEFT | DT_CLIP, textcol, true);
 			}
 		}
-		while(  text_pos<max  &&  c  );
+		while(  text_pos < end  &&  c != UNICODE_NUL  );
 
 		// reset clipping
 		display_set_clip_wh(old_clip.x, old_clip.y, old_clip.w, old_clip.h);

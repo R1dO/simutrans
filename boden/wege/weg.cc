@@ -4,10 +4,10 @@
  * This file is part of the Simutrans project under the artistic licence.
  * (see licence.txt)
  *
- * Basisklasse für Wege in Simutrans.
+ * Base class for Ways in Simutrans.
  *
- * 14.06.00 getrennt von simgrund.cc
- * Überarbeitet Januar 2001
+ * 14.06.00 derived from simgrund.cc
+ * Revised January 2001
  *
  * derived from simobj.h in 2007
  *
@@ -37,16 +37,18 @@
 #include "../../obj/signal.h"
 #include "../../obj/crossing.h"
 #include "../../utils/cbuffer_t.h"
+#include "../../dataobj/environment.h" // TILE_HEIGHT_STEP
 #include "../../dataobj/translator.h"
 #include "../../dataobj/loadsave.h"
-#include "../../besch/weg_besch.h"
-#include "../../besch/roadsign_besch.h"
+#include "../../descriptor/way_desc.h"
+#include "../../descriptor/roadsign_desc.h"
 
 #include "../../tpl/slist_tpl.h"
 
 #ifdef MULTI_THREAD
 #include "../../utils/simthread.h"
-static pthread_mutex_t weg_calc_image_mutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
+static pthread_mutex_t weg_calc_image_mutex;
+static recursive_mutex_maker_t weg_cim_maker(weg_calc_image_mutex);
 #endif
 
 /**
@@ -175,7 +177,7 @@ weg_t::~weg_t()
 	alle_wege.remove(this);
 	player_t *player=get_owner();
 	if(player) {
-		player_t::add_maintenance( player,  -desc->get_wartung(), desc->get_finance_waytype() );
+		player_t::add_maintenance( player,  -desc->get_maintenance(), desc->get_finance_waytype() );
 	}
 }
 
@@ -259,6 +261,10 @@ void weg_t::info(cbuffer_t & buf) const
 	}
 #endif
 	buf.append("\n");
+	if (char const* const maker = get_desc()->get_copyright()) {
+		buf.printf(translator::translate("Constructed by %s"), maker);
+		buf.append("\n");
+	}
 }
 
 
@@ -362,7 +368,7 @@ bool weg_t::check_season(const bool calc_only_season_change)
 	}
 
 	// use snow image if above snowline and above ground
-	bool snow = (from->ist_karten_boden()  ||  !from->ist_tunnel())  &&  (get_pos().z >= welt->get_snowline()  ||  welt->get_climate( get_pos().get_2d() ) == arctic_climate);
+	bool snow = (from->ist_karten_boden()  ||  !from->ist_tunnel())  &&  (get_pos().z  + from->get_weg_yoff()/TILE_HEIGHT_STEP >= welt->get_snowline()  ||  welt->get_climate( get_pos().get_2d() ) == arctic_climate);
 	bool old_snow = (flags&IS_SNOW) != 0;
 	if(  !(snow ^ old_snow)  ) {
 		// season is not changing ...
@@ -453,7 +459,7 @@ void weg_t::calc_image()
 	}
 	else {
 		// use snow image if above snowline and above ground
-		bool snow = (from->ist_karten_boden()  ||  !from->ist_tunnel())  &&  (get_pos().z >= welt->get_snowline() || welt->get_climate( get_pos().get_2d() ) == arctic_climate  );
+		bool snow = (from->ist_karten_boden()  ||  !from->ist_tunnel())  &&  (get_pos().z + from->get_weg_yoff()/TILE_HEIGHT_STEP >= welt->get_snowline() || welt->get_climate( get_pos().get_2d() ) == arctic_climate  );
 		flags &= ~IS_SNOW;
 		if(  snow  ) {
 			flags |= IS_SNOW;
@@ -568,7 +574,7 @@ void weg_t::finish_rd()
 {
 	player_t *player = get_owner();
 	if(  player  &&  desc  ) {
-		player_t::add_maintenance( player,  desc->get_wartung(), desc->get_finance_waytype() );
+		player_t::add_maintenance( player,  desc->get_maintenance(), desc->get_finance_waytype() );
 	}
 }
 

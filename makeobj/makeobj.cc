@@ -8,9 +8,9 @@ int debuglevel = 2;
 #include "../simtypes.h"
 #include "../simversion.h"
 #include "../utils/simstring.h"
-#include "../besch/writer/obj_pak_exception.h"
-#include "../besch/writer/root_writer.h"
-#include "../besch/writer/image_writer.h"
+#include "../descriptor/writer/obj_pak_exception.h"
+#include "../descriptor/writer/root_writer.h"
+#include "../descriptor/writer/image_writer.h"
 
 
 // Needed to avoid linking problems
@@ -41,12 +41,11 @@ int main(int argc, char* argv[])
 			argv++, argc--;
 			debuglevel = 1;	// only fatal errors
 		}
+	}
 
-		if(  debuglevel>1  ) {
-			puts( "\nMakeobj version " MAKEOBJ_VERSION " for Simutrans " VERSION_NUMBER " and higher\n" );
-			puts( "(c) 2002-2012 V. Meyer, Hj. Malthaner, M. Pristovsek & Simutrans development team\n" );
-		}
-
+	if(  debuglevel>1  ) {
+		puts( "\nMakeobj version " MAKEOBJ_VERSION " for Simutrans " VERSION_NUMBER " and higher\n" );
+		puts( "(c) 2002-2012 V. Meyer, Hj. Malthaner, M. Pristovsek & Simutrans development team\n" );
 	}
 
 	if (argc && !STRICMP(argv[0], "capabilities")) {
@@ -149,15 +148,15 @@ int main(int argc, char* argv[])
 		"         Creates a special pak file for with 128x128 images\n"
 		"         Works with PAK16 up to PAK32767 but only up to 255 are tested\n"
 		"      MakeObj LIST <pak file(s)>\n"
-		"         Lists the contents ot the given pak files\n"
+		"         Lists the contents of the given pak files\n"
 		"      MakeObj DUMP <pak file> <pak file(s)>\n"
 		"         List the internal nodes of a file\n"
 		"      MakeObj MERGE <pak file library> <pak file(s)>\n"
 		"         Merges multiple pak files into one new pak file library\n"
-		"      MakeObj EXTRACT <pak file archieve>\n"
+		"      MakeObj EXTRACT <pak file archive>\n"
 		"         Creates single files from a pak file library\n"
 		"\n"
-		"      with a trailing slash a direcory is searched rather than a file\n"
+		"      with a trailing slash a directory is searched rather than a file\n"
 		"      default for PAK is PAK ./ ./\n"
 		"\n"
 		"      with QUIET as first arg copyright message will be omitted\n"

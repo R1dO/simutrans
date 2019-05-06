@@ -5,6 +5,8 @@
 #include "../squirrel/sqstdaux.h" // for error handlers
 #include "../squirrel/sqstdio.h" // for loadfile
 #include "../squirrel/sqstdstring.h" // export for scripts
+#include "../squirrel/sqstdmath.h" // export for scripts
+#include "../squirrel/sqstdsystem.h" // export for scripts
 #include "../squirrel/sq_extensions.h" // for sq_call_restricted
 
 #include "../utils/log.h"
@@ -60,14 +62,17 @@ void script_vm_t::errorfunc(HSQUIRRELVM vm, const SQChar *s_, ...)
 	if (strcmp(s, "<error>")==0) {
 		// start of error message
 		buf.clear();
-		buf.printf("<st>Your script made an error!</st><br>\n");
+		buf.printf("<st>An error occured within a script!</st><br>\n");
 	}
 	else if (strcmp(s, "</error>")==0) {
 		// end of error message
-		help_frame_t *win = new help_frame_t();
+		help_frame_t *win = dynamic_cast<help_frame_t*>(win_get_magic((ptrdiff_t)script));
+		if (win == NULL) {
+			win = new help_frame_t();
+			create_win( win, w_info, (ptrdiff_t)script);
+		}
 		win->set_text(buf);
-		win->set_name("Script error occured");
-		create_win( win, w_info, magic_none);
+		win->set_name("Script error occurred");
 
 		if (script) {
 			script->set_error(buf);
@@ -122,6 +127,8 @@ script_vm_t::script_vm_t(const char* include_path_, const char* log_name)
 	// register libraries
 	sq_pushroottable(vm);
 	sqstd_register_stringlib(vm);
+	sqstd_register_mathlib(vm);
+	sqstd_register_systemlib(vm);
 	sq_pop(vm, 1);
 	// export include command
 	export_include(vm, include_path);
@@ -173,7 +180,7 @@ const char* script_vm_t::eval_string(const char* squirrel_string)
 	}
 	// execute
 	sq_pushroottable(vm);
-	sq_call_restricted(vm, 1, SQFalse, SQTrue);
+	sq_call_restricted(vm, 1, SQFalse, SQTrue, 100000);
 	sq_pop(vm, 1);
 	return get_error();
 }

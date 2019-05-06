@@ -33,6 +33,9 @@ field_t::field_t(koord3d p, player_t *player, const field_class_desc_t *desc, fa
 
 field_t::~field_t()
 {
+	// mark field image area as dirty for removal
+	mark_image_dirty( get_image(), 0 );
+
 	fab->remove_field_at( get_pos().get_2d() );
 }
 
@@ -58,7 +61,7 @@ void field_t::cleanup(player_t *player)
 // return the  right month graphic for factories
 image_id field_t::get_image() const
 {
-	const skin_besch_t *s=desc->get_images();
+	const skin_desc_t *s=desc->get_images();
 	uint16 count=s->get_count() - desc->has_snow_image();
 	if(  desc->has_snow_image()  &&  (get_pos().z >= welt->get_snowline()  ||  welt->get_climate( get_pos().get_2d() ) == arctic_climate)  ) {
 		// last images will be shown above snowline
@@ -66,7 +69,7 @@ image_id field_t::get_image() const
 	}
 	else {
 		// resolution 1/8th month (0..95)
-		const uint32 yearsteps = (welt->get_current_month()%12)*8 + ((welt->get_zeit_ms()>>(welt->ticks_per_world_month_shift-3))&7) + 1;
+		const uint32 yearsteps = (welt->get_current_month()%12)*8 + ((welt->get_ticks()>>(welt->ticks_per_world_month_shift-3))&7) + 1;
 		const image_id image = s->get_image_id( (count*yearsteps-1)/96 );
 		if((count*yearsteps-1)%96<count) {
 			mark_image_dirty( image, 0 );

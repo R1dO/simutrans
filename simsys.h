@@ -9,6 +9,7 @@
 
 #include <stddef.h>
 #include "simtypes.h"
+#include <zlib.h>
 
 // Provide chdir().
 #if defined(_WIN32) && !defined(__CYGWIN__)
@@ -17,13 +18,9 @@
 #	include <unistd.h>
 #endif
 
-#ifdef _WIN32
-#define SIM_SYSTEM_TRASHBINAVAILABLE
-#endif
+/* Variable for message processing */
 
-/* Variablen zur Messageverarbeitung */
-
-/* Klassen */
+/* Classes */
 
 #define SIM_NOEVENT         0
 #define SIM_MOUSE_BUTTONS   1
@@ -33,7 +30,7 @@
 #define SIM_SYSTEM          254
 #define SIM_IGNORE_EVENT    255
 
-/* Aktionen */ /* added RIGHTUP and MIDUP */
+/* Actions */ /* added RIGHTUP and MIDUP */
 #define SIM_MOUSE_LEFTUP            1
 #define SIM_MOUSE_RIGHTUP           2
 #define SIM_MOUSE_MIDUP             3
@@ -44,7 +41,7 @@
 #define SIM_MOUSE_WHEELUP           8 //2003-11-04 hsiegeln added
 #define SIM_MOUSE_WHEELDOWN         9 //2003-11-04 hsiegeln added
 
-/* Globale Variablen zur Messagebearbeitung */
+/* Global Variable for message processing */
 
 struct sys_event
 {
@@ -56,19 +53,16 @@ struct sys_event
 	int mx;                  /* es sind negative Koodinaten mgl */
 	int my;
 	int mb;
+	/**
+	 * new window size for SYSTEM_RESIZE
+	 */
+	int size_x, size_y;
 	unsigned int key_mod; /* key mod, like ALT, STRG, SHIFT */
 };
 
 extern struct sys_event sys_event;
 
-#ifdef SIM_SYSTEM_TRASHBINAVAILABLE
-/**
- * Moves the specified file to the system's trash bin.
- * @param path Path to the file to delete.
- * @return False on success.
- */
-bool dr_movetotrash(const char *path);
-#endif
+extern char const PATH_SEPARATOR[];
 
 // scale according to dpi setting
 bool dr_auto_scale(bool);
@@ -89,24 +83,51 @@ void dr_os_close();
 // returns the locale; NULL if unknown
 const char *dr_get_locale_string();
 
-void dr_mkdir(char const* path);
+// Functions the same as normal mkdir except path must be UTF-8 encoded and a default mode of 0777 is assumed.
+int dr_mkdir(char const* path);
 
-// accecpt whatever encoding your filename has (assuming ANSI for windows) and returns the Unicode name
-const char *dr_system_filename_to_uft8( const char *path_in );
+/**
+ * Moves the specified file to the system's trash bin.
+ * If trash is not available on the platform, removes file.
+ * @param path UTF-8 path to the file to delete.
+ * @return False on success.
+ */
+bool dr_movetotrash(const char *path);
 
-// accecpt utf8 and returns (on windows) an ANSI filename
-const char *dr_utf8_to_system_filename( const char *path_in_utf8, bool create=false );
+/**
+ * Returns true if platform supports recycle bin, otherwise false.
+ * Used to control which UI tooltip is shown for deletion.
+ */
+bool dr_cantrash();
+
+// Functions the same as cstdio remove except path must be UTF-8 encoded.
+int dr_remove(const char *path);
 
 // rename a file and delete eventually existing file new_utf8
-void dr_rename( const char *existing_utf8, const char *new_utf8 );
+int dr_rename( const char *existing_utf8, const char *new_utf8 );
+
+// Functions the same as chdir except path must be UTF-8 encoded.
+int dr_chdir(const char *path);
+
+// Functions the same as getcwd except path must be UTF-8 encoded.
+char *dr_getcwd(char *buf, size_t size);
+
+// Functions the same as fopen except filename must be UTF-8 encoded.
+FILE *dr_fopen(const char *filename, const char *mode);
+
+// Functions the same as gzopen except path must be UTF-8 encoded.
+gzFile dr_gzopen(const char *path, const char *mode);
+
+// Functions the same as stat except path must be UTF-8 encoded.
+int dr_stat(const char *path, struct stat *buf);
 
 /* query home directory */
 char const* dr_query_homedir();
 
 unsigned short* dr_textur_init();
 
-// returns the file path to a font file
-const char *dr_query_fontpath( const char * fontname );
+// returns the file path to a font file (or more than one, if used with number higher than zero)
+const char *dr_query_fontpath( int );
 
 void dr_textur(int xp, int yp, int w, int h);
 
@@ -115,7 +136,7 @@ int dr_textur_resize(unsigned short** textur, int w, int h);
 
 // needed for screen update
 void dr_prepare_flush();	// waits, if previous update not yet finished
-void dr_flush();	// copy to screen (eventuall multithreaded)
+void dr_flush();	// copy to screen (eventually multithreaded)
 
 /**
  * Transform a 24 bit RGB color into the system format.
@@ -172,7 +193,7 @@ size_t dr_paste(char *target, size_t max_length);
 /**
  * Open a program/starts a script to download pak sets from sourceforge
  * @param path_to_program : actual simutrans pakfile directory
- * @param portabel : true if lokal files to be save in simutransdir
+ * @param portabel : true if local files to be save in simutransdir
  * @return false, if nothing was downloaded
  */
 bool dr_download_pakset( const char *path_to_program, bool portable );

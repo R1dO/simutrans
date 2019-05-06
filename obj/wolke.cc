@@ -18,12 +18,12 @@
 #include "../tpl/vector_tpl.h"
 
 
-vector_tpl<const skin_besch_t *>wolke_t::all_clouds(0);
+vector_tpl<const skin_desc_t *>wolke_t::all_clouds(0);
 
-bool wolke_t::register_desc(const skin_besch_t* desc)
+bool wolke_t::register_desc(const skin_desc_t* desc)
 {
 	// avoid duplicates with same name
-	FOR(vector_tpl<skin_besch_t const*>, & i, all_clouds) {
+	FOR(vector_tpl<skin_desc_t const*>, & i, all_clouds) {
 		if (strcmp(i->get_name(), desc->get_name()) == 0) {
 			i = desc;
 			return true;
@@ -34,7 +34,7 @@ bool wolke_t::register_desc(const skin_besch_t* desc)
 
 
 
-wolke_t::wolke_t(koord3d pos, sint8 x_off, sint8 y_off, const skin_besch_t* desc ) :
+wolke_t::wolke_t(koord3d pos, sint8 x_off, sint8 y_off, const skin_desc_t* desc ) :
 	obj_no_info_t(pos)
 {
 	cloud_nr = all_clouds.index_of(desc);
@@ -64,7 +64,7 @@ wolke_t::wolke_t(loadsave_t* const file) : obj_no_info_t()
 
 image_id wolke_t::get_image() const
 {
-	const skin_besch_t *desc = all_clouds[cloud_nr];
+	const skin_desc_t *desc = all_clouds[cloud_nr];
 	return desc->get_image_id( (insta_zeit*desc->get_count())/2500 );
 }
 
@@ -72,7 +72,7 @@ image_id wolke_t::get_image() const
 
 void wolke_t::rdwr(loadsave_t *file)
 {
-	// not saving cloads! (and loading only for compatibility)
+	// not saving clouds! (and loading only for compatibility)
 	assert(file->is_loading());
 
 	obj_t::rdwr( file );
@@ -92,25 +92,31 @@ void wolke_t::rdwr(loadsave_t *file)
 }
 
 
-
 sync_result wolke_t::sync_step(uint32 delta_t)
 {
+	const image_id old_img = get_image();
+
 	insta_zeit += delta_t;
-	if(insta_zeit>=2499) {
+	if(  insta_zeit >= 2499  ) {
 		// delete wolke ...
 		insta_zeit = 2499;
 		return SYNC_DELETE;
 	}
-	// move cloud up
-	sint8 ymove = ((insta_zeit*OBJECT_OFFSET_STEPS) >> 12);
-	if(  base_y_off-ymove!=get_yoff()  ) {
-		// move/change cloud ... (happens much more often than image change => image change will be always done when drawing)
-		if(!get_flag(obj_t::dirty)) {
-			mark_image_dirty(get_image(),0);
-		}
-		set_yoff(  base_y_off - ymove  );
-		set_flag(obj_t::dirty);
-	}
+	const image_id new_img = get_image();
+
+ 	// move cloud up
+	const sint8 new_yoff = base_y_off - ((insta_zeit * OBJECT_OFFSET_STEPS) >> 12);
+	if(  new_yoff != get_yoff()  ||  new_img != old_img  ) {
+ 		// move/change cloud ... (happens much more often than image change => image change will be always done when drawing)
+		if(  !get_flag( obj_t::dirty )  ) {
+			set_flag( obj_t::dirty );
+			mark_image_dirty( old_img, 0 );
+			if(  new_img != old_img  ) {
+				mark_image_dirty( new_img, 0 );
+			}
+ 		}
+		set_yoff( new_yoff );
+ 	}
 	return SYNC_OK;
 }
 

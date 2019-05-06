@@ -9,13 +9,13 @@
 #include "../display/simgraph.h"
 
 #include "../simskin.h"
-#include "../besch/skin_besch.h"
+#include "../descriptor/skin_desc.h"
 
 #include "../dataobj/translator.h"
 #include "messagebox.h"
 
 
-news_window::news_window(const char* text, PLAYER_COLOR_VAL title_color) :
+news_window::news_window(const char* text, FLAGGED_PIXVAL title_color) :
 	base_infowin_t( translator::translate("Meldung" ) ),
 	color(title_color)
 {
@@ -28,7 +28,7 @@ news_window::news_window(const char* text, PLAYER_COLOR_VAL title_color) :
 
 
 fatal_news::fatal_news(const char* text) :
-	news_window(text, WIN_TITLE)
+	news_window(text, env_t::default_window_title_color)
 {
 	textarea.set_width(display_get_width()/2);
 	recalc_size();
@@ -36,14 +36,14 @@ fatal_news::fatal_news(const char* text) :
 
 
 news_img::news_img(const char* text) :
-	news_window(text, WIN_TITLE),
+	news_window(text, env_t::default_window_title_color),
 	image()
 {
 	init(skinverwaltung_t::meldungsymbol->get_image_id(0));
 }
 
 
-news_img::news_img(const char* text, image_id id, PLAYER_COLOR_VAL color) :
+news_img::news_img(const char* text, image_id id, FLAGGED_PIXVAL color) :
 	news_window(text, color),
 	image()
 {
@@ -60,17 +60,14 @@ void news_img::init(image_id id)
 {
 	if(  id!=IMG_EMPTY  ) {
 		image.set_image(id, true);
-
-		scr_coord_val xoff, yoff, xw, yw;
-		display_get_base_image_offset(id, &xoff, &yoff, &xw, &yw);
-		image.set_size( scr_size(xw, yw) );
-
+		image.enable_offset_removal(true);
+		image.set_size(image.get_min_size());
 		set_embedded(&image);
 	}
 }
 
 
-news_loc::news_loc(const char* text, koord k, PLAYER_COLOR_VAL color) :
+news_loc::news_loc(const char* text, koord k, FLAGGED_PIXVAL color) :
 	news_window(text, color),
 	view(welt->lookup_kartenboden(k)->get_pos(), scr_size( max(64, get_base_tile_raster_width()), max(56, (get_base_tile_raster_width()*7)/8) ))
 {

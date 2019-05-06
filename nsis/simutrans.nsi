@@ -37,31 +37,34 @@ finishGDIexe:
   ;WriteUninstaller $INSTDIR\uninstaller.exe
 FunctionEnd
 
-Section "Executable (GDI, Unicode)" GDIexe
-  AddSize 11203
-  StrCpy $downloadlink "http://downloads.sourceforge.net/project/simutrans/simutrans/120-1-3/simuwin-120-1-3.zip"
-  StrCpy $archievename "simuwin-120-1-3.zip"
+Section /o "Executable (GDI, run one more computers)" GDIexe
+  AddSize 12436
+  StrCpy $downloadlink "http://downloads.sourceforge.net/project/simutrans/simutrans/120-4-1/simuwin-120-4-1.zip"
+  StrCpy $archievename "simuwin-120-4-1.zip"
   StrCpy $downloadname "Simutrans Executable (GDI)"
   Call DownloadInstallZip
   Call PostExeInstall
 SectionEnd
 
-Section /o "Executable (SDL, better sound)" SDLexe
-  AddSize 11688
-  StrCpy $downloadlink "http://downloads.sourceforge.net/project/simutrans/simutrans/120-1-3/simuwin-sdl-120-1-3.zip"
-  StrCpy $archievename "simuwin-sdl-120-1-3.zip"
-  StrCpy $downloadname "Simutrans Executable (SDL)"
+Section "Executable (SDL2, better sound)" SDLexe
+  AddSize 14158
+  StrCpy $downloadlink "http://downloads.sourceforge.net/project/simutrans/simutrans/120-4-1/simuwin-sdl-120-4-1.zip"
+  StrCpy $archievename "simuwin-sdl-120-4-1.zip"
+  StrCpy $downloadname "Simutrans Executable (SDL2)"
   Call DownloadInstallZip
   Call PostExeInstall
 SectionEnd
 
-Section /o "Chinese Font" wenquanyi_font
+Section "Chinese Font" wenquanyi_font
   AddSize 3169
+  IfFileExists $INSTDIR\font\wenquanyi_9pt.bdf no_chinese_needed
   StrCpy $downloadlink "http://downloads.sourceforge.net/project/simutrans/simutrans/wenquanyi_9pt-font-bdf.zip"
   StrCpy $archievename "wenquanyi_9pt-font-bdf.zip"
   StrCpy $downloadname "wenquanyi_9pt"
   Call DownloadInstallZipWithoutSimutrans
   Rename $INSTDIR\wenquanyi_9pt.bdf $INSTDIR\font\wenquanyi_9pt.bdf
+  Delete $INSTDIR\wenquanyi_9pt.bdf
+no_chinese_needed:
 SectionEnd
 
 SectionGroupEnd
@@ -75,13 +78,14 @@ SectionGroupEnd
 !include "other-functions.nsh"
 
 
-;********************* from here on special own helper funtions ************
+;********************* from here on special own helper functions ************
 
 
 ; make sure, at least one executable is installed
 Function .onSelChange
 
   ; radio button macro does not work as intended now => do it yourself
+  SectionSetFlags ${wenquanyi_font} ${SF_SELECTED}
   SectionGetFlags ${SDLexe} $R0
   IntOp $R0 $R0 & ${SF_SELECTED}
   IntCmp $R0 ${SF_SELECTED} +1 test_for_pak
@@ -99,13 +103,10 @@ Function .onSelChange
   Goto test_for_pak
 
 select_SDL:
-  ; ok SDL was selected => deselect chines font and GDI
+  ; ok SDL was selected
   SectionGetFlags ${GDIexe} $R0
   IntOp $R0 $R0 & ${SECTION_OFF}
   SectionSetFlags ${GDIexe} $R0
-  SectionGetFlags ${wenquanyi_font} $R0
-  IntOp $R0 $R0 & ${SECTION_OFF}
-  SectionSetFlags ${wenquanyi_font} $R0
 
 test_for_pak:
   ; save last state of SDLexe selection

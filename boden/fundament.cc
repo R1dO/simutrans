@@ -1,12 +1,12 @@
 /*
- * Untergrund für Gebäude in Simutrans.
- * Überarbeitet Januar 2001
- * von Hj. Malthaner
+ * Ground for buildings in Simutrans.
+ * Revised January 2001
+ * Hj. Malthaner
  */
 
 #include "../simconst.h"
 
-#include "../besch/grund_besch.h"
+#include "../descriptor/ground_desc.h"
 #include "../dataobj/loadsave.h"
 
 #include "grund.h"
@@ -34,7 +34,7 @@ fundament_t::fundament_t(koord3d pos, slope_t::type hang ) : grund_t(pos)
 
 void fundament_t::calc_image_internal(const bool calc_only_snowline_change)
 {
-	set_image( ground_besch_t::get_ground_tile(this) );
+	set_image( ground_desc_t::get_ground_tile(this) );
 
 	if(  !calc_only_snowline_change  ) {
 		grund_t::calc_back_image( get_disp_height(), 0 );

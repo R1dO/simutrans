@@ -9,6 +9,7 @@
 #include <string.h>
 #include "sound.h"
 #include "../simmem.h"
+#include "../simdebug.h"
 #include <stdio.h>
 
 /*
@@ -17,7 +18,7 @@
 static int use_sound = 0;
 
 /*
- * defines the number of channels avaiable
+ * defines the number of channels available
  */
 #define CHANNELS 4
 
@@ -26,12 +27,12 @@ static int use_sound = 0;
  * this structure contains the data for one sample
  */
 struct sample {
-    /* the buffer containing the data for the sample, the format
-     * must always be identical to the one of the system output
-     * format */
-    Uint8 *audio_data;
+	/* the buffer containing the data for the sample, the format
+	 * must always be identical to the one of the system output
+	 * format */
+	Uint8 *audio_data;
 
-    Uint32 audio_len;		    /* number of samples in the adiop data */
+	Uint32 audio_len;	/* number of samples in the audio data */
 };
 
 
@@ -47,14 +48,13 @@ static int samplenumber = 0;
 /* this structure contains the information about one channel
  */
 struct channel {
-    Uint32 sample_pos; /* the current position inside this sample */
-    Uint8 sample;		/* which sample is played, 255 for no sample */
-    Uint8 volume;		/* the volume this channel should be played */
+	Uint32 sample_pos;	/* the current position inside this sample */
+	Uint8 sample;		/* which sample is played, 255 for no sample */
+	Uint8 volume;		/* the volume this channel should be played */
 };
 
 
-/* this array contains all the information of the currently played samples
- */
+/* this array contains all the information of the currently played samples */
 static channel channels[CHANNELS];
 
 
@@ -121,7 +121,7 @@ bool dr_init_sound()
 
 		if (SDL_OpenAudio(&desired, &output_audio_format) != -1) {
 
-			// check if we got the right audi format
+			// check if we got the right audio format
 			if (output_audio_format.format == AUDIO_S16SYS) {
 
 				int i;
@@ -135,20 +135,22 @@ bool dr_init_sound()
 				// start playing sounds
 				SDL_PauseAudio(0);
 
-			} else {
-				printf("Open audio channel doesn't meet requirements. Muting\n");
+			}
+			else {
+				dbg->error("dr_init_sound()", "Open audio channel doesn't meet requirements. Muting");
 				SDL_CloseAudio();
 				SDL_QuitSubSystem(SDL_INIT_AUDIO);
 			}
 
 
-		} else {
-			printf("Could not open required audio channel. Muting\n");
+		}
+		else {
+			dbg->error("dr_init_sound()", "Could not open required audio channel. Muting");
 			SDL_QuitSubSystem(SDL_INIT_AUDIO);
 		}
 	}
 	else {
-		printf("Could not initialize sound system. Muting\n");
+		dbg->error("dr_init_sound()", "Could not initialize sound system. Muting");
 	}
 
 	use_sound = sound_ok ? 1: -1;
@@ -173,7 +175,7 @@ int dr_load_sample(const char *filename)
 
 		/* load the sample */
 		if (SDL_LoadWAV(filename, &wav_spec, &wav_data, &wav_length) == NULL) {
-			printf("could not load wav (%s)\n", SDL_GetError());
+			dbg->warning("dr_load_sample", "could not load wav (%s)", SDL_GetError());
 			return -1;
 		}
 
@@ -183,7 +185,7 @@ int dr_load_sample(const char *filename)
 			    output_audio_format.format,
 			    output_audio_format.channels,
 			    output_audio_format.freq) < 0) {
-			printf("could not create conversion structure\n");
+			dbg->warning("dr_load_sample", "could not create conversion structure");
 			SDL_FreeWAV(wav_data);
 			return -1;
 		}
@@ -195,7 +197,7 @@ int dr_load_sample(const char *filename)
 		SDL_FreeWAV(wav_data);
 
 		if (SDL_ConvertAudio(&wav_cvt) < 0) {
-			printf("could not convert wav to output format\n");
+			dbg->warning("dr_load_sample", "could not convert wav to output format");
 			return -1;
 		}
 
@@ -203,7 +205,7 @@ int dr_load_sample(const char *filename)
 		smp.audio_data = wav_cvt.buf;
 		smp.audio_len = wav_cvt.len_cvt;
 		samples[samplenumber] = smp;
-		printf("Loaded %s to sample %i.\n",filename,samplenumber);
+		dbg->message("dr_load_sample", "Loaded %s to sample %i.",filename,samplenumber);
 
 		return samplenumber++;
 	}

@@ -4,7 +4,7 @@
  * This file is part of the Simutrans project under the artistic license.
  *
  *  Description:
- *      This header defines all pathes used be simutrans relative to the game
+ *      This header defines all paths used be simutrans relative to the game
  *	directory.
  */
 
@@ -12,7 +12,7 @@
 #define __PATHES_H
 
 /**
- * two defines for all pathes - if You want the root path,  use:
+ * two defines for all paths - if You want the root path,  use:
  *	#define _PATH ""
  *	#define _PATH_X ""
  * else use
@@ -30,7 +30,7 @@
 #define SAVE_PATH_X	    SAVE_PATH "/"
 #define SAVE_PATH_X_LEN (sizeof(SAVE_PATH_X) - 1)
 
-#define SCRENSHOT_PATH	    "screenshot"
-#define SCRENSHOT_PATH_X    SCRENSHOT_PATH "/"
+#define SCREENSHOT_PATH	    "screenshot"
+#define SCREENSHOT_PATH_X    SCREENSHOT_PATH "/"
 
 #endif

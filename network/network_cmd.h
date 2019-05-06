@@ -30,6 +30,7 @@ enum {
 	NWC_CHG_PLAYER,
 	NWC_SCENARIO,
 	NWC_SCENARIO_RULES,
+	NWC_STEP,
 	NWC_COUNT
 };
 
@@ -53,7 +54,7 @@ public:
 	/**
 	 * sends to a client
 	 * sends complete command-packet
-	 * @return whether send was succesfull
+	 * @return whether send was successful
 	 */
 	bool send(SOCKET s);
 
@@ -66,8 +67,6 @@ public:
 	virtual bool execute(karte_t *) { return true;}
 
 	virtual const char* get_name() { return "network_command_t";}
-
-	bool is_local_cmd();
 
 	uint16 get_id() { return id;}
 
@@ -121,12 +120,12 @@ public:
 	~nwc_service_t();
 
 #ifndef NETTOOL
-	virtual bool execute(karte_t *);
+	bool execute(karte_t *) OVERRIDE;
 #endif
 
-	virtual void rdwr();
+	void rdwr() OVERRIDE;
 
-	virtual const char* get_name() { return "nwc_service_t";}
+	const char* get_name() OVERRIDE { return "nwc_service_t";}
 };
 
 
@@ -143,10 +142,10 @@ public:
 	nwc_auth_player_t(uint8 nr, const pwd_hash_t& hash_) : network_command_t(NWC_AUTH_PLAYER), hash(hash_), player_unlocked(0), player_nr(nr)  { }
 
 #ifndef NETTOOL
-	virtual bool execute(karte_t *);
+	bool execute(karte_t *) OVERRIDE;
 #endif
-	virtual void rdwr();
-	virtual const char* get_name() { return "nwc_auth_player_t";}
+	void rdwr() OVERRIDE;
+	const char* get_name() OVERRIDE { return "nwc_auth_player_t";}
 	pwd_hash_t hash;
 	uint16 player_unlocked;
 	uint8  player_nr;

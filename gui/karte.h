@@ -1,7 +1,7 @@
 #ifndef gui_karte_h
 #define gui_karte_h
 
-#include "components/gui_komponente.h"
+#include "components/gui_component.h"
 #include "../halthandle_t.h"
 #include "../simline.h"
 #include "../convoihandle_t.h"
@@ -17,7 +17,7 @@ class stadt_t;
 class player_t;
 class schedule_t;
 class loadsave_t;
-class ware_besch_t;
+class goods_desc_t;
 
 
 #define MAX_SEVERITY_COLORS 10
@@ -71,9 +71,9 @@ private:
 	static reliefkarte_t *single_instance;
 
 	// the terrain map
-	array2d_tpl<uint8> *relief;
+	array2d_tpl<PIXVAL> *relief;
 
-	void set_relief_color_clip( sint16 x, sint16 y, uint8 color );
+	void set_relief_color_clip( sint16 x, sint16 y, PIXVAL color );
 
 	// all stuff connected with schedule display
 	class line_segment_t
@@ -88,10 +88,10 @@ private:
 		uint8 end_offset;
 		bool start_diagonal;
 		line_segment_t() {}
-		line_segment_t( koord s, uint8 so, koord e, uint8 eo, schedule_t *f, player_t *player_, uint8 cc, bool diagonal ) {
+		line_segment_t( koord s, uint8 so, koord e, uint8 eo, schedule_t *f, player_t *p, uint8 cc, bool diagonal ) {
 			schedule = f;
 			waytype = f->get_waytype();
-			player = player_;
+			player = p;
 			colorcount = cc;
 			start_diagonal = diagonal;
 			if(  s.x<e.x  ||  (s.x==e.x  &&  s.y<e.y)  ) {
@@ -139,7 +139,14 @@ private:
 
 	koord last_world_pos;
 
-	// current and new offset and size (to avoid drawing invisible parts)
+	/**
+	 * current and new offset and size (to avoid drawing invisible parts)
+	 *
+	 * gui_component_t::size is always equal to max_size.
+	 *
+	 * These are size and offset of visible part of map.
+	 * We only show and compute this.
+	 */
 	scr_coord cur_off, new_off;
 	scr_size cur_size, new_size;
 
@@ -148,7 +155,7 @@ private:
 
 	const fabrik_t* get_fab(koord pos, bool large_area) const;
 
-	const fabrik_t* draw_fab_connections(uint8 colour, scr_coord pos) const;
+	const fabrik_t* draw_fab_connections(PIXVAL colour, scr_coord pos) const;
 
 	static sint32 max_cargo;
 	static sint32 max_passed;
@@ -169,33 +176,33 @@ public:
 
 	int player_showed_on_map;
 	int transport_type_showed_on_map;
-	const ware_besch_t *freight_type_group_index_showed_on_map;
+	const goods_desc_t *freight_type_group_index_showed_on_map;
 
 	/**
 	 * returns a color based on an amount (high amount/scale -> color shifts from green to red)
 	 * @author hsiegeln
 	 */
-	static uint8 calc_severity_color(sint32 amount, sint32 scale);
+	static PIXVAL calc_severity_color(sint32 amount, sint32 scale);
 
 	/**
 	 * returns a color based on an amount (high amount/scale -> color shifts from green to red)
 	 * but using log scale
 	 * @author prissi
 	 */
-	static uint8 calc_severity_color_log(sint32 amount, sint32 scale);
+	static PIXVAL calc_severity_color_log(sint32 amount, sint32 scale);
 
 	/**
 	* returns a color based on the current high
 	* @author hsiegeln
 	*/
-	static uint8 calc_hoehe_farbe(const sint16 hoehe, const sint16 grundwasser);
+	static PIXVAL calc_hoehe_farbe(const sint16 hoehe, const sint16 groundwater);
 
 	// needed for town passenger map
-	static uint8 calc_relief_farbe(const grund_t *gr);
+	static PIXVAL calc_relief_farbe(const grund_t *gr);
 
 	// public, since the convoi updates need this
 	// nonstatic, if we have someday many maps ...
-	void set_relief_farbe(koord k, int color);
+	void set_relief_farbe(koord k, PIXVAL color);
 
 	// we are single instance ...
 	static reliefkarte_t *get_karte();
@@ -231,7 +238,7 @@ public:
 
 	bool infowin_event(event_t const*) OVERRIDE;
 
-	void draw(scr_coord pos);
+	void draw(scr_coord pos) OVERRIDE;
 
 	void set_current_cnv( convoihandle_t c );
 
@@ -251,6 +258,9 @@ public:
 
 	void rdwr(loadsave_t *file);
 
+	scr_size get_min_size() const OVERRIDE;
+
+	scr_size get_max_size() const OVERRIDE;
 };
 
 #endif

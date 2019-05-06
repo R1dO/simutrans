@@ -12,24 +12,24 @@
 
 #include "simplay.h"
 
-#include "../sucher/bauplatz_sucher.h"
+#include "../finder/building_placefinder.h"
 
 class karte_t;
 class vehicle_desc_t;
-class ware_besch_t;
+class goods_desc_t;
 
 /**
  * bauplatz_mit_strasse_sucher_t:
  *
- * Sucht einen freien Bauplatz mithilfe der Funktion suche_platz().
+ * Search for a free location using the function find_place().
  *
  * @author V. Meyer
  */
-class ai_bauplatz_mit_strasse_sucher_t : public bauplatz_sucher_t  {
+class ai_building_place_with_road_finder : public building_placefinder_t  {
 public:
-	ai_bauplatz_mit_strasse_sucher_t(karte_t *welt) : bauplatz_sucher_t(welt) {}
-	bool strasse_bei(sint16 x, sint16 y) const;
-	virtual bool ist_platz_ok(koord pos, sint16 b, sint16 h, climate_bits cl) const;
+	ai_building_place_with_road_finder(karte_t *welt) : building_placefinder_t(welt) {}
+	bool is_road_at(sint16 x, sint16 y) const;
+	bool is_area_ok(koord pos, sint16 w, sint16 h, climate_bits cl) const OVERRIDE;
 };
 
 
@@ -64,13 +64,10 @@ public:
 	sint32 get_construction_speed() const { return construction_speed; }
 	virtual void set_construction_speed( sint32 newspeed ) { construction_speed = newspeed; }
 
-	virtual void rdwr(loadsave_t *file);
+	void rdwr(loadsave_t *file) OVERRIDE;
 
 	// return true, if there is already a connection
-	bool is_connected(const koord star_pos, const koord end_pos, const ware_besch_t *wtyp) const;
-
-	// prepares a general tool just like a human player work do
-	bool init_general_tool( int tool, const char *param );
+	bool is_connected(const koord star_pos, const koord end_pos, const goods_desc_t *wtyp) const;
 
 	// calls a general tool just like a human player work do
 	bool call_general_tool( int tool, koord k, const char *param );
@@ -86,8 +83,9 @@ public:
 	halthandle_t get_halt( const koord haltpos ) const;
 
 	/**
-	 * Find the first water tile using line algorithm von Hajo
+	 * Find the first water tile using line algorithm
 	 * start MUST be on land!
+	 * @author Hajo
 	 **/
 	koord find_shore(koord start, koord end) const;
 	bool find_harbour(koord &start, koord &size, koord target);
@@ -98,7 +96,7 @@ public:
 	bool create_simple_road_transport(koord platz1, koord size1, koord platz2, koord size2, const way_desc_t *road );
 
 	/// helper method to call vehicle_builder_t::vehikel_search and fill in time-line related parameters
-	static const vehicle_desc_t *vehikel_search(waytype_t typ, const uint32 target_power, const sint32 target_speed, const ware_besch_t * target_freight, bool include_electric);
+	static const vehicle_desc_t *vehikel_search(waytype_t typ, const uint32 target_power, const sint32 target_speed, const goods_desc_t * target_freight, bool include_electric);
 };
 
 #endif

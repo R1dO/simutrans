@@ -12,9 +12,9 @@
 #include "../dataobj/translator.h"
 #include "../obj/tunnel.h"
 
-#include "../besch/grund_besch.h"
-#include "../besch/skin_besch.h"
-#include "../besch/tunnel_besch.h"
+#include "../descriptor/ground_desc.h"
+#include "../descriptor/skin_desc.h"
+#include "../descriptor/tunnel_desc.h"
 
 #include "../utils/cbuffer_t.h"
 
@@ -75,7 +75,7 @@ void tunnelboden_t::calc_image_internal(const bool calc_only_snowline_change)
 		// default tunnel ground images
 		// single or double slope? (single slopes are not divisible by 8)
 		const uint8 slope_this =  get_disp_slope();
-		const uint8 imageid = (!slope_this  ||  (slope_this & 7)) ? ground_besch_t::slopetable[slope_this] : ground_besch_t::slopetable[slope_this >> 1] + 12;
+		const uint8 imageid = (!slope_this  ||  (slope_this & 7)) ? ground_desc_t::slopetable[slope_this] : ground_desc_t::slopetable[slope_this >> 1] + 12;
 		set_image( skinverwaltung_t::tunnel_texture->get_image_id( imageid ) );
 	}
 }

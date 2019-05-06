@@ -15,18 +15,20 @@
 #include "components/gui_scrollpane.h"
 
 
-#include "../bauer/warenbauer.h"
-#include "../besch/ware_besch.h"
+#include "../bauer/goods_manager.h"
+#include "../descriptor/goods_desc.h"
 #include "../dataobj/translator.h"
 
 #include "../simcolor.h"
+#include "../simline.h"
+#include "simwin.h"
 #include "../simworld.h"
 
 /**
  * This variable defines the current speed for bonus calculation
  * @author prissi
  */
-int goods_frame_t::relative_speed_change=100;
+sint16 goods_frame_t::relative_speed_change=100;
 
 /**
  * This variable defines by which column the table is sorted
@@ -60,81 +62,76 @@ const char *goods_frame_t::sort_text[SORT_MODES] = {
  */
 bool goods_frame_t::filter_goods = false;
 
+static simline_t::linetype last_scheduletype = simline_t::trainline;
+
 goods_frame_t::goods_frame_t() :
 	gui_frame_t( translator::translate("gl_title") ),
-	sort_label(translator::translate("hl_txt_sort")),
-	change_speed_label(NULL,SYSCOL_TEXT_HIGHLIGHT,gui_label_t::right),
+	speed_text( &speed_message, D_BUTTON_WIDTH*4+D_V_SPACE*3 ),
 	goods_stats(),
 	scrolly(&goods_stats)
 {
-	int y=D_BUTTON_HEIGHT+4-D_TITLEBAR_HEIGHT;
+	set_table_layout(1,0);
 
-	speed_bonus[0] = 0;
-	speed_down.init(button_t::repeatarrowleft, "", scr_coord(BUTTON4_X-20, y), scr_size(10,D_BUTTON_HEIGHT));
-	speed_down.add_listener(this);
-	add_component(&speed_down);
+	// top line: combo, input, text
+	add_table(3,1);
+	{
+		for (int i = 1; i < simline_t::MAX_LINE_TYPE; i++) {
+			scheduletype.new_component<gui_scrolled_list_t::const_text_scrollitem_t>(simline_t::get_linetype_name((simline_t::linetype)i), SYSCOL_TEXT);
+		}
+		scheduletype.set_selection( last_scheduletype-1 );
+		add_component(&scheduletype);
+		scheduletype.add_listener( this );
 
-	change_speed_label.set_text(speed_bonus);
-	change_speed_label.set_width(display_get_char_max_width("-0123456789")*4);
-	change_speed_label.align_to(&speed_down, ALIGN_LEFT | ALIGN_EXTERIOR_H | ALIGN_CENTER_V,scr_coord(D_V_SPACE,0));
-	add_component(&change_speed_label);
+		speed.init( welt->get_average_speed(simline_t::linetype_to_waytype(last_scheduletype)), 1, 2048, gui_numberinput_t::AUTOLINEAR, false );
+		add_component(&speed);
+		speed.add_listener( this );
 
-	speed_up.init(button_t::repeatarrowright, "",speed_down.get_pos());
-	speed_up.align_to(&change_speed_label, ALIGN_LEFT | ALIGN_EXTERIOR_H, scr_coord(D_V_SPACE,0));
-	speed_up.add_listener(this);
-	add_component(&speed_up);
-	y=D_BUTTON_HEIGHT+4+5*LINESPACE;
+		gui_label_buf_t *lb = new_component<gui_label_buf_t>(SYSCOL_TEXT_HIGHLIGHT);
+		lb->buf().printf(translator::translate("100 km/h = %i tiles/month"), welt->speed_to_tiles_per_month(kmh_to_speed(100)) );
+		lb->update();
+	}
+	end_table();
 
-	filter_goods_toggle.init(button_t::square_state, "Show only used", scr_coord(BUTTON1_X, y));
+	add_component(&speed_text);
+
+	filter_goods_toggle.init(button_t::square_state, "Show only used");
 	filter_goods_toggle.set_tooltip(translator::translate("Only show goods which are currently handled by factories"));
 	filter_goods_toggle.add_listener(this);
 	filter_goods_toggle.pressed = filter_goods;
 	add_component(&filter_goods_toggle);
-	y += LINESPACE+2;
 
-	sort_label.set_pos(scr_coord(BUTTON1_X, y));
-	add_component(&sort_label);
+	// sort mode
+	sort_row = add_table(3,1);
+	{
+		new_component<gui_label_t>("hl_txt_sort");
 
-	y += LINESPACE+1;
+		sortedby.init(button_t::roundbox, "");
+		sortedby.add_listener(this);
+		add_component(&sortedby);
 
-	sortedby.init(button_t::roundbox, "", scr_coord(BUTTON1_X, y));
-	sortedby.add_listener(this);
-	add_component(&sortedby);
+		sorteddir.init(button_t::roundbox, "");
+		sorteddir.add_listener(this);
+		add_component(&sorteddir);
+	}
+	end_table();
 
-	sorteddir.init(button_t::roundbox, "", scr_coord(BUTTON2_X, y));
-	sorteddir.add_listener(this);
-	add_component(&sorteddir);
-
-	y += D_BUTTON_HEIGHT+2;
-
-	scrolly.set_pos(scr_coord(1, y));
-	scrolly.set_scroll_amount_y(LINESPACE+1);
 	add_component(&scrolly);
 
 	sort_list();
 
-	int h = (warenbauer_t::get_count()+1)*(LINESPACE+1)+y;
-	if(h>450) {
-		h = y+27*(LINESPACE+1)+D_TITLEBAR_HEIGHT+1;
-	}
-	set_windowsize(scr_size(D_DEFAULT_WIDTH, h));
-	set_min_windowsize(scr_size(D_DEFAULT_WIDTH,3*(LINESPACE+1)+D_TITLEBAR_HEIGHT+y+1));
-
-	set_resizemode(vertical_resize);
-	resize (scr_coord(0,0));
+	reset_min_windowsize();
+	set_windowsize(get_min_windowsize());
+	set_resizemode(diagonal_resize);
 }
 
 
-bool goods_frame_t::compare_goods(uint16 const a, uint16 const b)
+bool goods_frame_t::compare_goods(goods_desc_t const* const w1, goods_desc_t const* const w2)
 {
-	ware_besch_t const* const w1 = warenbauer_t::get_info(a);
-	ware_besch_t const* const w2 = warenbauer_t::get_info(b);
-
 	int order = 0;
 
 	switch (sortby) {
 		case 0: // sort by number
-			order = a - b;
+			order = w1->get_index() - w2->get_index();
 			break;
 		case 2: // sort by revenue
 			{
@@ -166,87 +163,8 @@ bool goods_frame_t::compare_goods(uint16 const a, uint16 const b)
 // creates the list and pass it to the child function good_stats, which does the display stuff ...
 void goods_frame_t::sort_list()
 {
-	sortedby.set_text(sort_text[sortby]);
-	sorteddir.set_text(sortreverse ? "hl_btn_sort_desc" : "hl_btn_sort_asc");
-
-	// Fetch the list of goods produced by the factories that exist in the current game
-	const vector_tpl<const ware_besch_t*> &goods_in_game = welt->get_goods_list();
-
-	int n=0;
-	for(unsigned int i=0; i<warenbauer_t::get_count(); i++) {
-		const ware_besch_t * wtyp = warenbauer_t::get_info(i);
-
-		// Hajo: we skip goods that don't generate income
-		//       this should only be true for the special good 'None'
-		if(  wtyp->get_value()!=0  &&  (!filter_goods  ||  goods_in_game.is_contained(wtyp))  ) {
-			good_list[n++] = i;
-		}
-	}
-
-	std::sort(good_list, good_list + n, compare_goods);
-
-	goods_stats.update_goodslist( good_list, relative_speed_change, n );
-}
-
-
-/**
- * resize window in response to a resize event
- * @author Hj. Malthaner
- * @date   16-Oct-2003
- */
-void goods_frame_t::resize(const scr_coord delta)
-{
-	gui_frame_t::resize(delta);
-	scr_size size = get_windowsize()-scrolly.get_pos()-scr_size(0,D_TITLEBAR_HEIGHT);
-	scrolly.set_size(size);
-}
-
-
-/**
- * This method is called if an action is triggered
- * @author Hj. Malthaner
- */
-bool goods_frame_t::action_triggered( gui_action_creator_t *komp,value_t /* */)
-{
-	if(komp == &sortedby) {
-		// sort by what
-		sortby = (sort_mode_t)((int)(sortby+1)%(int)SORT_MODES);
-		sort_list();
-	}
-	else if(komp == &sorteddir) {
-		// order
-		sortreverse ^= 1;
-		sort_list();
-	}
-	else if(komp == &speed_down) {
-		if(relative_speed_change>1) {
-			relative_speed_change --;
-			sort_list();
-		}
-	}
-	else if(komp == &speed_up) {
-		relative_speed_change ++;
-		sort_list();
-	}
-	else if(komp == &filter_goods_toggle) {
-		filter_goods = !filter_goods;
-		filter_goods_toggle.pressed = filter_goods;
-		sort_list();
-	}
-
-	return true;
-}
-
-
-/**
- * Draw the component
- * @author Hj. Malthaner
- */
-void goods_frame_t::draw(scr_coord pos, scr_size size)
-{
-	gui_frame_t::draw(pos, size);
-
-	sprintf(speed_bonus,"%i",relative_speed_change-100);
+	// update all strings
+	relative_speed_change = (100*speed.get_value())/welt->get_average_speed(simline_t::linetype_to_waytype(last_scheduletype));
 
 	speed_message.clear();
 	speed_message.printf(translator::translate("Speedbonus\nroad %i km/h, rail %i km/h\nships %i km/h, planes %i km/h."),
@@ -255,20 +173,87 @@ void goods_frame_t::draw(scr_coord pos, scr_size size)
 		(welt->get_average_speed(water_wt)*relative_speed_change)/100,
 		(welt->get_average_speed(air_wt)*relative_speed_change)/100
 	);
-	display_multiline_text( pos.x + D_MARGIN_LEFT, pos.y + D_BUTTON_HEIGHT + 4, speed_message, SYSCOL_TEXT_HIGHLIGHT );
-
-	speed_message.clear();
 	speed_message.printf(translator::translate("tram %i km/h, monorail %i km/h\nmaglev %i km/h, narrowgauge %i km/h."),
 		(welt->get_average_speed(tram_wt)*relative_speed_change)/100,
 		(welt->get_average_speed(monorail_wt)*relative_speed_change)/100,
 		(welt->get_average_speed(maglev_wt)*relative_speed_change)/100,
 		(welt->get_average_speed(narrowgauge_wt)*relative_speed_change)/100
 	);
-	display_multiline_text( pos.x + D_MARGIN_LEFT, pos.y + D_BUTTON_HEIGHT + 4 + 3 * LINESPACE, speed_message, SYSCOL_TEXT_HIGHLIGHT );
+	speed_text.recalc_size();
 
-	speed_message.clear();
-	speed_message.printf(translator::translate("100 km/h = %i tiles/month"),
-		welt->speed_to_tiles_per_month(kmh_to_speed(100))
-	);
-	display_multiline_text( pos.x + D_MARGIN_LEFT, pos.y + D_BUTTON_HEIGHT + 4 + 5 * LINESPACE, speed_message, SYSCOL_TEXT_HIGHLIGHT );
+	// update buttons
+	sortedby.set_text(sort_text[sortby]);
+	sorteddir.set_text(sortreverse ? "hl_btn_sort_desc" : "hl_btn_sort_asc");
+	filter_goods_toggle.pressed = filter_goods;
+	sort_row->set_size(sort_row->get_min_size());
+
+	// now prepare the sort
+	// Fetch the list of goods produced by the factories that exist in the current game
+	const vector_tpl<const goods_desc_t*> &goods_in_game = welt->get_goods_list();
+
+	good_list.clear();
+	for(unsigned int i=0; i<goods_manager_t::get_count(); i++) {
+		const goods_desc_t * wtyp = goods_manager_t::get_info(i);
+
+		// Hajo: we skip goods that don't generate income
+		//       this should only be true for the special good 'None'
+		if(  wtyp->get_value()!=0  &&  (!filter_goods  ||  goods_in_game.is_contained(wtyp))  ) {
+			good_list.insert_ordered( wtyp, compare_goods );
+		}
+	}
+
+	goods_stats.update_goodslist( good_list, relative_speed_change);
+}
+
+
+/**
+ * This method is called if an action is triggered
+ * @author Hj. Malthaner
+ */
+bool goods_frame_t::action_triggered( gui_action_creator_t *comp,value_t /* */)
+{
+	if(comp == &sortedby) {
+		// sort by what
+		sortby = (sort_mode_t)((int)(sortby+1)%(int)SORT_MODES);
+	}
+	else if(comp == &sorteddir) {
+		// order
+		sortreverse ^= 1;
+	}
+	else if(comp == &filter_goods_toggle) {
+		filter_goods = !filter_goods;
+	}
+	else if(comp == &scheduletype) {
+		double relative_speed_change = speed.get_value()/(double)welt->get_average_speed(simline_t::linetype_to_waytype(last_scheduletype));
+		last_scheduletype = (simline_t::linetype)(scheduletype.get_selection()+1);
+		speed.set_value( (welt->get_average_speed(simline_t::linetype_to_waytype(last_scheduletype))*relative_speed_change)+0.5 );
+	}
+	sort_list();
+
+	return true;
+}
+
+
+uint32 goods_frame_t::get_rdwr_id()
+{
+	return magic_goodslist;
+}
+
+
+
+void goods_frame_t::rdwr( loadsave_t *file )
+{
+	file->rdwr_short( relative_speed_change );
+	file->rdwr_bool( sortreverse );
+	file->rdwr_bool( filter_goods );
+	sint16 s = last_scheduletype;
+	file->rdwr_short( s );
+	sint16 b = sortby;
+	file->rdwr_short( b );
+
+	if(  file->is_loading()  ) {
+		scheduletype.set_selection( s-1 );
+		sortby = (sort_mode_t)b;
+		sort_list();
+	}
 }

@@ -18,11 +18,13 @@
 #include "../simplan.h"
 #include "../simmenu.h"
 #include "../player/simplay.h"
-#include "../besch/grund_besch.h"
+#include "../descriptor/ground_desc.h"
 #include "../boden/wasser.h"
 #include "../dataobj/environment.h"
 #include "../obj/zeiger.h"
 #include "../utils/simrandom.h"
+
+uint16 win_get_statusbar_height(); // simwin.h
 
 main_view_t::main_view_t(karte_t *welt)
 {
@@ -101,7 +103,7 @@ void main_view_t::display(bool force_dirty)
 	const sint16 menu_height = env_t::iconsize.h;
 	const sint16 IMG_SIZE = get_tile_raster_width();
 
-	const sint16 disp_height = display_get_height() - 15 - (!ticker::empty() ? TICKER_HEIGHT : 0);
+	const sint16 disp_height = display_get_height() - win_get_statusbar_height() - (!ticker::empty() ? TICKER_HEIGHT : 0);
 	display_set_clip_wh( 0, menu_height, disp_width, disp_height-menu_height );
 
 	// redraw everything?
@@ -132,7 +134,7 @@ void main_view_t::display(bool force_dirty)
 	else {
 		// calculate also days if desired
 		uint32 month = welt->get_last_month();
-		const uint32 ticks_this_month = welt->get_zeit_ms() % welt->ticks_per_world_month;
+		const uint32 ticks_this_month = welt->get_ticks() % welt->ticks_per_world_month;
 		uint32 hours2;
 		if (env_t::show_month > env_t::DATE_FMT_MONTH) {
 			static sint32 days_per_month[12]={31,28,31,30,31,30,31,31,30,31,30,31};
@@ -148,7 +150,7 @@ void main_view_t::display(bool force_dirty)
 	// not very elegant, but works:
 	// fill everything with black for Underground mode ...
 	if( grund_t::underground_mode ) {
-		display_fillbox_wh(0, menu_height, disp_width, disp_height-menu_height, COL_BLACK, force_dirty);
+		display_fillbox_wh_rgb(0, menu_height, disp_width, disp_height-menu_height, color_idx_to_rgb(COL_BLACK), force_dirty);
 	}
 	else if( welt->is_background_dirty()  &&  outside_visible  ) {
 		// we check if background will be visible, no need to clear screen if it's not.
@@ -162,8 +164,26 @@ void main_view_t::display(bool force_dirty)
 	const sint8 hmax_ground = (grund_t::underground_mode==grund_t::ugm_level) ? grund_t::underground_level : 127;
 
 	// lower limit for y: display correctly water/outside graphics at upper border of screen
-	int y_min = (-const_y_off + 4*tile_raster_scale_y( min(hmax_ground, welt->get_grundwasser())*TILE_HEIGHT_STEP, IMG_SIZE )
+	int y_min = (-const_y_off + 4*tile_raster_scale_y( min(hmax_ground, welt->min_height)*TILE_HEIGHT_STEP, IMG_SIZE )
 					+ 4*(menu_height-IMG_SIZE)-IMG_SIZE/2-1) / IMG_SIZE;
+
+	// prepare view
+	rect_t const world_rect(koord(0, 0), welt->get_size());
+
+	koord const estimated_min(((y_min+(-2-((y_min+dpy_width) & 1))) >> 1) + i_off,
+		((y_min-(disp_width - const_x_off) / (IMG_SIZE/2) - 1) >> 1) + j_off);
+
+	sint16 const worst_case_mountain_extra = (welt->max_height - welt->min_height) / 2;
+	koord const estimated_max((((dpy_height+4*4)+(disp_width - const_x_off) / (IMG_SIZE/2) - 1) >> 1) + i_off + worst_case_mountain_extra,
+		(((dpy_height+4*4)-(-2-(((dpy_height+4*4)+dpy_width) & 1))) >> 1) + j_off + worst_case_mountain_extra);
+
+	rect_t view_rect(estimated_min, estimated_max - estimated_min + koord(1, 1));
+	view_rect.mask(world_rect);
+
+	if (view_rect != viewport->prepared_rect) {
+		welt->prepare_tiles(view_rect, viewport->prepared_rect);
+		viewport->prepared_rect = view_rect;
+	}
 
 #ifdef MULTI_THREAD
 	if(  can_multithreading  ) {
@@ -268,17 +288,17 @@ void main_view_t::display(bool force_dirty)
 		if(zeiger->get_yoff()==Z_PLAN) {
 			grund_t *gr = welt->lookup( zeiger->get_pos() );
 			if(gr && gr->is_visible()) {
-				const PLAYER_COLOR_VAL transparent = TRANSPARENT25_FLAG|OUTLINE_FLAG| env_t::cursor_overlay_color;
+				const FLAGGED_PIXVAL transparent = TRANSPARENT25_FLAG|OUTLINE_FLAG| env_t::cursor_overlay_color;
 				if(  gr->get_image()==IMG_EMPTY  ) {
 					if(  gr->hat_wege()  ) {
 						display_img_blend( gr->obj_bei(0)->get_image(), background_pos.x, background_pos.y, transparent, 0, dirty );
 					}
 					else {
-						display_img_blend( ground_besch_t::get_ground_tile(gr), background_pos.x, background_pos.y, transparent, 0, dirty );
+						display_img_blend( ground_desc_t::get_ground_tile(gr), background_pos.x, background_pos.y, transparent, 0, dirty );
 					}
 				}
 				else if(  gr->get_typ()==grund_t::wasser  ) {
-					display_img_blend( ground_besch_t::sea->get_image(gr->get_image(),wasser_t::stage), background_pos.x, background_pos.y, transparent, 0, dirty );
+					display_img_blend( ground_desc_t::sea->get_image(gr->get_image(),wasser_t::stage), background_pos.x, background_pos.y, transparent, 0, dirty );
 				}
 				else {
 					display_img_blend( gr->get_image(), background_pos.x, background_pos.y, transparent, 0, dirty );
@@ -291,11 +311,26 @@ void main_view_t::display(bool force_dirty)
 
 	if(welt) {
 		// show players income/cost messages
-		for(int x=0; x<MAX_PLAYER_COUNT; x++) {
-			if(  welt->get_player(x)  ) {
-				welt->get_player(x)->display_messages();
-			}
+		switch (env_t::show_money_message) {
+
+			case 0:
+				// show messages of all players
+				for(int x=0; x<MAX_PLAYER_COUNT; x++) {
+					if(  welt->get_player(x)  ) {
+						welt->get_player(x)->display_messages();
+					}
+				}
+				break;
+			
+			case 1:
+				// show message of active player
+				int x = welt->get_active_player_nr();
+				if(  welt->get_player(x)  ) {
+					welt->get_player(x)->display_messages();
+				}
+				break;
 		}
+
 	}
 
 	assert( rs == get_random_seed() ); (void)rs;
@@ -303,6 +338,11 @@ void main_view_t::display(bool force_dirty)
 #else
 	(void)force_dirty;
 #endif
+}
+
+void main_view_t::clear_prepared() const
+{
+	viewport->prepared_rect.discard_area();
 }
 
 
@@ -357,16 +397,16 @@ void main_view_t::display_region( koord lt, koord wh, sint16 y_min, sint16 y_max
 						kb->display_if_visible( xpos, yypos, IMG_SIZE, clip_num, force_show_grid );
 #else
 						if(  env_t::hide_under_cursor  ) {
+							const bool saved_grid = grund_t::show_grid;
 							const uint32 cursor_dist = shortest_distance( pos, cursor_pos );
 							if(  cursor_dist <= env_t::cursor_hide_range + 2u  ) {
 								kb->set_flag( grund_t::dirty );
 								if(  cursor_dist <= env_t::cursor_hide_range  ) {
-									const bool saved_grid = grund_t::show_grid;
 									grund_t::show_grid = true;
-									kb->display_if_visible( xpos, yypos, IMG_SIZE );
-									grund_t::show_grid = saved_grid;
 								}
 							}
+							kb->display_if_visible( xpos, yypos, IMG_SIZE );
+							grund_t::show_grid = saved_grid;
 						}
 						else {
 							kb->display_if_visible( xpos, yypos, IMG_SIZE );
@@ -384,8 +424,8 @@ void main_view_t::display_region( koord lt, koord wh, sint16 y_min, sint16 y_max
 					// check if outside visible
 					outside_visible = true;
 					if(  env_t::draw_outside_tile  ) {
-						const sint16 yypos = ypos - tile_raster_scale_y( welt->get_grundwasser() * TILE_HEIGHT_STEP, IMG_SIZE );
-						display_normal( ground_besch_t::outside->get_image(0), xpos, yypos, 0, true, false  CLIP_NUM_PAR);
+						const sint16 yypos = ypos - tile_raster_scale_y( welt->min_height * TILE_HEIGHT_STEP, IMG_SIZE );
+						display_normal( ground_desc_t::outside->get_image(0), xpos, yypos, 0, true, false  CLIP_NUM_PAR);
 					}
 				}
 			}
@@ -449,7 +489,7 @@ void main_view_t::display_region( koord lt, koord wh, sint16 y_min, sint16 y_max
 							// If the corresponding setting is on, then hide trees and buildings under mouse cursor
 #ifdef MULTI_THREAD
 							if(  threaded  ) {
-								pthread_mutex_lock( &hide_mutex  );
+								pthread_mutex_lock( &hide_mutex );
 								if(  threads_req_pause  ) {
 									// another thread is requesting we pause
 									num_threads_paused++;
@@ -482,12 +522,12 @@ void main_view_t::display_region( koord lt, koord wh, sint16 y_min, sint16 y_max
 
 									// unpause all threads
 									threads_req_pause = false;
-									pthread_mutex_unlock( &hide_mutex  );
 									pthread_cond_broadcast( &hiding_cond );
+									pthread_mutex_unlock( &hide_mutex );
 								}
 								else {
 									// not in the hidden area, draw multithreaded
-									pthread_mutex_unlock( &hide_mutex  );
+									pthread_mutex_unlock( &hide_mutex );
 									plan->display_obj( xpos, yypos, IMG_SIZE, true, hmin, hmax, clip_num );
 								}
 							}
@@ -523,10 +563,10 @@ void main_view_t::display_region( koord lt, koord wh, sint16 y_min, sint16 y_max
 #ifdef MULTI_THREAD
 	// show thread as paused when finished
 	if(  threaded  ) {
-		pthread_mutex_lock( &hide_mutex  );
+		pthread_mutex_lock( &hide_mutex );
 		num_threads_paused++;
 		pthread_cond_broadcast( &waiting_cond );
-		pthread_mutex_unlock( &hide_mutex  );
+		pthread_mutex_unlock( &hide_mutex );
 	}
 #endif
 }
@@ -535,6 +575,6 @@ void main_view_t::display_region( koord lt, koord wh, sint16 y_min, sint16 y_max
 void main_view_t::display_background( KOORD_VAL xp, KOORD_VAL yp, KOORD_VAL w, KOORD_VAL h, bool dirty )
 {
 	if(  !(env_t::draw_earth_border  &&  env_t::draw_outside_tile)  ) {
-		display_fillbox_wh(xp, yp, w, h, env_t::background_color, dirty );
+		display_fillbox_wh_rgb(xp, yp, w, h, env_t::background_color, dirty );
 	}
 }

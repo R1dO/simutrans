@@ -15,7 +15,8 @@
 #include "../simobj.h"
 #include "../tpl/slist_tpl.h"
 
-#define POWER_TO_MW (12)  // bitshift for converting internal power values to MW for display
+// bitshift for converting internal power values to MW for display
+extern const uint32 POWER_TO_MW;
 
 class powernet_t;
 class player_t;
@@ -56,11 +57,18 @@ protected:
 	* Dient zur Neuberechnung des Bildes
 	* @author Hj. Malthaner
 	*/
-	void calc_image();
+	void calc_image() OVERRIDE;
 
 public:
+	// number of fractional bits for network load values
+	static const uint8 FRACTION_PRECISION;
+
 	powernet_t* get_net() const { return net; }
-	void set_net(powernet_t* p) { net = p; }
+	/**
+	 * Changes the currently registered power net.
+	 * Can be overwritten to modify the power net on change.
+	 */
+	virtual void set_net(powernet_t* p) { net = p; }
 
 	const way_desc_t * get_desc() { return desc; }
 	void set_desc(const way_desc_t *new_desc) { desc = new_desc; }
@@ -73,32 +81,32 @@ public:
 	virtual ~leitung_t();
 
 	// just book the costs for destruction
-	void cleanup(player_t *);
+	void cleanup(player_t *) OVERRIDE;
 
 	// for map rotation
-	void rotate90();
+	void rotate90() OVERRIDE;
 
-	typ get_typ() const { return leitung; }
+	typ get_typ() const OVERRIDE { return leitung; }
 
-	const char *get_name() const {return "Leitung"; }
+	const char *get_name() const OVERRIDE {return "Leitung"; }
 
 	/**
 	 * waytype associated with this object
 	 */
-	waytype_t get_waytype() const { return powerline_wt; }
+	waytype_t get_waytype() const OVERRIDE { return powerline_wt; }
 
 	/**
 	* @return Einen Beschreibungsstring für das Objekt, der z.B. in einem
 	* Beobachtungsfenster angezeigt wird.
 	* @author Hj. Malthaner
 	*/
-	void info(cbuffer_t & buf) const;
+	void info(cbuffer_t & buf) const OVERRIDE;
 
 	ribi_t::ribi get_ribi() const { return ribi; }
 
 	inline void set_image( image_id b ) { image = b; }
-	image_id get_image() const {return is_crossing ? IMG_EMPTY : image;}
-	image_id get_front_image() const {return is_crossing ? image : IMG_EMPTY;}
+	image_id get_image() const OVERRIDE {return is_crossing ? IMG_EMPTY : image;}
+	image_id get_front_image() const OVERRIDE {return is_crossing ? image : IMG_EMPTY;}
 
 	/**
 	* Recalculates the images of all neighbouring
@@ -108,28 +116,14 @@ public:
 	*/
 	void calc_neighbourhood();
 
-	/**
-	* Wird nach dem Laden der Welt aufgerufen - üblicherweise benutzt
-	* um das Aussehen des Dings an Boden und Umgebung anzupassen
-	*
-	* @author Hj. Malthaner
-	*/
-	virtual void finish_rd();
-
-	/**
-	* Speichert den Zustand des Objekts.
-	*
-	* @param file Zeigt auf die Datei, in die das Objekt geschrieben werden
-	* soll.
-	* @author Hj. Malthaner
-	*/
-	virtual void rdwr(loadsave_t *file);
+	void rdwr(loadsave_t *file) OVERRIDE;
+	void finish_rd() OVERRIDE;
 
 	/**
 	 * @return NULL if OK, otherwise an error message
 	 * @author Hj. Malthaner
 	 */
-	virtual const char *is_deletable(const player_t *player);
+	const char *is_deletable(const player_t *player) OVERRIDE;
 };
 
 
@@ -144,7 +138,9 @@ private:
 	static slist_tpl<pumpe_t *> pumpe_list;
 
 	fabrik_t *fab;
-	uint32 supply;
+
+	// The power supplied through the transformer.
+	uint32 power_supply;
 
 	void step(uint32 delta_t);
 
@@ -153,15 +149,34 @@ public:
 	pumpe_t(koord3d pos, player_t *player);
 	~pumpe_t();
 
-	typ get_typ() const { return pumpe; }
+	void set_net(powernet_t* p) OVERRIDE;
 
-	const char *get_name() const {return "Aufspanntransformator";}
+	/**
+	 * Set the power supply of the transformer.
+	 */
+	void set_power_supply(uint32 newsupply);
 
-	void info(cbuffer_t & buf) const;
+	/**
+	 * Get the power supply of the transformer.
+	 */
+	uint32 get_power_supply() const {return power_supply;}
 
-	void finish_rd();
+	/**
+ 	 * Get the normalized satisfaction value of the power consumed, updated every tick.
+	 * Return value is fixed point with FRACTION_PRECISION fractional bits.
+	 */
+	sint32 get_power_consumption() const;
 
-	void calc_image() {}	// otherwise it will change to leitung
+	typ get_typ() const OVERRIDE { return pumpe; }
+
+	const char *get_name() const OVERRIDE {return "Aufspanntransformator";}
+
+	void info(cbuffer_t & buf) const OVERRIDE;
+
+	void rdwr(loadsave_t *file) OVERRIDE;
+	void finish_rd() OVERRIDE;
+
+	void calc_image() OVERRIDE {}	// otherwise it will change to leitung
 
 	const fabrik_t* get_factory() const { return fab; }
 };
@@ -169,14 +184,7 @@ public:
 
 /*
  * Distribution transformers act as an interface between power networks and
- * and power consuming factories. They work in a pipelined way by taking the
- * energy demand of a factory, solving it between ticks and feeding the results
- * back the next tick.
- *
- * This buffering means that the factory will get the results for a demand
- * after 2 ticks, with the first tick getting the previous result. Any unfulfilled
- * demand from a result will be refunded to the factory so that the factory can
- * calculate how well demand is being fulfilled in general.
+ * and power consuming factories.
  */
 class senke_t : public leitung_t, public sync_steppable
 {
@@ -184,44 +192,78 @@ public:
 	static void new_world();
 	static void step_all(uint32 delta_t);
 
+	/**
+	 * Read and write static state.
+	 * This is used to make payments occur at the same time after load as after saving.
+	 */
+	static void static_rdwr(loadsave_t *file);
+
 private:
+	// List of all distribution transformers.
 	static slist_tpl<senke_t *> senke_list;
 
-	sint32 einkommen;
-	sint32 max_einkommen;
+	// Timer for global power payment.
+	static uint32 payment_timer;
+
 	fabrik_t *fab;
-	sint32 delta_sum;
-	sint32 next_t;
 
-	// the power demand to be solved next tick
-	uint32 next_power_demand;
+	// Pwm timer for duty cycling image.
+	uint32 delta_sum;
 
-	// the last power demand solved
-	uint32 last_power_demand;
+	// Timer for recalculating image.
+	uint32 next_t;
 
-	// the last power satisfaction computed
-	uint32 power_load;
+	// The power requested through the transformer.
+	uint32 power_demand;
+
+	// Energy accumulator (how much energy has been metered).
+	uint64 energy_acc;
 
 	void step(uint32 delta_t);
+
+	// Pay out revenue for the energy metered.
+	void pay_revenue();
 
 public:
 	senke_t(loadsave_t *file);
 	senke_t(koord3d pos, player_t *player);
 	~senke_t();
 
-	typ get_typ() const { return senke; }
+	void set_net(powernet_t* p) OVERRIDE;
 
-	// used to alternate between displaying power on and power off images at a frequency determined by the percentage of power supplied
-	// gives players a visual indication of a power network with insufficient generation
-	sync_result sync_step(uint32 delta_t);
+	typ get_typ() const OVERRIDE { return senke; }
 
-	const char *get_name() const {return "Abspanntransformator";}
+	/**
+	 * Set the power demand of the transformer.
+	 */
+	void set_power_demand(uint32 newdemand);
 
-	void info(cbuffer_t & buf) const;
+	/**
+	 * Get the power demand of the transformer.
+	 */
+	uint32 get_power_demand() const {return power_demand;}
 
-	void finish_rd();
+	/**
+	 * Get the normalized satisfaction value of the power demand, updated every tick.
+	 * Return value is fixed point with FRACTION_PRECISION fractional bits.
+	 */
+	sint32 get_power_satisfaction() const;
 
-	void calc_image() {}	// otherwise it will change to leitung
+	/**
+	 * Used to alternate between displaying power on and power off images.
+	 * Frequency determined by the percentage of power supplied.
+	 * Gives players a visual indication of a power network with insufficient generation.
+	 */
+	sync_result sync_step(uint32 delta_t) OVERRIDE;
+
+	const char *get_name() const OVERRIDE {return "Abspanntransformator";}
+
+	void info(cbuffer_t & buf) const OVERRIDE;
+
+	void rdwr(loadsave_t *file) OVERRIDE;
+	void finish_rd() OVERRIDE;
+
+	void calc_image() OVERRIDE {}	// otherwise it will change to leitung
 
 	const fabrik_t* get_factory() const { return fab; }
 };

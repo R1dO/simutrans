@@ -8,10 +8,11 @@
 #include <stdio.h>
 
 #include "../simmem.h"
-#include "../gui/simwin.h"
+#include "simwin.h"
 #include "../simmenu.h"
 #include "../simsys.h"
 #include "../simworld.h"
+#include "../simticker.h" // TICKER_HEIGHT
 
 #include "../utils/cbuffer_t.h"
 #include "../utils/simstring.h"
@@ -22,35 +23,40 @@
 
 #include "help_frame.h"
 
-// Padding between text and scroll client area.
 #define DIALOG_MIN_WIDTH (100)
 
+
 help_frame_t::help_frame_t() :
-	gui_frame_t( translator::translate("Help") ),
-	scrolly_generaltext(&generaltext),
-	scrolly_helptext(&helptext)
+	gui_frame_t( translator::translate("Help") )
 {
 	// info windows do not show general text
-	scrolly_generaltext.set_visible( false );
+	generaltext.set_visible( false );
 
 	set_text("<title>Unnamed</title><p>No text set</p>");
 
-	helptext.set_pos( scr_coord(D_MARGIN_LEFT,D_MARGIN_TOP) );
-	helptext.add_listener(this);
+	set_table_layout(1,0);
 
-	scrolly_helptext.set_show_scroll_x(true);
-	add_component(&scrolly_helptext);
+	helptext.add_listener(this);
+	add_component(&helptext);
 
 	set_resizemode(diagonal_resize);
-	set_min_windowsize( scr_size( D_MARGIN_LEFT + (D_SCROLLBAR_WIDTH<<1) + DIALOG_MIN_WIDTH + D_MARGIN_RIGHT, D_TITLEBAR_HEIGHT + D_MARGIN_TOP + (D_SCROLLBAR_HEIGHT<<1) + D_MARGIN_BOTTOM) );
+	reset_min_windowsize();
+	set_windowsize( scr_size( D_MARGIN_LEFT + (D_SCROLLBAR_WIDTH<<1) + DIALOG_MIN_WIDTH + D_MARGIN_RIGHT, D_TITLEBAR_HEIGHT + D_MARGIN_TOP + (D_SCROLLBAR_HEIGHT<<1) + D_MARGIN_BOTTOM) );
 }
 
 
 help_frame_t::help_frame_t(char const* const filename) :
-	gui_frame_t( translator::translate("Help") ),
-	scrolly_generaltext(&generaltext),
-	scrolly_helptext(&helptext)
+	gui_frame_t( translator::translate("Help") )
 {
+	set_table_layout(2,0);
+	set_alignment(ALIGN_TOP | ALIGN_LEFT);
+
+	add_component(&generaltext);
+	generaltext.add_listener(this);
+
+	add_component(&helptext);
+	helptext.add_listener(this);
+
 	// we now exclusive build out index on the fly
 	slist_tpl<plainstring> already_there;
 	cbuffer_t index_txt;
@@ -60,18 +66,6 @@ help_frame_t::help_frame_t(char const* const filename) :
 	cbuffer_t game_start;
 	cbuffer_t how_to_play;
 	cbuffer_t others;
-
-	helptext.set_pos( scr_coord(D_MARGIN_LEFT,D_MARGIN_TOP) );
-	scrolly_helptext.set_show_scroll_x(true);
-	add_component(&scrolly_helptext);
-	helptext.add_listener(this);
-
-	generaltext.set_pos( scr_coord(D_MARGIN_LEFT,D_MARGIN_TOP) );
-	scrolly_generaltext.set_pos( scr_coord( 0, 0) );
-	scrolly_generaltext.set_show_scroll_x(true);
-	scrolly_generaltext.set_visible( true );
-	add_component(&scrolly_generaltext);
-	generaltext.add_listener(this);
 
 	add_helpfile( introduction, NULL, "simutrans.txt", true, 0 );
 
@@ -164,12 +158,9 @@ help_frame_t::help_frame_t(char const* const filename) :
 
 	set_helpfile( filename, true );
 
-	//scrolly_helptext.set_show_scroll_x(true);
-	//add_component(&scrolly_helptext);
-
 	set_resizemode(diagonal_resize);
-	set_min_windowsize(scr_size(200, D_DEFAULT_HEIGHT));
-//	set_min_windowsize(scr_size(200, D_TITLEBAR_HEIGHT + D_MARGIN_TOP + (D_SCROLLBAR_HEIGHT) + D_MARGIN_BOTTOM));
+	reset_min_windowsize();
+	set_windowsize(scr_size(200, D_DEFAULT_HEIGHT));
 }
 
 
@@ -189,21 +180,21 @@ void help_frame_t::open_help_on( const char *helpfilename )
 // just loads a whole help file as one chunk
 static const char *load_text(char const* const filename )
 {
-	std::string file_prefix("text/");
-	std::string fullname = file_prefix + translator::get_lang()->iso + "/" + filename;
-	chdir(env_t::program_dir);
+	std::string file_prefix= std::string("text") + PATH_SEPARATOR;
+	std::string fullname = file_prefix + translator::get_lang()->iso + PATH_SEPARATOR + filename;
+	dr_chdir(env_t::program_dir);
 
-	FILE* file = fopen(fullname.c_str(), "rb");
+	FILE* file = dr_fopen(fullname.c_str(), "rb");
 	if (!file) {
 		//Check for the 'base' language(ie en from en_gb)
-		file = fopen((file_prefix + translator::get_lang()->iso_base + "/" + filename).c_str(), "rb");
+		file = dr_fopen((file_prefix + translator::get_lang()->iso_base + PATH_SEPARATOR + filename).c_str(), "rb");
 	}
 	if (!file) {
 		// Hajo: check fallback english
-		file = fopen((file_prefix + "/en/" + filename).c_str(), "rb");
+		file = dr_fopen((file_prefix + PATH_SEPARATOR + "en" + PATH_SEPARATOR + filename).c_str(), "rb");
 	}
 	// go back to load/save dir
-	chdir( env_t::user_dir );
+	dr_chdir( env_t::user_dir );
 
 	if(file) {
 		fseek(file,0,SEEK_END);
@@ -252,7 +243,6 @@ static const char *load_text(char const* const filename )
 void help_frame_t::set_text(const char * buf, bool resize_frame )
 {
 	helptext.set_text(buf);
-	helptext.set_pos( scr_coord(D_MARGIN_LEFT,D_MARGIN_TOP) );
 
 	if(  resize_frame  ) {
 
@@ -267,18 +257,14 @@ void help_frame_t::set_text(const char * buf, bool resize_frame )
 			curr = helptext.get_preferred_size();
 		}
 
-		// the second line isn't redundant!!!
-		helptext.set_size(helptext.get_preferred_size());
 		helptext.set_size(helptext.get_preferred_size());
 
-		if(  scrolly_generaltext.is_visible()  ) {
+		if(  generaltext.is_visible()  ) {
 			generaltext.set_pos( scr_coord(D_MARGIN_LEFT, D_MARGIN_TOP) );
 			generaltext.set_size( scr_size( min(180,display_get_width()/3), 0 ) );
 			int generalwidth = min( display_get_width()/3, generaltext.get_preferred_size().w );
 			generaltext.set_size( scr_size( generalwidth, helptext.get_size().h ) );
 			generaltext.set_size( generaltext.get_preferred_size() );
-			generaltext.set_size( generaltext.get_preferred_size() );
-			generaltext.set_size( generaltext.get_text_size() );
 		}
 		else {
 			generaltext.set_size( scr_size(D_MARGIN_LEFT, D_MARGIN_TOP) );
@@ -287,7 +273,7 @@ void help_frame_t::set_text(const char * buf, bool resize_frame )
 		// calculate sizes (might not a help but info window, which do not have general text)
 		scr_coord_val size_x = helptext.get_size().w + D_MARGIN_LEFT + D_MARGIN_RIGHT + D_SCROLLBAR_WIDTH;
 		scr_coord_val size_y = helptext.get_size().h + D_TITLEBAR_HEIGHT + D_MARGIN_TOP  + D_MARGIN_BOTTOM + D_SCROLLBAR_HEIGHT;
-		if(  scrolly_generaltext.is_visible()  ) {
+		if(  generaltext.is_visible()  ) {
 			size_x += generaltext.get_size().w + D_SCROLLBAR_WIDTH + D_H_SPACE;
 		}
 		// set window size
@@ -295,15 +281,16 @@ void help_frame_t::set_text(const char * buf, bool resize_frame )
 			size_x = display_get_width()-32;
 		}
 
-		if(  size_y>display_get_height()-64) {
-			size_y = display_get_height()-64;
+		const scr_coord_val h = display_get_height() - D_TITLEBAR_HEIGHT - win_get_statusbar_height() - TICKER_HEIGHT;
+		if(  size_y>h) {
+			size_y = h;
 		}
 		set_windowsize( scr_size( size_x, size_y ) );
 	}
 
 	// generate title
 	title = "";
-	if(  scrolly_generaltext.is_visible()  ) {
+	if(  generaltext.is_visible()  ) {
 		title = translator::translate( "Help" );
 		title += " - ";
 	}
@@ -384,22 +371,22 @@ void help_frame_t::set_helpfile(const char *filename, bool resize_frame )
 FILE *help_frame_t::has_helpfile( char const* const filename, int &mode )
 {
 	mode = native;
-	std::string file_prefix("text/");
-	std::string fullname = file_prefix + translator::get_lang()->iso + "/" + filename;
-	chdir(env_t::program_dir);
+	std::string file_prefix = std::string("text") + PATH_SEPARATOR;
+	std::string fullname = file_prefix + translator::get_lang()->iso + PATH_SEPARATOR + filename;
+	dr_chdir(env_t::program_dir);
 
-	FILE* file = fopen(fullname.c_str(), "rb");
+	FILE* file = dr_fopen(fullname.c_str(), "rb");
 	if(  !file  &&  strcmp(translator::get_lang()->iso,translator::get_lang()->iso_base)  ) {
 		//Check for the 'base' language(ie en from en_gb)
-		file = fopen(  (file_prefix + translator::get_lang()->iso_base + "/" + filename).c_str(), "rb"  );
+		file = dr_fopen(  (file_prefix + translator::get_lang()->iso_base + PATH_SEPARATOR + filename).c_str(), "rb"  );
 	}
 	if(  !file  ) {
 		// Hajo: check fallback english
-		file = fopen((file_prefix + "en/" + filename).c_str(), "rb");
+		file = dr_fopen((file_prefix + "en/" + filename).c_str(), "rb");
 		mode = english;
 	}
 	// go back to load/save dir
-	chdir( env_t::user_dir );
+	dr_chdir( env_t::user_dir );
 	// success?
 	if(  !file  ) {
 		mode = missing;
@@ -503,23 +490,14 @@ void help_frame_t::resize(const scr_coord delta)
 	gui_frame_t::resize(delta);
 
 	scr_coord_val generalwidth = 0;
-	if(  scrolly_generaltext.is_visible()  ) {
+	if(  generaltext.is_visible()  ) {
 		// do not use more than 1/3 for the general infomations
-		generalwidth = min( display_get_width()/3, generaltext.get_preferred_size().w ) + D_SCROLLBAR_WIDTH + D_MARGIN_LEFT;
-		scrolly_generaltext.set_size( scr_size( generalwidth, get_windowsize().h-D_TITLEBAR_HEIGHT ) );
-
-		scr_size general_size = scrolly_generaltext.get_size() - D_SCROLLBAR_SIZE - scr_size(D_MARGIN_LEFT,D_MARGIN_TOP);
-		generaltext.set_size( general_size );
-		generaltext.set_size( generaltext.get_text_size() );
+		generalwidth = min( get_windowsize().w/3, generaltext.get_preferred_size().w ) + D_SCROLLBAR_WIDTH;
+		generaltext.set_size( scr_size( generalwidth, get_client_windowsize().h  - D_MARGIN_BOTTOM) );
 
 		generalwidth += D_H_SPACE;
-		scrolly_helptext.set_pos( scr_size( generalwidth, 0 ) );
+		helptext.set_pos( generaltext.get_pos() + scr_size( generalwidth, 0 ) );
 	}
 
-	scrolly_helptext.set_size( get_windowsize() - scr_size( generalwidth, D_TITLEBAR_HEIGHT ) );
-
-	scr_size helptext_size =  scrolly_helptext.get_size() - helptext.get_pos() - D_SCROLLBAR_SIZE - scr_size(D_MARGIN_LEFT,D_MARGIN_TOP);
-
-	helptext.set_size( helptext_size );
-	helptext.set_size( helptext.get_text_size() );
+	helptext.set_size( get_client_windowsize() - scr_size( generalwidth, 0) -scr_size(D_MARGIN_RIGHT,D_MARGIN_BOTTOM) );
 }

@@ -18,6 +18,7 @@
 
 #include <string>
 
+class building_desc_t;
 class karte_ptr_t;
 class player_t;
 class rule_t;
@@ -39,9 +40,9 @@ enum city_cost {
 	HIST_MAIL_TRANSPORTED,	// letters that could be sent
 	HIST_MAIL_WALKED,       // direct handover
 	HIST_MAIL_GENERATED,	// all letters generated
-	HIST_GOODS_RECIEVED,	// times all storages were not empty
+	HIST_GOODS_RECEIVED,	// times all storages were not empty
 	HIST_GOODS_NEEDED,	// times storages checked
-	HIST_POWER_RECIEVED,	// power consumption (not used at the moment!)
+	HIST_POWER_RECEIVED,	// power consumption (not used at the moment!)
 	MAX_CITY_HISTORY	// Total number of items in array
 };
 
@@ -133,8 +134,8 @@ private:
 
 	weighted_vector_tpl <gebaeude_t *> buildings;
 
-	sparse_tpl<uint8> pax_destinations_old;
-	sparse_tpl<uint8> pax_destinations_new;
+	sparse_tpl<PIXVAL> pax_destinations_old;
+	sparse_tpl<PIXVAL> pax_destinations_new;
 
 	// this counter will increment by one for every change => dialogs can question, if they need to update map
 	uint32 pax_destinations_new_change;
@@ -208,38 +209,38 @@ private:
 	 * @author DrSuperGood
 	 */
 private:
-	 // The growth factor type in form of the amount demanded and what was received.
-	 struct city_growth_factor_t {
-		 // The wanted value.
-		 sint64 demand;
-		 // The received value.
-		 sint64 supplied;
+	// The growth factor type in form of the amount demanded and what was received.
+	struct city_growth_factor_t {
+		// The wanted value.
+		sint64 demand;
+		// The received value.
+		sint64 supplied;
 
-		 city_growth_factor_t() : demand(0), supplied(0){}
-	 };
+		city_growth_factor_t() : demand(0), supplied(0){}
+	};
 
-	 // The previous values of the growth factors. Used to get delta between ticks and must be saved for determinism.
-	 city_growth_factor_t city_growth_factor_previous[GROWTH_FACTOR_NUMBER];
+	// The previous values of the growth factors. Used to get delta between ticks and must be saved for determinism.
+	city_growth_factor_t city_growth_factor_previous[GROWTH_FACTOR_NUMBER];
 
-	 /* Method to generate comparable growth factor data.
+	/* Method to generate comparable growth factor data.
 	 * This allows one to alter the logic which computes growth.
 	 * @param factors factor array.
 	 * @param month the month which is to be used for the growth factors.
 	 */
-	 void city_growth_get_factors(city_growth_factor_t (&factors)[GROWTH_FACTOR_NUMBER], uint32 const month) const;
+	void city_growth_get_factors(city_growth_factor_t (&factors)[GROWTH_FACTOR_NUMBER], uint32 const month) const;
 
-	 /* Method to compute base growth using growth factors.
-	  * Logs differences in growth factors as well.
-	  * rprec : The returned fractional precision (out of sint32).
-	  * cprec : The computation fractional precision (out of sint32).
-	  */
-	 sint32 city_growth_base(uint32 const rprec = 6, uint32 const cprec = 16);
+	/* Method to compute base growth using growth factors.
+	 * Logs differences in growth factors as well.
+	 * rprec : The returned fractional precision (out of sint32).
+	 * cprec : The computation fractional precision (out of sint32).
+	 */
+	sint32 city_growth_base(uint32 const rprec = 6, uint32 const cprec = 16);
 
-	 /* Method to roll previous growth factors at end of month, called before history rolls over.
-	  * Needed to prevent loss of data (not set to 0) and while keeping reasonable (no insane values).
-	  * month : The month index of what is now the "last month".
-	  */
-	 void city_growth_monthly(uint32 const month);
+	/* Method to roll previous growth factors at end of month, called before history rolls over.
+	 * Needed to prevent loss of data (not set to 0) and while keeping reasonable (no insane values).
+	 * month : The month index of what is now the "last month".
+	 */
+	void city_growth_monthly(uint32 const month);
 
 public:
 	/**
@@ -352,7 +353,7 @@ private:
 	 * ein Passagierziel in die Zielkarte eintragen
 	 * @author Hj. Malthaner
 	 */
-	void merke_passagier_ziel(koord ziel, uint8 color);
+	void merke_passagier_ziel(koord ziel, PIXVAL color);
 
 	/**
 	 * baut Spezialgebaeude, z.B Stadion
@@ -382,7 +383,10 @@ private:
 	void build_city_building(koord pos);
 	void renovate_city_building(gebaeude_t *gb);
 
-	void generate_private_cars(koord pos, sint32 level,koord target);
+#ifdef DESTINATION_CITYCARS
+	sint16	number_of_cars; // allowed number of cars to spawn per month
+	void generate_private_cars(koord pos, koord target);
+#endif
 
 	/**
 	 * baut ein Stueck Strasse
@@ -391,7 +395,7 @@ private:
 	 *
 	 * @author Hj. Malthaner, V. Meyer
 	 */
-	bool build_road(const koord k, player_t *player, bool forced);
+	bool build_road(const koord k, player_t *player_, bool forced);
 
 	void build();
 
@@ -433,6 +437,9 @@ public:
 	const factory_set_t& get_target_factories_for_mail() const { return target_factories_mail; }
 	factory_set_t& access_target_factories_for_pax() { return target_factories_pax; }
 	factory_set_t& access_target_factories_for_mail() { return target_factories_mail; }
+
+	// calculated the "best" orietation of city buildings, also used by editor, thus public
+	static int orient_city_building(const koord k, const building_desc_t *h, koord maxarea );
 
 	// this function removes houses from the city house list
 	// (called when removed by player, or by town)
@@ -490,13 +497,13 @@ public:
 	 * gibt das pax-statistik-array für letzten monat zurück
 	 * @author Hj. Malthaner
 	 */
-	const sparse_tpl<unsigned char>* get_pax_destinations_old() const { return &pax_destinations_old; }
+	const sparse_tpl<PIXVAL>* get_pax_destinations_old() const { return &pax_destinations_old; }
 
 	/**
 	 * gibt das pax-statistik-array für den aktuellen monat zurück
 	 * @author Hj. Malthaner
 	 */
-	const sparse_tpl<unsigned char>* get_pax_destinations_new() const { return &pax_destinations_new; }
+	const sparse_tpl<PIXVAL>* get_pax_destinations_new() const { return &pax_destinations_new; }
 
 	/* this counter will increment by one for every change
 	 * => dialogs can question, if they need to update map
@@ -609,7 +616,7 @@ public:
 	inline koord get_linksoben() const { return lo;}
 	inline koord get_rechtsunten() const { return ur;}
 
-	koord get_center() const { return (lo+ur)/2; }
+	koord get_center() const { return lo/2 + ur/2; }
 
 	/**
 	 * Erzeugt ein Array zufaelliger Startkoordinaten,
