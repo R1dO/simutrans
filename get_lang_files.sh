@@ -7,6 +7,27 @@ OUTPUT_DIR=simutrans/text
 # The first file is longer, but only because it contains SQL error messages
 # - discard it after complete download (although parsing it would give us the archive's name):
 
+OUTPUT_DIR="${1-${OUTPUT_DIR}}"
+if [ $# -eq 0 ]; then
+	echo "Getting translations for default repository build location: $(pwd -P)/${OUTPUT_DIR}"
+elif [ "${1}" = '-h' ] || [ "${1}" = '--help' ]; then
+	echo "Usage"
+	echo "====="
+	echo "Download and extract to default repository build location:"
+	echo "	$0"
+	echo "Download and extract to a user defined location:"
+	echo "	$0 output_path"
+  echo
+  echo "Note:"
+  echo " If downloading into an existing simutrans installation make sure the path ends with: '/text'."
+	exit 1
+elif [ ! -e "${1}" ]; then
+	echo "ERROR: User defined location does not exist."
+	exit 1
+else
+	echo "Getting translations for user defined location: ${OUTPUT_DIR}"
+fi
+
 # Use curl if available, else use wget
 curl -q -h > /dev/null
 if [ $? -eq 0 ]; then
