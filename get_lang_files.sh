@@ -9,23 +9,23 @@ OUTPUT_DIR=simutrans/text
 
 OUTPUT_DIR="${1-${OUTPUT_DIR}}"
 if [ $# -eq 0 ]; then
-	echo "Getting translations for default location: $(pwd -P)/${OUTPUT_DIR}"
+    echo "Getting translations for default location: $(pwd -P)/${OUTPUT_DIR}"
 elif [ "${1}" = '-h' ] || [ "${1}" = '--help' ]; then
-	echo "Usage"
-	echo "====="
-	echo "Download and extract to default location:"
-	echo "	$0"
-	echo "Download and extract to a user defined location:"
-	echo "	$0 output_path"
-  echo
-  echo "Note:"
-  echo " If downloading into an existing simutrans installation make sure the path ends with: '/text'."
-	exit 1
+    echo "Usage"
+    echo "====="
+    echo "Download and extract to default location:"
+    echo "  $0"
+    echo "Download and extract to a user defined location:"
+    echo "  $0 output_path"
+    echo
+    echo "Note:"
+    echo " If downloading into an existing simutrans installation make sure the path ends with: '/text'."
+    exit 1
 elif [ ! -e "${1}" ]; then
-	echo "ERROR: User defined location does not exist."
-	exit 1
+    echo "ERROR: User defined location does not exist."
+    exit 1
 else
-	echo "Getting translations for user defined location: ${OUTPUT_DIR}"
+    echo "Getting translations for user defined location: ${OUTPUT_DIR}"
 fi
 
 # Use curl if available, else use wget
