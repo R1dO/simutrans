@@ -3,17 +3,15 @@
 # script to fetch language files
 #
 OUTPUT_DIR=simutrans/text
-# get the translations for basis
-# The first file is longer, but only because it contains SQL error messages
-# - discard it after complete download (although parsing it would give us the archive's name):
 
+# Parse input and provide basic help text.
 OUTPUT_DIR="${1-${OUTPUT_DIR}}"
 if [ $# -eq 0 ]; then
     echo "Getting translations for default location: $(pwd -P)/${OUTPUT_DIR}"
 elif [ "${1}" = '-h' ] || [ "${1}" = '--help' ]; then
     echo "Usage"
     echo "====="
-    echo "Download and extract to default location:"
+    echo "Download and extract to default location (relative to script):"
     echo "  $0"
     echo "Download and extract to a user defined location:"
     echo "  $0 output_path"
@@ -28,6 +26,10 @@ else
     echo "Getting translations for user defined location: ${OUTPUT_DIR}"
 fi
 
+# get the translations for basis
+# The first file is longer, but only because it contains SQL error messages
+# - discard it after complete download (although parsing it would give us the archive's name):
+#
 # Use curl if available, else use wget
 curl -q -h > /dev/null
 if [ $? -eq 0 ]; then
@@ -57,15 +59,15 @@ else
         exit 6
     fi
 fi
-unzip -otv "language_pack-Base+texts.zip" -d ${OUTPUT_DIR} || {
+unzip -otv "language_pack-Base+texts.zip" -d "${OUTPUT_DIR}" || {
    echo "Error: file language_pack-Base+texts.zip seems to be defective" >&2
    rm -f "language_pack-Base+texts.zip"
    exit 5
 }
-unzip -o "language_pack-Base+texts.zip" -d ${OUTPUT_DIR}
+unzip -o "language_pack-Base+texts.zip" -d "${OUTPUT_DIR}"
 rm language_pack-Base+texts.zip
 # remove Chris English (may become simple English ... )
-rm -f ${OUTPUT_DIR}/ce.tab
+rm -f "${OUTPUT_DIR}/ce.tab"
 # Remove check test
 #rm xx.tab
 #rm -rf xx
