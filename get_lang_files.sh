@@ -20,7 +20,7 @@ elif [ "${1}" = '-h' ] || [ "${1}" = '--help' ]; then
     echo " If downloading into an existing simutrans installation make sure the path ends with: '/text'."
     exit 1
 elif [ ! -e "${1}" ]; then
-    echo "ERROR: User defined location does not exist."
+    echo "ERROR: User defined location (${OUTPUT_DIR}) does not exist."
     exit 1
 else
     echo "Getting translations for user defined location: ${OUTPUT_DIR}"
