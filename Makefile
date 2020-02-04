@@ -158,6 +158,13 @@ ifdef USE_UPNP
   endif
 endif
 
+ifdef USE_ZSRD
+  ifeq ($(shell expr $(USE_UPNP) \>= 1), 1)
+    CFLAGS      += -DUSE_ZSTD
+    LDFLAGS     += -lzstd
+  endif
+endif
+
 ifeq ($(shell expr $(PROFILE) \>= 1), 1)
   CFLAGS   += -pg -DPROFILE
   ifeq ($(shell expr $(PROFILE) \>= 2), 1)
@@ -600,8 +607,8 @@ ifeq ($(BACKEND),sdl2)
 
   ifeq ($(SDL2_CONFIG),)
     ifeq ($(OSTYPE),mac)
-      SDL_CFLAGS  := -I/Library/Frameworks/SDL2.framework/Headers
-      SDL_LDFLAGS := -framework SDL2
+      SDL_CFLAGS  := -F /Library/Frameworks -I/Library/Frameworks/SDL2.framework/Headers 
+      SDL_LDFLAGS := -framework SDL2 -F /Library/Frameworks -I /Library/Frameworks/SDL2.framework/Headers 
     else
       SDL_CFLAGS  := -I$(MINGDIR)/include/SDL2 -Dmain=SDL_main
       SDL_LDFLAGS := -lSDL2main -lSDL2
@@ -622,8 +629,8 @@ ifeq ($(BACKEND),mixer_sdl2)
   SOURCES += simsys_s2.cc
   ifeq ($(SDL2_CONFIG),)
     ifeq ($(OSTYPE),mac)
-      SDL_CFLAGS  := -I/Library/Frameworks/SDL2.framework/Headers
-      SDL_LDFLAGS := -framework SDL2
+      SDL_CFLAGS  := -F /Library/Frameworks -I/Library/Frameworks/SDL2.framework/Headers 
+      SDL_LDFLAGS := -framework SDL2 -F /Library/Frameworks -I /Library/Frameworks/SDL2.framework/Headers 
     else
       SDL_CFLAGS  := -I$(MINGDIR)/include/SDL2 -Dmain=SDL_main
       SDL_LDFLAGS := -lSDL2main -lSDL2
