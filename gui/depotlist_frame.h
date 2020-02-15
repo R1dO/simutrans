@@ -10,6 +10,7 @@
 #include "components/gui_scrollpane.h"
 #include "components/gui_scrolled_list.h"
 #include "components/gui_label.h"
+#include "components/gui_image.h"
 
 class depot_t;
 
@@ -20,6 +21,8 @@ private:
 	button_t	sortedby;
 	button_t	sorteddir;
 	gui_scrolled_list_t scrolly;
+
+	uint32 last_depot_count;
 
 	void fill_list();
 
@@ -42,6 +45,7 @@ class depotlist_stats_t : public gui_aligned_container_t, public gui_scrolled_li
 private:
 	depot_t *depot;
 	gui_label_buf_t label;
+	gui_image_t waytype_symbol;
 
 	void update_label();
 
