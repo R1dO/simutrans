@@ -1,11 +1,18 @@
+;
+; This file is part of the Simutrans project under the Artistic License.
+; (see LICENSE.txt)
+;
+
 ; ************************************* Pakset downloader for simutrans *********************************************
 
 ; needs the following plugins:
 ; nsisunz
 ; inetc
-; CabDll
+; CabX
 ; untgz
 ; ShellLink
+
+Unicode true
 
 !include "preparation-functions.nsh"
 

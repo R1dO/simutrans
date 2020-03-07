@@ -1,14 +1,6 @@
 /*
- * Copyright (c) 1997 - 2001 Hj. Malthaner
- *
- * This file is part of the Simutrans project under the artistic license.
- * (see license.txt)
- */
-
-/*
- * Basic class of all visible things
- *
- * Hj. Maltahner
+ * This file is part of the Simutrans project under the Artistic License.
+ * (see LICENSE.txt)
  */
 
 #include <string.h>
@@ -257,11 +249,9 @@ void obj_t::rotate90()
 {
 	// most basic: rotate coordinate
 	pos.rotate90( welt->get_size().y-1 );
-	if(xoff!=0) {
-		sint8 new_dx = -2*yoff;
-		yoff = xoff/2;
-		xoff = new_dx;
-	}
+	sint8 new_dx = -2*yoff;
+	yoff = xoff/2;
+	xoff = new_dx;
 }
 
 
