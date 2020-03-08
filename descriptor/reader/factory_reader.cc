@@ -16,7 +16,7 @@
 #include "factory_reader.h"
 
 
-// Knightly : determine the combined probability of 256 rounds of chances
+// determine the combined probability of 256 rounds of chances
 uint16 rescale_probability(const uint16 p)
 {
 	if(  p  ) {
@@ -39,13 +39,13 @@ obj_desc_t *factory_field_class_reader_t::read_node(FILE *fp, obj_node_info_t &n
 
 	field_class_desc_t *desc = new field_class_desc_t();
 
-	// Hajo: Read data
+	// Read data
 	fread(desc_buf, node.size, 1, fp);
 	char * p = desc_buf;
 
 	uint16 v = decode_uint16(p);
 	if(  v==0x8001  ) {
-		// Knightly : field class specific data
+		// field class specific data
 		desc->snow_image = decode_uint8(p);
 		desc->production_per_field = decode_uint16(p);
 		desc->storage_capacity = decode_uint16(p);
@@ -72,7 +72,7 @@ obj_desc_t *factory_field_group_reader_t::read_node(FILE *fp, obj_node_info_t &n
 
 	field_group_desc_t *desc = new field_group_desc_t();
 
-	// Hajo: Read data
+	// Read data
 	fread(desc_buf, node.size, 1, fp);
 	char * p = desc_buf;
 
@@ -85,16 +85,16 @@ obj_desc_t *factory_field_group_reader_t::read_node(FILE *fp, obj_node_info_t &n
 		desc->field_classes = decode_uint16(p);
 	}
 	else if(  v==0x8002  ) {
-		// Knightly : this version only store shared, common data
+		// this version only store shared, common data
 		desc->probability = rescale_probability( decode_uint16(p) );
 		desc->max_fields = decode_uint16(p);
 		desc->min_fields = decode_uint16(p);
 		desc->field_classes = decode_uint16(p);
 	}
 	else if(  v==0x8001  ) {
-		/* Knightly :
-		 *   leave shared, common data in field desc
-		 *   field class specific data goes to field class desc
+		/*
+		 * leave shared, common data in field desc
+		 * field class specific data goes to field class desc
 		 */
 		field_class_desc_t *const field_class_desc = new field_class_desc_t();
 
@@ -107,9 +107,9 @@ obj_desc_t *factory_field_group_reader_t::read_node(FILE *fp, obj_node_info_t &n
 		field_class_desc->storage_capacity = 0;
 		field_class_desc->spawn_weight = 1000;
 
-		/* Knightly :
-		 *   store it in a static variable for further processing
-		 *   later in factory_field_reader_t::register_obj()
+		/*
+		 * store it in a static variable for further processing
+		 * later in factory_field_reader_t::register_obj()
 		 */
 		incomplete_field_class_desc = field_class_desc;
 
@@ -147,7 +147,7 @@ void factory_field_group_reader_t::register_obj(obj_desc_t *&data)
 {
 	field_group_desc_t *const desc = static_cast<field_group_desc_t *>(data);
 
-	// Knightly : check if we need to continue with the construction of field class desc
+	// check if we need to continue with the construction of field class desc
 	if (field_class_desc_t *const field_class_desc = incomplete_field_class_desc) {
 		// we *must* transfer the obj_desc_t array and not just the desc object itself
 		// as xref reader has already logged the address of the array element for xref resolution
@@ -166,7 +166,7 @@ obj_desc_t *factory_smoke_reader_t::read_node(FILE *fp, obj_node_info_t &node)
 
 	smoke_desc_t *desc = new smoke_desc_t();
 
-	// Hajo: Read data
+	// Read data
 	fread(desc_buf, node.size, 1, fp);
 	char * p = desc_buf;
 
@@ -193,11 +193,11 @@ obj_desc_t *factory_supplier_reader_t::read_node(FILE *fp, obj_node_info_t &node
 
 	factory_supplier_desc_t *desc = new factory_supplier_desc_t();
 
-	// Hajo: Read data
+	// Read data
 	fread(desc_buf, node.size, 1, fp);
 	char * p = desc_buf;
 
-	// Hajo: old versions of PAK files have no version stamp.
+	// old versions of PAK files have no version stamp.
 	// But we know, the higher most bit was always cleared.
 
 	const uint16 v = decode_uint16(p);
@@ -231,12 +231,12 @@ obj_desc_t *factory_product_reader_t::read_node(FILE *fp, obj_node_info_t &node)
 
 	factory_product_desc_t *desc = new factory_product_desc_t();
 
-	// Hajo: Read data
+	// Read data
 	fread(desc_buf, node.size, 1, fp);
 
 	char * p = desc_buf;
 
-	// Hajo: old versions of PAK files have no version stamp.
+	// old versions of PAK files have no version stamp.
 	// But we know, the higher most bit was always cleared.
 	const uint16 v = decode_uint16(p);
 	const int version = v & 0x8000 ? v & 0x7FFF : 0;
@@ -269,22 +269,57 @@ obj_desc_t *factory_reader_t::read_node(FILE *fp, obj_node_info_t &node)
 
 	factory_desc_t *desc = new factory_desc_t();
 
-	// Hajo: Read data
+	// Read data
 	fread(desc_buf, node.size, 1, fp);
 
 	char * p = desc_buf;
 
 	desc->sound_id = NO_SOUND;
 	desc->sound_interval = 0xFFFFFFFFul;
+	desc->smokerotations = 0;
 
-	// Hajo: old versions of PAK files have no version stamp.
+	// old versions of PAK files have no version stamp.
 	// But we know, the higher most bit was always cleared.
 
 	const uint16 v = decode_uint16(p);
 	const int version = v & 0x8000 ? v & 0x7FFF : 0;
 
 	typedef factory_desc_t::site_t site_t;
-	if(version == 4) {
+	if(version == 5) {
+		// Versioned node, version 4 with sound and animation
+		desc->placement = (site_t)decode_uint16(p);
+		desc->productivity = decode_uint16(p);
+		desc->range = decode_uint16(p);
+		desc->distribution_weight = decode_uint16(p);
+		desc->color = decode_uint8(p);
+		desc->fields = decode_uint8(p);
+		desc->supplier_count = decode_uint16(p);
+		desc->product_count = decode_uint16(p);
+		desc->pax_level = decode_uint16(p);
+		desc->expand_probability = rescale_probability( decode_uint16(p) );
+		desc->expand_minimum = decode_uint16(p);
+		desc->expand_range = decode_uint16(p);
+		desc->expand_times = decode_uint16(p);
+		desc->electric_boost = decode_uint16(p);
+		desc->pax_boost = decode_uint16(p);
+		desc->mail_boost = decode_uint16(p);
+		desc->electric_demand = decode_uint16(p);
+		desc->pax_demand = decode_uint16(p);
+		desc->mail_demand = decode_uint16(p);
+		desc->sound_interval = decode_uint32(p);
+		desc->sound_id = decode_sint8(p);
+
+		desc->smokerotations = decode_sint8(p);
+		for( int i = 0; i < 4; i++ ) {
+			desc->smoketile[i].x = decode_sint16(p);
+			desc->smoketile[i].y = decode_sint16(p);
+			desc->smokeoffset[i].x = decode_sint16(p);
+			desc->smokeoffset[i].y = decode_sint16(p);
+		}
+		desc->smokeuplift = decode_uint16(p);
+		desc->smokelifetime = decode_uint16(p);
+	}
+	else if(version == 4) {
 		// Versioned node, version 4 with sound and animation
 		desc->placement = (site_t)decode_uint16(p);
 		desc->productivity = decode_uint16(p);
@@ -450,8 +485,10 @@ DBG_MESSAGE("vehicle_reader_t::register_obj()","old sound %i to %i",old_id,desc-
 void factory_reader_t::register_obj(obj_desc_t *&data)
 {
 	factory_desc_t* desc = static_cast<factory_desc_t*>(data);
+	const char *name = desc->get_name();
 	size_t fab_name_len = strlen( desc->get_name() );
 	desc->electricity_producer = ( fab_name_len>11   &&  (strcmp(desc->get_name()+fab_name_len-9, "kraftwerk")==0  ||  strcmp(desc->get_name()+fab_name_len-11, "Power Plant")==0) );
+	desc->correct_smoke();
 	factory_builder_t::register_desc(desc);
 }
 

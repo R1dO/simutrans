@@ -10,15 +10,15 @@
 
 #include "components/gui_aligned_container.h"
 #include "components/gui_colorbox.h"
+#include "components/gui_button.h"
 #include "components/gui_image.h"
 #include "components/gui_label.h"
 #include "components/gui_scrolled_list.h"
 #include "../halthandle_t.h"
 
 class gui_halt_type_images_t;
-/**
- * @author Hj. Malthaner
- */
+
+
 class halt_list_stats_t : public gui_aligned_container_t, public gui_scrolled_list_t::scrollitem_t
 {
 private:
@@ -29,6 +29,7 @@ public:
 	gui_image_t img_enabled[3];
 	gui_halt_type_images_t *img_types;
 	gui_colorbox_t indicator;
+	button_t gotopos;
 
 public:
 	halt_list_stats_t(halthandle_t halt_);
@@ -37,7 +38,6 @@ public:
 
 	/**
 	 * Draw the component
-	 * @author Hj. Malthaner
 	 */
 	void draw(scr_coord offset) OVERRIDE;
 

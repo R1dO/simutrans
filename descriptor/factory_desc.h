@@ -13,14 +13,20 @@
 #include "../dataobj/koord.h"
 #include "../tpl/weighted_vector_tpl.h"
 
+
+#define DEFAULT_FACTORYSMOKE_TIME (2499)
+#define DEFAULT_SMOKE_UPLIFT (16)
+
+
 class checksum_t;
 
-/* Knightly : this desc will store data specific to each class of fields
+/**
+ * this desc will store data specific to each class of fields
  * Fields are xref'ed from skin_desc_t
  */
 class field_class_desc_t : public obj_desc_t {
 	friend class factory_field_class_reader_t;
-	friend class factory_field_group_reader_t;		// Knightly : this is a special case due to desc restructuring
+	friend class factory_field_group_reader_t;		// this is a special case due to desc restructuring
 
 private:
 	uint8  snow_image;			// 0 or 1 for snow
@@ -42,7 +48,7 @@ public:
 };
 
 
-// Knightly : this desc now only contains common, shared data regarding fields
+// this desc now only contains common, shared data regarding fields
 class field_group_desc_t : public obj_desc_t {
 	friend class factory_field_group_reader_t;
 
@@ -82,12 +88,8 @@ public:
 
 
 
-/*
- *  Author:
- *      Volker Meyer
- *
- *  Description:
- *      Smoke objects for factories.
+/**
+ * Smoke objects for factories.
  *
  *  Child nodes:
  *	0   SKin
@@ -126,12 +128,8 @@ public:
 };
 
 
-/*
- *  Author:
- *      Volker Meyer
- *
- *  Description:
- *      Information about required goods for production
+/**
+ * Information about required goods for production
  *
  *  Child nodes:
  *	0   Ware
@@ -153,12 +151,8 @@ public:
 };
 
 
-/*
- *  Author:
- *      Volker Meyer
- *
- *  Description:
- *      Information about produced goods of a factory
+/**
+ * Information about produced goods of a factory
  *
  *  Child nodes:
  *	0   Ware
@@ -172,7 +166,6 @@ private:
     /**
      * How much of this product is derived from one unit of factory
      * production? 256 means 1.0
-     * @author Hj. Malthaner
      */
     uint16 factor;
 
@@ -184,12 +177,8 @@ public:
 };
 
 
-/*
- *  Author:
- *      Volker Meyer
- *
- *  Description:
- *      Factory.
+/**
+ * Factory.
  *
  *  Child nodes:
  *	0   House descriptor
@@ -229,14 +218,25 @@ private:
 	uint16 electric_demand;
 	uint16 pax_demand;
 	uint16 mail_demand;
-	sint8 sound_id;
+	uint16 smokeuplift;
+	uint16 smokelifetime;
+	koord  smoketile[4];
+	koord  smokeoffset[4];
+	uint8  smokerotations;
+	sint8  sound_id;
 	uint32 sound_interval;
 
 public:
 	const char *get_name() const { return get_building()->get_name(); }
 	const char *get_copyright() const { return get_building()->get_copyright(); }
 	building_desc_t  const* get_building()  const { return get_child<building_desc_t>(0); }
+
 	smoke_desc_t const* get_smoke() const { return get_child<smoke_desc_t>(1); }
+	void correct_smoke();
+	koord get_smoketile( uint8 rot ) const { return smoketile[ rot%smokerotations ]; }
+	koord get_smokeoffset( uint8 rot ) const { return smokeoffset[ rot%smokerotations ]; }
+	uint16 get_smokeuplift() const { return smokeuplift; }
+	uint16 get_smokelifetime() const { return smokelifetime; }
 
 	// we must take care, for the case of no producer/consumer
 	const factory_supplier_desc_t *get_supplier(uint16 i) const
