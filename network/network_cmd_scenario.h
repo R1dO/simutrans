@@ -3,8 +3,9 @@
  * (see LICENSE.txt)
  */
 
-#ifndef _NETWORK_CMD_SCENARIO_H_
-#define _NETWORK_CMD_SCENARIO_H_
+#ifndef NETWORK_NETWORK_CMD_SCENARIO_H
+#define NETWORK_NETWORK_CMD_SCENARIO_H
+
 
 #include "network_cmd.h"
 #include "network_cmd_ingame.h"
@@ -28,7 +29,7 @@ public:
 		CALL_SCRIPT,        /// client asks for an update
 		CALL_SCRIPT_ANSWER, /// client wants string, server sends string
 		UPDATE_WON_LOST,    /// update win/lose flags of the scenario
-		OPEN_SCEN_WIN,      /// open scenario info window
+		OPEN_SCEN_WIN       /// open scenario info window
 	};
 	uint16 what;
 

@@ -3,8 +3,9 @@
  * (see LICENSE.txt)
  */
 
-#ifndef scenario_h
-#define scenario_h
+#ifndef DATAOBJ_SCENARIO_H
+#define DATAOBJ_SCENARIO_H
+
 
 /** @file scenario.h declarations for scenario interface */
 
@@ -36,8 +37,8 @@ class scenario_t
 private:
 	/// possible states of scenario
 	enum scenario_state_t {
-		INACTIVE = 0,         ///< scenario inactive
-		SCRIPTED = 7,         ///< scenario active (non-network game or at server)
+		INACTIVE         = 0, ///< scenario inactive
+		SCRIPTED         = 7, ///< scenario active (non-network game or at server)
 		SCRIPTED_NETWORK = 8  ///< scenario active, network game at client
 	};
 
@@ -62,11 +63,6 @@ private:
 	 */
 	bool load_script(const char* filename);
 
-	/**
-	 * loads necessary compatibility scripts
-	 */
-	void load_compatibility_script();
-
 	/// is set, if an error occurred during loading of savegame
 	/// e.g. re-starting of scenario failed due to script error
 	bool rdwr_error;
@@ -85,7 +81,11 @@ private:
 	 * tools or to have toolbars reflect allowed tools.
 	 */
 	struct forbidden_t {
-		enum forbid_type { forbid_tool = 1, forbid_tool_rect = 2};
+		enum forbid_type {
+			forbid_tool      = 1,
+			forbid_tool_rect = 2
+		};
+
 		forbid_type type;
 		uint8 player_nr;
 		/// id of tool to be forbidden, as set by constructors of classes derived from
@@ -158,7 +158,7 @@ private:
 	vector_tpl<forbidden_t*>forbidden_tools;
 
 	/// set to true if rules changed to update toolbars,
-	/// toolbars will be updated in next call to step()
+	/// toolbars and active tools will be updated in next call to step()
 	bool need_toolbar_update;
 
 	/**
@@ -396,6 +396,12 @@ public:
 	 * @ingroup squirrel-api
 	 */
 	void clear_rules();
+
+	/**
+	 * Toolbars/active tools need an update due to changed rules; update is done in step().
+	 * @ingroup squirrel-api
+	 */
+	void gui_needs_update() { need_toolbar_update = true; }
 
 	/**
 	 * Checks if player can use this tool at all.

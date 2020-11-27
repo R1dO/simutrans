@@ -3,12 +3,15 @@
  * (see LICENSE.txt)
  */
 
-#ifndef depotlist_frame_t_h
-#define depotlist_frame_t_h
+#ifndef GUI_DEPOTLIST_FRAME_H
+#define GUI_DEPOTLIST_FRAME_H
+
 
 #include "gui_frame.h"
+#include "simwin.h"
 #include "components/gui_scrollpane.h"
 #include "components/gui_scrolled_list.h"
+#include "components/gui_waytype_tab_panel.h"
 #include "components/gui_label.h"
 #include "components/gui_image.h"
 
@@ -18,9 +21,9 @@ class depot_t;
 class depotlist_frame_t : public gui_frame_t, private action_listener_t
 {
 private:
-	button_t	sortedby;
-	button_t	sorteddir;
 	gui_scrolled_list_t scrolly;
+
+	gui_waytype_tab_panel_t tabs;
 
 	uint32 last_depot_count;
 
@@ -29,7 +32,9 @@ private:
 	player_t *player;
 
 public:
-	depotlist_frame_t(player_t *player);
+	depotlist_frame_t();
+
+	depotlist_frame_t(player_t* player);
 
 	const char *get_help_filename() const OVERRIDE {return "depotlist.txt"; }
 
@@ -37,9 +42,13 @@ public:
 
 	void draw(scr_coord pos, scr_size size) OVERRIDE;
 
-	bool has_min_sizer() const { return true; }
+	bool has_min_sizer() const OVERRIDE { return true; }
 
 	void map_rotate90( sint16 ) OVERRIDE { fill_list(); }
+
+	void rdwr(loadsave_t* file) OVERRIDE;
+
+	uint32 get_rdwr_id() OVERRIDE { return magic_depotlist; }
 };
 
 
@@ -49,19 +58,16 @@ private:
 	depot_t *depot;
 	gui_label_buf_t label;
 	gui_image_t waytype_symbol;
-	button_t	gotopos;
+	button_t gotopos;
 
 	void update_label();
 
 public:
-	static int sort_mode;
-	static bool reverse;
-
 	depotlist_stats_t(depot_t *);
 
 	void draw( scr_coord pos) OVERRIDE;
 
-	char const* get_text() const { return ""; /* label.buf().get_str(); */ }
+	char const* get_text() const  OVERRIDE { return ""; /* label.buf().get_str(); */ }
 	bool infowin_event(const event_t *) OVERRIDE;
 	bool is_valid() const OVERRIDE;
 	void set_size(scr_size size) OVERRIDE;

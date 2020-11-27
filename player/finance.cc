@@ -167,14 +167,14 @@ void finance_t::calc_finance_history()
 sint64 finance_t::get_maintenance_with_bits(transport_type tt) const
 {
 	assert(tt<TT_MAX);
-	return world->scale_with_month_length((sint64)maintenance[tt]);
+	return world->scale_with_month_length(maintenance[tt]);
 }
 
 
 sint64 finance_t::get_vehicle_maintenance_with_bits(transport_type tt) const
 {
 	assert(tt<TT_MAX);
-	return world->scale_with_month_length((sint64)vehicle_maintenance[tt]);
+	return world->scale_with_month_length(vehicle_maintenance[tt]);
 }
 
 
@@ -217,9 +217,9 @@ void finance_t::rdwr(loadsave_t *file)
 
 	/* following lines enables FORWARD compatibility
 	/ you will be still able to load future versions of games with:
-	* 	longer history
-	*	more transport_types
-	*	and new items in ATC_ or ATV_
+	*   longer history
+	*   more transport_types
+	*   and new items in ATC_ or ATV_
 	*/
 	sint8 max_years  = MAX_PLAYER_HISTORY_YEARS;
 	sint8 max_months = MAX_PLAYER_HISTORY_MONTHS;
@@ -389,25 +389,25 @@ transport_type finance_t::translate_waytype_to_tt(const waytype_t wt)
 #define OLD_MAX_PLAYER_HISTORY_MONTHS  (12) // number of months to keep history
 
 enum player_cost {
-	COST_CONSTRUCTION=0,// Construction
-	COST_VEHICLE_RUN,   // Vehicle running costs
-	COST_NEW_VEHICLE,   // New vehicles
-	COST_INCOME,        // Income
-	COST_MAINTENANCE,   // Upkeep
-	COST_ASSETS,        // value of all vehicles and buildings
-	COST_CASH,          // Cash
-	COST_NETWEALTH,     // Total Cash + Assets
-	COST_PROFIT,        // COST_POWERLINES+COST_INCOME-(COST_CONSTRUCTION+COST_VEHICLE_RUN+COST_NEW_VEHICLE+COST_MAINTENANCE)
-	COST_OPERATING_PROFIT, // COST_POWERLINES+COST_INCOME-(COST_VEHICLE_RUN+COST_MAINTENANCE)
-	COST_MARGIN,        // COST_OPERATING_PROFIT/COST_INCOME
-	COST_ALL_TRANSPORTED, // all transported goods
-	COST_POWERLINES,	  // revenue from the power grid
-	COST_TRANSPORTED_PAS,	// number of passengers that actually reached destination
+	COST_CONSTRUCTION = 0,   // Construction
+	COST_VEHICLE_RUN,        // Vehicle running costs
+	COST_NEW_VEHICLE,        // New vehicles
+	COST_INCOME,             // Income
+	COST_MAINTENANCE,        // Upkeep
+	COST_ASSETS,             // value of all vehicles and buildings
+	COST_CASH,               // Cash
+	COST_NETWEALTH,          // Total Cash + Assets
+	COST_PROFIT,             // COST_POWERLINES+COST_INCOME-(COST_CONSTRUCTION+COST_VEHICLE_RUN+COST_NEW_VEHICLE+COST_MAINTENANCE)
+	COST_OPERATING_PROFIT,   // COST_POWERLINES+COST_INCOME-(COST_VEHICLE_RUN+COST_MAINTENANCE)
+	COST_MARGIN,             // COST_OPERATING_PROFIT/COST_INCOME
+	COST_ALL_TRANSPORTED,    // all transported goods
+	COST_POWERLINES,         // revenue from the power grid
+	COST_TRANSPORTED_PAS,    // number of passengers that actually reached destination
 	COST_TRANSPORTED_MAIL,
 	COST_TRANSPORTED_GOOD,
-	COST_ALL_CONVOIS,		// number of convois
-	COST_SCENARIO_COMPLETED,// scenario success (only useful if there is one ... )
-	COST_WAY_TOLLS,
+	COST_ALL_CONVOIS,        // number of convois
+	COST_SCENARIO_COMPLETED, // scenario success (only useful if there is one ... )
+	COST_WAY_TOLLS
 	// OLD_MAX_PLAYER_COST = 19
 };
 

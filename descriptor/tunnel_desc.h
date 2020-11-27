@@ -3,8 +3,9 @@
  * (see LICENSE.txt)
  */
 
-#ifndef __TUNNEL_DESC_H
-#define __TUNNEL_DESC_H
+#ifndef DESCRIPTOR_TUNNEL_DESC_H
+#define DESCRIPTOR_TUNNEL_DESC_H
+
 
 #include "../display/simimg.h"
 #include "../simtypes.h"
@@ -26,7 +27,7 @@
  */
 class tunnel_desc_t : public obj_desc_transport_infrastructure_t {
 	friend class tunnel_reader_t;
-	friend class tunnel_builder_t;	// to convert the old tunnels to new ones
+	friend class tunnel_builder_t; // to convert the old tunnels to new ones
 
 private:
 	static int slope_indices[81];

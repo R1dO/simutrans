@@ -3,8 +3,9 @@
  * (see LICENSE.txt)
  */
 
-#ifndef labellist_stats_t_h
-#define labellist_stats_t_h
+#ifndef GUI_LABELLIST_STATS_T_H
+#define GUI_LABELLIST_STATS_T_H
+
 
 #include "components/gui_aligned_container.h"
 #include "components/gui_label.h"
@@ -12,7 +13,12 @@
 
 
 namespace labellist {
-    enum sort_mode_t { by_name=0, by_koord, by_player, SORT_MODES };
+	enum sort_mode_t {
+		by_name = 0,
+		by_koord,
+		by_player,
+		SORT_MODES
+	};
 };
 
 class label_t;

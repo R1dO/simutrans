@@ -357,6 +357,10 @@ draw_outside_tile = 0
 compass_screen_position = 0
 compass_map_position = 13
 
+# if set to 1 (default) teh numpad will alsoways move the map.
+# If active, this does not allow for number entry
+numpad_always_moves_map = 0
+
 ###################################money stuff##################################
 #
 # These values are usually set in the pak files
@@ -548,13 +552,14 @@ tree_climates = 4
 # climates with no trees at all (desert and arctic at the moment)
 no_tree_climates = 130
 
-# if set, no trees will be created at all (save about 30% memory and
+# 0: no trees will be created at all (save about 30% memory and
 # the season change will be much smoother on small machines)
-# also prevents construction of trees
-no_trees = 0
+# 1: normal elliptic forest tree distribution
+# 2: if humidity climate generation is enabled, also direibute tree from humidity (else use 1)
+tree_distribution = 2
 
-# if set, no lakes will be created at all
-no_lakes = 0
+# maximum height level for lake creation (0=no lakes)
+lake_height = 8
 
 ###################################time stuff###################################
 
@@ -594,19 +599,21 @@ bits_per_month = 20
 
 #################################system stuff#################################
 
-# compress savegames?
-# "binary" means uncompressed, "zipped" means compressed
-# "bzip2" uses another compression algorithm
-# "zstd" may be available too
-# other options are "xml", "xml_zipped" and "xml_bzip2"
-# xml detects more errors of broken savegames but files are much larger
-# bzip2 savegames are smaller than zipped but saving/loading takes longer
+# File format for saved games
+# Uncompressed formats:
+# - binary   Uncompressed binary data
+# - xml      Uncompressed XML data (better error detection/correction but significantly larger files)
+# Compressed formats:
+# - zipped, xml_zipped    Compressed with gzip
+# - bzip2,  xml_bzip2     Compressed with bzip2 (smaller files but slower save/reload)
+# - zstd,   xml_zstd      Compressed with zstd (larger files than bzip2 but faster reload)
+#                         Not always available
 saveformat = bzip2
 
 # Alternate format for faster autosaves
 autosaveformat = zipped
 
-# zip and zstd allow for finetuning their packaging versus speed with and additional
+# zip and zstd allow for finetuning their packaging versus speed with an additional
 # compression level parameter.
 # Zip form 1(fastest) to 9(smallest) with 6 a good compromise
 # zstd goes form -10 to 30 or so. Meaningful are mostly single digit values
@@ -633,6 +640,9 @@ autosave = 0
 # How many frames per second to use? Display may look pretty until 10 or so
 # (depends very much on computer, game complexity and graphics driver)
 frames_per_second = 25
+
+# Same as frames_per_second, but for fast forward (default 10)
+#fast_forward_frames_per_second = 10
 
 # during zooming out simutrans may get slow due to the very high number
 # of tiles visible. If the tiles become equal or smaller than the tile size

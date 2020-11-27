@@ -4,7 +4,7 @@
  */
 
 #include "simdebug.h"
-#include "simobj.h"
+#include "obj/simobj.h"
 #include "simfab.h"
 #include "display/simgraph.h"
 #include "simmenu.h"
@@ -98,7 +98,8 @@ void planquadrat_t::boden_hinzufuegen(grund_t *bd)
 	}
 	else if(ground_size==1) {
 		// needs to convert to array
-//	assert(data.one->get_hoehe()!=bd->get_hoehe());
+//		assert(data.one->get_hoehe()!=bd->get_hoehe());
+
 		if(data.one->get_hoehe()==bd->get_hoehe()) {
 DBG_MESSAGE("planquadrat_t::boden_hinzufuegen()","addition ground %s at (%i,%i,%i) will be ignored!",bd->get_name(),bd->get_pos().x,bd->get_pos().y,bd->get_pos().z);
 			return;
@@ -257,16 +258,17 @@ void planquadrat_t::rdwr(loadsave_t *file, koord pos )
 
 			switch(gtyp) {
 				case -1: gr = NULL; break;
-				case grund_t::boden:	    gr = new boden_t(file, pos);                 break;
-				case grund_t::wasser:	    gr = new wasser_t(file, pos);                break;
-				case grund_t::fundament:	    gr = new fundament_t(file, pos);	       break;
-				case grund_t::tunnelboden:	    gr = new tunnelboden_t(file, pos);       break;
-				case grund_t::brueckenboden:    gr = new brueckenboden_t(file, pos);     break;
-				case grund_t::monorailboden:	    gr = new monorailboden_t(file, pos); break;
+				case grund_t::boden:         gr = new boden_t(file, pos);         break;
+				case grund_t::wasser:        gr = new wasser_t(file, pos);        break;
+				case grund_t::fundament:     gr = new fundament_t(file, pos);     break;
+				case grund_t::tunnelboden:   gr = new tunnelboden_t(file, pos);   break;
+				case grund_t::brueckenboden: gr = new brueckenboden_t(file, pos); break;
+				case grund_t::monorailboden: gr = new monorailboden_t(file, pos); break;
 				default:
 					gr = 0; // keep compiler happy, fatal() never returns
 					dbg->fatal("planquadrat_t::rdwr()","Error while loading game: Unknown ground type '%d'",gtyp);
 			}
+
 			// check if we have a matching building here, otherwise set to nothing
 			if (gr  &&  gtyp == grund_t::fundament  &&  gr->find<gebaeude_t>() == NULL) {
 				koord3d pos = gr->get_pos();
@@ -293,8 +295,8 @@ void planquadrat_t::rdwr(loadsave_t *file, koord pos )
 					hgt = welt->lookup_hgt(pos);
 				}
 				else {
-					// other ground must not reset the height
 					boden_hinzufuegen(gr);
+					// other ground must not change the grid height => reset it
 					welt->set_grid_hgt( pos, hgt );
 				}
 			}
@@ -343,7 +345,7 @@ void planquadrat_t::correct_water()
 		sint8 disp_hn_se = max( gr->get_hoehe() + corner_se(slope), water_hgt );
 		sint8 disp_hn_ne = max( gr->get_hoehe() + corner_ne(slope), water_hgt );
 		sint8 disp_hn_nw = max( gr->get_hoehe() + corner_nw(slope), water_hgt );
-		const uint8 sneu = (disp_hn_sw - disp_hneu) + ((disp_hn_se - disp_hneu) * 3) + ((disp_hn_ne - disp_hneu) * 9) + ((disp_hn_nw - disp_hneu) * 27);
+		const slope_t::type sneu = encode_corners(disp_hn_sw - disp_hneu, disp_hn_se - disp_hneu, disp_hn_ne - disp_hneu, disp_hn_nw - disp_hneu);
 		gr->set_hoehe( disp_hneu );
 		gr->set_grund_hang( (slope_t::type)sneu );
 	}
@@ -357,7 +359,7 @@ void planquadrat_t::abgesenkt()
 		const uint8 slope = gr->get_grund_hang();
 
 		gr->obj_loesche_alle(NULL);
-		sint8 max_hgt = gr->get_hoehe() + (slope != 0 ? (slope & 7 ? 1 : 2) : 0);
+		sint8 max_hgt = gr->get_hoehe() + (slope ? 1 : 0);		// only matters that not flat
 
 		koord k(gr->get_pos().get_2d());
 		if(  max_hgt <= welt->get_water_hgt( k )  &&  gr->get_typ() != grund_t::wasser  ) {
@@ -365,7 +367,7 @@ void planquadrat_t::abgesenkt()
 			kartenboden_setzen( gr );
 			// recalc water ribis of neighbors
 			for(int r=0; r<4; r++) {
-				grund_t *gr2 = welt->lookup_kartenboden(k + koord::nsew[r]);
+				grund_t *gr2 = welt->lookup_kartenboden(k + koord::nesw[r]);
 				if (gr2  &&  gr2->is_water()) {
 					gr2->calc_image();
 				}
@@ -386,7 +388,7 @@ void planquadrat_t::angehoben()
 		const uint8 slope = gr->get_grund_hang();
 
 		gr->obj_loesche_alle(NULL);
-		sint8 max_hgt = gr->get_hoehe() + (slope != 0 ? (slope & 7 ? 1 : 2) : 0);
+		sint8 max_hgt = gr->get_hoehe() + (slope ? 1 : 0);		// only matters that not flat
 
 		koord k(gr->get_pos().get_2d());
 		if(  max_hgt > welt->get_water_hgt( k )  &&  gr->get_typ() == grund_t::wasser  ) {
@@ -394,7 +396,7 @@ void planquadrat_t::angehoben()
 			kartenboden_setzen( gr );
 			// recalc water ribis
 			for(int r=0; r<4; r++) {
-				grund_t *gr2 = welt->lookup_kartenboden(k + koord::nsew[r]);
+				grund_t *gr2 = welt->lookup_kartenboden(k + koord::nesw[r]);
 				if(  gr2  &&  gr2->is_water()  ) {
 					gr2->calc_image();
 				}
@@ -406,7 +408,7 @@ void planquadrat_t::angehoben()
 			kartenboden_setzen( gr );
 			// recalc water ribis
 			for(int r=0; r<4; r++) {
-				grund_t *gr2 = welt->lookup_kartenboden(k + koord::nsew[r]);
+				grund_t *gr2 = welt->lookup_kartenboden(k + koord::nesw[r]);
 				if(  gr2  &&  gr2->is_water()  ) {
 					gr2->calc_image();
 				}
@@ -428,7 +430,7 @@ void planquadrat_t::display_obj(const sint16 xpos, const sint16 ypos, const sint
 
 	const sint8 h0 = gr0->get_disp_height();
 	uint8 i = 1;
-	// underground
+	// tiles below ground drawing height (tunnels in full underground mode)
 	if(  hmin < h0  ) {
 		for(  ;  i < ground_size;  i++  ) {
 			const grund_t* gr = data.some[i];
@@ -466,6 +468,11 @@ void planquadrat_t::display_obj(const sint16 xpos, const sint16 ypos, const sint
 			for(  uint8 j = i;  j < ground_size;  j++  ) {
 				const sint8 h = data.some[j]->get_hoehe();
 				const sint8 htop = h + slope_t::max_diff(data.some[j]->get_grund_hang());
+
+				// still underground
+				if(  h < h0  ) {
+					continue;
+				}
 				// too high?
 				if(  h > hmax  ) {
 					break;
@@ -473,7 +480,7 @@ void planquadrat_t::display_obj(const sint16 xpos, const sint16 ypos, const sint
 				// not too low?
 				if(  htop >= hmin  ) {
 					// something on top: clip horizontally to prevent trees etc shining trough bridges
-					const sint16 yh = ypos - tile_raster_scale_y( (h - h0) * TILE_HEIGHT_STEP, raster_tile_width ) + ((3 * raster_tile_width) >> 2);
+					const sint16 yh = ypos - tile_raster_scale_y( (h + corner_nw(data.some[j]->get_grund_hang()) - h0) * TILE_HEIGHT_STEP, raster_tile_width ) + ((3 * raster_tile_width) >> 2);
 					if(  yh >= p_cr.y  ) {
 						display_push_clip_wh(p_cr.x, yh, p_cr.w, p_cr.h + p_cr.y - yh  CLIP_NUM_PAR  );
 					}
@@ -487,12 +494,17 @@ void planquadrat_t::display_obj(const sint16 xpos, const sint16 ypos, const sint
 			gr0->display_obj_all( xpos, ypos, raster_tile_width, is_global  CLIP_NUM_PAR );
 		}
 	}
-	// above ground
+	// above ground drawing height
 	for(  ;  i < ground_size;  i++  ) {
 		const grund_t* gr = data.some[i];
 		const sint8 h = gr->get_hoehe();
 		const slope_t::type slope = gr->get_grund_hang();
 		const sint8 htop = h + max(max(corner_sw(slope), corner_se(slope)),max(corner_ne(slope), corner_nw(slope)));
+
+		// still underground
+		if(  h < h0  ) {
+			continue;
+		}
 		// too high?
 		if(  h > hmax  ) {
 			break;
@@ -532,11 +544,13 @@ void planquadrat_t::display_overlay(const sint16 xpos, const sint16 ypos) const
 
 	// building transformers - show outlines of factories
 
-/*	alternative method of finding selected tool - may be more useful in future but use simpler method for now
+/*
+	// alternative method of finding selected tool - may be more useful in future but use simpler method for now
 	tool_t *tool = welt->get_tool(welt->get_active_player_nr());
 	int tool_id = tool->get_id();
 
-	if(tool_id==(TOOL_TRANSFORMER|GENERAL_TOOL)....	*/
+	if(tool_id==(TOOL_TRANSFORMER|GENERAL_TOOL)....
+*/
 
 	if( (grund_t::underground_mode == grund_t::ugm_all
 		||  (grund_t::underground_mode == grund_t::ugm_level  &&  gr->get_hoehe() == grund_t::underground_level + welt->get_settings().get_way_height_clearance()) )
@@ -610,11 +624,12 @@ void planquadrat_t::display_overlay(const sint16 xpos, const sint16 ypos) const
 
 	gr->display_overlay( xpos, ypos );
 	if(  ground_size > 1  ) {
+		const sint16 raster_tile_width = get_tile_raster_width();
 		const sint8 h0 = gr->get_disp_height();
 		for(  uint8 i = 1;  i < ground_size;  i++  ) {
 			grund_t* gr = data.some[i];
 			const sint8 h = gr->get_disp_height();
-			const sint16 yypos = ypos - (h - h0 ) * get_tile_raster_width() / 2;
+			const sint16 yypos = ypos - tile_raster_scale_y( (h - h0) * TILE_HEIGHT_STEP, raster_tile_width );
 			gr->display_overlay( xpos, yypos );
 		}
 	}

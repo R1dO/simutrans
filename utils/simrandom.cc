@@ -5,8 +5,11 @@
 
 #include <assert.h>
 #include <math.h>
+#include <time.h>
 #include "simrandom.h"
-#include "../simsys.h"
+#include "../sys/simsys.h"
+#include "../dataobj/loadsave.h"
+
 
 /* This is the mersenne random generator: More random and faster! */
 
@@ -17,8 +20,8 @@
 #define UPPER_MASK 0x80000000UL /* most significant w-r bits */
 #define LOWER_MASK 0x7fffffffUL /* least significant r bits */
 
-static unsigned long mersenne_twister[MERSENNE_TWISTER_N]; // the array for the state vector
-static int mersenne_twister_index = MERSENNE_TWISTER_N + 1; // mersenne_twister_index==N+1 means mersenne_twister[N] is not initialized
+static uint32 mersenne_twister[MERSENNE_TWISTER_N]; // the array for the state vector
+static uint32 mersenne_twister_index = MERSENNE_TWISTER_N + 1; // mersenne_twister_index==N+1 means mersenne_twister[N] is not initialized
 
 static uint8 random_origin = 0;
 
@@ -64,7 +67,7 @@ static void MTgenerate()
 }
 
 
-// returns current seed value
+/* returns current seed value */
 uint32 get_random_seed()
 {
 	if (mersenne_twister_index >= MERSENNE_TWISTER_N) { /* generate N words at one time */
@@ -72,7 +75,6 @@ uint32 get_random_seed()
 	}
 	return mersenne_twister[mersenne_twister_index];
 }
-
 
 
 /* generates a random number on [0,0xffffffff]-interval */
@@ -87,7 +89,7 @@ uint32 simrand_plain()
 
 	/* Tempering */
 	y ^= (y >> 11);
-	y ^= (y << 7) & 0x9d2c5680UL;
+	y ^= (y <<  7) & 0x9d2c5680UL;
 	y ^= (y << 15) & 0xefc60000UL;
 	y ^= (y >> 18);
 
@@ -100,10 +102,24 @@ uint32 simrand(const uint32 max)
 {
 	assert( (random_origin&INTERACTIVE_RANDOM) == 0  );
 
-	if(max<=1) {	// may rather assert this?
+	if(max<=1) { // may rather assert this?
 		return 0;
 	}
 	return simrand_plain() % max;
+}
+
+
+void simrand_rdwr(loadsave_t *file)
+{
+	xml_tag_t t(file, "simrand");
+
+	// rdwr index
+	file->rdwr_long(mersenne_twister_index);
+
+	// rdwr state vector
+	for (uint32 i=0; i<MERSENNE_TWISTER_N; ++i) {
+		file->rdwr_long(mersenne_twister[i]);
+	}
 }
 
 
@@ -125,9 +141,9 @@ uint16 get_random_mode()
 }
 
 
-static uint32 async_rand_seed = 12345678+dr_time();
+static uint32 async_rand_seed = 12345678 + time( NULL ); // Do not use dr_time(). It returns 0 on program startup for some platforms (SDL).
 
-// simpler simrand for anything not game critical (like UI)
+/* simpler simrand for anything not game critical (like UI) */
 uint32 sim_async_rand( uint32 max )
 {
 	if(  max==0  ) {
@@ -140,7 +156,6 @@ uint32 sim_async_rand( uint32 max )
 }
 
 
-
 static uint32 noise_seed = 0;
 
 uint32 setsimrand(uint32 seed,uint32 ns)
@@ -149,7 +164,7 @@ uint32 setsimrand(uint32 seed,uint32 ns)
 
 	if(seed!=0xFFFFFFFF) {
 		init_genrand( seed );
-		async_rand_seed = seed+dr_time();
+		async_rand_seed = seed + dr_time(); // dr_time() ok here. re comment ^^^. setsimrand not called immediately on program startup.
 		random_origin = 0;
 	}
 	if(noise_seed!=0xFFFFFFFF) {
@@ -193,7 +208,6 @@ void exit_perlin_map()
 
 #define map_noise(x,y) (0+map[(x)+1+((y)+1)*map_w])
 
-
 static double smoothed_noise(const int x, const int y)
 {
 	/* this gives a very smooth world */
@@ -234,6 +248,7 @@ static double smoothed_noise(const int x, const int y)
 //   return int_noise(x,y);
 }
 
+
 static double linear_interpolate(const double a, const double b, const double x)
 {
 //    return  a*(1.0-x) + b*x;
@@ -273,18 +288,18 @@ static double interpolated_noise(const double x, const double y)
  */
 double perlin_noise_2D(const double x, const double y, const double p)
 {
-    double total = 0.0;
-    for(  int  i=0;  i<6;  i++  ) {
+	double total = 0.0;
+	for(  int  i=0;  i<6;  i++  ) {
 		const double frequency = (double)(1 << i);
 		const double amplitude = pow(p, (double)i);
 		total += interpolated_noise( (x * frequency) / 64.0, (y * frequency) / 64.0) * amplitude;
-    }
+	}
 
-    return total;
+	return total;
 }
 
 
-// compute integer log10
+/* compute integer log10 */
 uint32 log10(uint32 v)
 {
 	return ( (log2(v) + 1) * 1233) >> 12; // 1 / log_2(10) ~~ 1233 / 4096
@@ -310,53 +325,53 @@ uint32 log2(uint32 n)
 }
 
 
-// compute integer sqrt
+/* compute integer sqrt */
 uint32 sqrt_i32(uint32 num)
 {
-	// taken from http://en.wikipedia.org/wiki/Methods_of_computing_square_roots
-    uint32 res = 0;
-    uint32 bit = 1 << 30; // The second-to-top bit is set: 1<<14 for short
+	// taken from https://en.wikipedia.org/wiki/Methods_of_computing_square_roots
+	uint32 res = 0;
+	uint32 bit = 1 << 30; // The second-to-top bit is set: 1<<14 for short
 
-    // "bit" starts at the highest power of four <= the argument.
-    while(  bit > num  ) {
-        bit >>= 2;
-    }
+	// "bit" starts at the highest power of four <= the argument.
+	while(  bit > num  ) {
+		bit >>= 2;
+	}
 
-    while(  bit != 0  ) {
-        if(  num >= res + bit  ) {
-            num -= res + bit;
-            res = (res >> 1) + bit;
-        }
-        else {
-            res >>= 1;
-        }
-        bit >>= 2;
-    }
-    return res;
+	while(  bit != 0  ) {
+		if(  num >= res + bit  ) {
+			num -= res + bit;
+			res = (res >> 1) + bit;
+		}
+		else {
+			res >>= 1;
+		}
+		bit >>= 2;
+	}
+	return res;
 }
 
 
-// compute integer sqrt
+/* compute integer sqrt */
 uint64 sqrt_i64(uint64 num)
 {
-	// taken from http://en.wikipedia.org/wiki/Methods_of_computing_square_roots
-    uint64 res = 0;
-    uint64 bit = (uint64)1 << 62; // The second-to-top bit is set: 1<<14 for short
+	// taken from https://en.wikipedia.org/wiki/Methods_of_computing_square_roots
+	uint64 res = 0;
+	uint64 bit = (uint64)1 << 62; // The second-to-top bit is set: 1<<14 for short
 
-    // "bit" starts at the highest power of four <= the argument.
-    while(  bit > num  ) {
-        bit >>= 2;
-    }
+	// "bit" starts at the highest power of four <= the argument.
+	while(  bit > num  ) {
+		bit >>= 2;
+	}
 
-    while(  bit != 0  ) {
-        if(  num >= res + bit  ) {
-            num -= res + bit;
-            res = (res >> 1) + bit;
-        }
-        else {
-            res >>= 1;
-        }
-        bit >>= 2;
-    }
-    return res;
+	while(  bit != 0  ) {
+		if(  num >= res + bit  ) {
+			num -= res + bit;
+			res = (res >> 1) + bit;
+		}
+		else {
+			res >>= 1;
+		}
+		bit >>= 2;
+	}
+	return res;
 }

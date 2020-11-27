@@ -3,11 +3,12 @@
  * (see LICENSE.txt)
  */
 
-#ifndef gui_thing_info_h
-#define gui_thing_info_h
+#ifndef GUI_OBJ_INFO_H
+#define GUI_OBJ_INFO_H
+
 
 #include "../simdebug.h"
-#include "../simobj.h"
+#include "../obj/simobj.h"
 #include "base_info.h"
 #include "components/gui_obj_view_t.h"
 

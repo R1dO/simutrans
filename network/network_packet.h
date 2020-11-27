@@ -3,8 +3,9 @@
  * (see LICENSE.txt)
  */
 
-#ifndef _NETWORK_PACKET_H
-#define _NETWORK_PACKET_H
+#ifndef NETWORK_NETWORK_PACKET_H
+#define NETWORK_NETWORK_PACKET_H
+
 
 #include "../simtypes.h"
 #include "memory_rw.h"
@@ -13,7 +14,7 @@
 #define MAX_PACKET_LEN (8192)
 
 // static const do not work on all compilers/architectures
-#define HEADER_SIZE (6)	// the network sizes are given ...
+#define HEADER_SIZE (6) // the network sizes are given ...
 
 
 class packet_t : public memory_rw_t {
@@ -23,7 +24,7 @@ private:
 	// the header
 	// [0]  size
 	uint16 size;
-	// [2]	version
+	// [2]  version
 	uint16 version;
 	// [4]  id
 	uint16 id;

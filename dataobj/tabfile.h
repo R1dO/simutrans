@@ -3,8 +3,9 @@
  * (see LICENSE.txt)
  */
 
-#ifndef __tabfile_h
-#define __tabfile_h
+#ifndef DATAOBJ_TABFILE_H
+#define DATAOBJ_TABFILE_H
+
 
 #include <stdio.h>
 
@@ -33,28 +34,45 @@ public:
  * format in all.
  *
  * File format:
- *	Lines starting with '#' or ' ' are comment lines.
- *	The file content is treated as a list of objects.
- *	Objects are separated by a line starting with a dash (-)
- *	Each object can contain any number of lines in the format '<Key>=<Value>'
- *	These line are NOT ordered
- *	If keys are duplicated for one object, the first value is used
- *	Keys are not case sensitive
+ *  - Lines starting with '#' or ' ' are comment lines.
+ *  - The file content is treated as a list of objects.
+ *  - Objects are separated by a line starting with a dash (-)
+ *  - Each object can contain any number of lines in the format '<Key>=<Value>'
+ *    These line are NOT ordered
+ *  - If keys are duplicated for one object, the first value is used
+ *  - Keys are not case sensitive
  */
-class tabfile_t {
-private:
-	FILE *file;
+class tabfile_t
+{
+public:
+	tabfile_t() : file(NULL) {}
+	~tabfile_t() { close(); }
 
+public:
+	bool open(const char *filename);
+
+	void close();
+
+	/**
+	 * Read an entire object from the open file.
+	 *
+	 * @return bool false, if empty object or eof
+	 * @param &objinfo  will receive the object info
+	 */
+	bool read(tabfileobj_t &objinfo, FILE *fp = NULL);
+
+private:
 	/**
 	 * Read one non-comment line from input.
 	 * Lines starting with ' ' are comment lines here. This differs from the
 	 * global read_line() function.
 	 *
-	 * @return bool	false in case of eof
-	 * @param s		line buffer
-	 * @param size	size of line buffer
+	 * @param dest      line buffer
+	 * @param dest_size size of line buffer
+	 *
+	 * @returns false in case of eof
 	 */
-	bool read_line(char *s, int size);
+	bool read_line(char *dest, size_t dest_size);
 
 	/**
 	 * Return parameters and expansions
@@ -64,38 +82,27 @@ private:
 	/**
 	 * Calculates expression provided in buffer, substituting parameters provided
 	 */
-	int calculate(char *expression, int parameter_value[10][256], int parameters, int combination[10]);
+	int calculate(char *expression, const int (&parameter_value)[10][256], int parameters, int combination[10]);
 
 	/**
 	 * Adds brackets to expression to ensure calculate_internal processes expression correctly
 	 */
-	void add_operator_brackets(char *expression, char *processed);
+	void add_operator_parens(char *expression, char *processed);
 
 	/**
 	 * Calculates expression provided in buffer (do not call directly!)
 	 */
-	int calculate_internal(char *expression, int parameter_value[10][256], int parameters, int combination[10]);
+	int calculate_internal(char *expression, const int (&parameter_value)[10][256], int parameters, int combination[10], int nest_level);
 
 	/**
 	 * Format the key string (trimright and lowercase)
 	 */
 	void format_key(char *key);
 
-public:
-	tabfile_t() : file(NULL) {}
-	~tabfile_t() { close(); }
+private:
+	FILE *file;
 
-	bool open(const char *filename);
-
-	void close();
-
-	/**
-	 * Read an entire object from the open file.
-	 *
-	 * @return bool	false, if empty object or eof
-	 * @param &objinfo  will receive the object info
-	 */
-	bool read(tabfileobj_t &objinfo, FILE *fp = NULL);
+	int current_line_number;
 };
 
 
@@ -133,7 +140,7 @@ public:
 	/**
 	 * Get the value for a key - key must be lowercase
 	 *
-	 * @return const char *	returns at least an empty string, never NULL.
+	 * @return const char *returns at least an empty string, never NULL.
 	 */
 	const char *get(const char *key);
 
@@ -146,7 +153,7 @@ public:
 	/**
 	 * Get the value for a koord key - key must be lowercase
 	 *
-	 * @return koord	returns def, if key is not found
+	 * @return def, if key is not found
 	 */
 	const koord &get_koord(const char *key, koord def);
 	const scr_size &get_scr_size(const char *key, scr_size def);
@@ -172,7 +179,7 @@ public:
 	 * and returns an allocated int[N + 1] with
 	 * N at pos. 0, <num 1> at pos 1, etc.
 	 * Do not forget to "delete []" the returned value.
-	 * @return const char *	returns at least an int[1], never NULL.
+	 * @return at least an int[1], never NULL.
 	 */
 	int *get_ints(const char *key);
 	sint64 *get_sint64s(const char *key);

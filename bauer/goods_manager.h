@@ -3,8 +3,9 @@
  * (see LICENSE.txt)
  */
 
-#ifndef goods_manager_t_h
-#define goods_manager_t_h
+#ifndef BAUER_GOODS_MANAGER_H
+#define BAUER_GOODS_MANAGER_H
+
 
 #include "../tpl/vector_tpl.h"
 #include "../tpl/stringhashtable_tpl.h"
@@ -28,7 +29,11 @@ private:
 	static uint8 max_catg_index;
 
 public:
-	enum { INDEX_PAS=0, INDEX_MAIL=1, INDEX_NONE=2 };
+	enum {
+		INDEX_PAS  = 0,
+		INDEX_MAIL = 1,
+		INDEX_NONE = 2
+	};
 
 	static const goods_desc_t *passengers;
 	static const goods_desc_t *mail;

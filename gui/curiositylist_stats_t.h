@@ -3,8 +3,9 @@
  * (see LICENSE.txt)
  */
 
-#ifndef curiositylist_stats_t_h
-#define curiositylist_stats_t_h
+#ifndef GUI_CURIOSITYLIST_STATS_T_H
+#define GUI_CURIOSITYLIST_STATS_T_H
+
 
 #include "components/gui_aligned_container.h"
 #include "components/gui_colorbox.h"
@@ -13,7 +14,12 @@
 class gebaeude_t;
 
 namespace curiositylist {
-    enum sort_mode_t { by_name=0, by_paxlevel/*, by_maillevel*/, SORT_MODES };
+	enum sort_mode_t {
+		by_name=0,
+		by_paxlevel,
+//		by_maillevel,
+		SORT_MODES
+	};
 };
 
 /**

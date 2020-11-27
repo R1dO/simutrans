@@ -3,17 +3,22 @@
  * (see LICENSE.txt)
  */
 
-#ifndef signal_spacing_h
-#define signal_spacing_h
+#ifndef GUI_SIGNAL_SPACING_H
+#define GUI_SIGNAL_SPACING_H
+
 
 #include "gui_frame.h"
 #include "components/action_listener.h"
+#include "components/gui_numberinput.h"
+#include "components/gui_label.h"
+
 
 class gui_numberinput_t;
 class button_t;
 class gui_label_t;
 class tool_build_roadsign_t;
 class player_t;
+
 
 /*
  * Dialogue to set the signal spacing, when CTRL+clicking a signal on toolbar

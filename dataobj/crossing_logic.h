@@ -3,8 +3,9 @@
  * (see LICENSE.txt)
  */
 
-#ifndef crossing_logic_h
-#define crossing_logic_h
+#ifndef DATAOBJ_CROSSING_LOGIC_H
+#define DATAOBJ_CROSSING_LOGIC_H
+
 
 #include "../simtypes.h"
 #include "../tpl/minivec_tpl.h"
@@ -22,7 +23,14 @@ class vehicle_base_t;
 class crossing_logic_t
 {
 public:
-	enum crossing_state_t { CROSSING_INVALID=0, CROSSING_OPEN, CROSSING_REQUEST_CLOSE, CROSSING_CLOSED };
+	enum crossing_state_t {
+		CROSSING_INVALID = 0,
+		CROSSING_OPEN,
+		CROSSING_REQUEST_CLOSE,
+		CROSSING_CLOSED,
+		NUM_CROSSING_STATES
+	};
+
 protected:
 	static karte_ptr_t welt;
 

@@ -3,10 +3,11 @@
  * (see LICENSE.txt)
  */
 
-#ifndef SIMROADTRAFFIC_H
-#define SIMROADTRAFFIC_H
+#ifndef VEHICLE_SIMROADTRAFFIC_H
+#define VEHICLE_SIMROADTRAFFIC_H
 
-#include "simvehicle.h"
+
+#include "vehicle_base.h"
 #include "overtaker.h"
 
 #include "../tpl/stringhashtable_tpl.h"
@@ -18,7 +19,7 @@ class karte_t;
 /**
  * Base class for traffic participants with random movement
  *
- * Transport vehicles are defined in simvehicle.h, because they greatly
+ * Transport vehicles are defined in vehicle.h, because they greatly
  * differ from the vehicles defined herein for the individual traffic
  * (pedestrians, citycars, movingobj aka flock of sheep).
  */
@@ -102,8 +103,9 @@ public:
 	/**
 	 * Creates citycar at position given by @p gr.
 	 * Does not add car to the tile!
+	 * If @p name == NULL then a random car is created.
 	 */
-	private_car_t(grund_t* gr, koord target);
+	private_car_t(grund_t* gr, koord target, const char* name = NULL);
 
 	virtual ~private_car_t();
 

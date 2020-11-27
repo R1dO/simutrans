@@ -17,8 +17,8 @@
 
 void way_obj_reader_t::register_obj(obj_desc_t *&data)
 {
-    way_obj_desc_t *desc = static_cast<way_obj_desc_t *>(data);
-    wayobj_t::register_desc(desc);
+	way_obj_desc_t *desc = static_cast<way_obj_desc_t *>(data);
+	wayobj_t::register_desc(desc);
 
 	checksum_t *chk = new checksum_t();
 	desc->calc_checksum(chk);
@@ -28,7 +28,7 @@ void way_obj_reader_t::register_obj(obj_desc_t *&data)
 
 bool way_obj_reader_t::successfully_loaded() const
 {
-    return wayobj_t::successfully_loaded();
+	return wayobj_t::successfully_loaded();
 }
 
 
@@ -58,7 +58,7 @@ obj_desc_t * way_obj_reader_t::read_node(FILE *fp, obj_node_info_t &node)
 		desc->own_wtyp = decode_uint8(p);
 	}
 	else {
-		dbg->fatal("way_obj_reader_t::read_node()","Invalid version %d", version);
+		dbg->fatal( "way_obj_reader_t::read_node()", "Cannot handle too new node version %i", version );
 	}
 	DBG_DEBUG("way_obj_reader_t::read_node()",
 	     "version=%d price=%d maintenance=%d topspeed=%d wtype=%d own_wtype=%d intro=%i/%i, retire=%i/%i",

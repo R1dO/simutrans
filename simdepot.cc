@@ -8,7 +8,6 @@
 #include <string.h>
 
 #include "simconvoi.h"
-#include "vehicle/simvehicle.h"
 #include "gui/simwin.h"
 #include "player/simplay.h"
 #include "simworld.h"
@@ -33,8 +32,14 @@
 
 #include "utils/cbuffer_t.h"
 
+#include "vehicle/air_vehicle.h"
+#include "vehicle/rail_vehicle.h"
+#include "vehicle/road_vehicle.h"
+#include "vehicle/water_vehicle.h"
+
 
 slist_tpl<depot_t *> depot_t::all_depots;
+
 
 depot_t::depot_t(loadsave_t *file) : gebaeude_t()
 {
@@ -51,7 +56,7 @@ depot_t::depot_t(loadsave_t *file) : gebaeude_t()
 
 
 depot_t::depot_t(koord3d pos, player_t *player, const building_tile_desc_t *t) :
-    gebaeude_t(pos, player, t)
+	gebaeude_t(pos, player, t)
 {
 	all_depots.append(this);
 	selected_filter = VEHICLE_FILTER_RELEVANT;
@@ -533,7 +538,7 @@ void depot_t::rdwr_vehikel(slist_tpl<vehicle_t *> &list, loadsave_t *file)
 			}
 			if(v->get_desc()) {
 				DBG_MESSAGE("depot_t::vehikel_laden()","loaded %s", v->get_desc()->get_name());
-				list.insert( v );
+				list.append( v );
 			}
 			else {
 				dbg->error("depot_t::vehikel_laden()","vehicle has no desc => ignored");

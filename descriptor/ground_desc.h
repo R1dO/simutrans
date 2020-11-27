@@ -3,26 +3,28 @@
  * (see LICENSE.txt)
  */
 
-#ifndef __GROUND_DESC_H
-#define __GROUND_DESC_H
+#ifndef DESCRIPTOR_GROUND_DESC_H
+#define DESCRIPTOR_GROUND_DESC_H
+
 
 #include "obj_base_desc.h"
 #include "image_array.h"
 #include "../simtypes.h"
 #include "../dataobj/ribi.h"
 
-/**
- * Images of all possible surface tiles: slopes, climates, transitions, etc.
- *
- *  Child nodes:
- *	0   Name
- *	1   Copyright
- *	2   Image-array
- */
 
 class grund_t;
 class karte_t;
 
+
+/**
+ * Images of all possible surface tiles: slopes, climates, transitions, etc.
+ *
+ * Child nodes:
+ *  0   Name
+ *  1   Copyright
+ *  2   Image-array
+ */
 class ground_desc_t : public obj_named_desc_t {
 private:
 	static karte_t *world;
@@ -34,13 +36,13 @@ public:
 	static sint16 water_depth_levels;
 
 	// only these textures need external access
-	static const ground_desc_t *shore;	// nicer shore graphics, optional
+	static const ground_desc_t *shore; // nicer shore graphics, optional
 	static const ground_desc_t *fundament;
 	static const ground_desc_t *slopes;
 	static const ground_desc_t *fences;
 	static const ground_desc_t *marker;
 	static const ground_desc_t *borders;
-	static const ground_desc_t *sea;	// different water depth
+	static const ground_desc_t *sea;     // different water depth
 	static const ground_desc_t *outside;
 
 	static char const* get_climate_name_from_bit(climate n);

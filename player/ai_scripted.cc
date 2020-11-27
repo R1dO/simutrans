@@ -12,7 +12,7 @@
 
 // scripting
 #include "../script/script.h"
-#include "../script/export_objs.h"
+#include "../script/script_loader.h"
 #include "../script/api/api.h"
 
 // TODO ai debug window
@@ -71,31 +71,14 @@ const char* ai_scripted_t::init( const char *ai_base, const char *ai_name_)
 	return NULL;
 }
 
-bool load_base_script(script_vm_t *script, const char* base); // scenario.cc
 
 bool ai_scripted_t::load_script(const char* filename)
 {
 	cbuffer_t buf;
 	buf.printf("script-ai-%d.log", player_nr);
-
-	script = new script_vm_t(ai_path.c_str(), buf);
-	// load global stuff
-	// constants must be known compile time
-	export_global_constants(script->get_vm());
-
-	// load scripting base definitions
-	if (!load_base_script(script, "script_base.nut")) {
-		return false;
-	}
-	// load ai base definitions
-	if (!load_base_script(script, "ai_base.nut")) {
-		return false;
-	}
-
-	// register api functions
-	register_export_function(script->get_vm(), false);
-	if (script->get_error()) {
-		dbg->error("ai_scripted_t::load_script", "error [%s] calling register_export_function", script->get_error());
+	// start vm
+	script = script_loader_t::start_vm("ai_base.nut", buf, ai_path.c_str(), false);
+	if (script == NULL) {
 		return false;
 	}
 	// set my player number
@@ -114,6 +97,9 @@ bool ai_scripted_t::load_script(const char* filename)
 
 const char* ai_scripted_t::reload_script()
 {
+	if (script == NULL) {
+		return NULL;
+	}
 	// save the script to string
 	plainstring str;
 	script->call_function(script_vm_t::FORCEX, "save", str);
@@ -172,6 +158,43 @@ void ai_scripted_t::new_year()
 }
 
 
+void repair_table_keys(plainstring &str)
+{
+	// iterate linewise, enclose key starting with digit by [" .. "]
+	char *p = str;
+
+	char *line = p; // start of line
+	char *equal = NULL; // place of equality sign
+	char *first_digit = NULL; // first digit in line
+	while (*p) {
+		if (*p == '=') {
+			if (first_digit  &&  first_digit > line  &&  equal == NULL) {
+				*(p-1) = '"';
+				*(p  ) = ']';
+				*(p+1) = '=';
+				equal = p;
+			}
+		}
+		else if (*p == '\n') {
+			line = p;
+			equal = NULL;
+			first_digit = NULL;
+		}
+		else if('0' <= *p  &&  *p <= '9') {
+			if (first_digit == NULL  &&  p >= line+2) {
+				*(p-2) = '[';
+				*(p-1) = '"';
+				first_digit = p;
+			}
+		}
+		else if (first_digit == NULL  &&  *p != ' '  &&  *p != '\t') {
+			first_digit = line;
+		}
+		p++;
+	}
+}
+
+
 void ai_scripted_t::rdwr(loadsave_t *file)
 {
 	ai_t::rdwr(file);
@@ -207,9 +230,9 @@ void ai_scripted_t::rdwr(loadsave_t *file)
 		script_filename.printf("%sai.nut", ai_path.c_str());
 		bool rdwr_error = !load_script(script_filename);
 
-		// failed, try ai from program directory
+		// failed, try ai from data directory
 		if (rdwr_error) {
-			ai_path = ( std::string(env_t::program_dir) + "/ai/" + ai_name.c_str() + "/").c_str();
+			ai_path = ( std::string(env_t::data_dir) + "/ai/" + ai_name.c_str() + "/").c_str();
 			script_filename.clear();
 			script_filename.printf("%sai.nut", ai_path.c_str());
 			rdwr_error = !load_script(script_filename);
@@ -218,6 +241,15 @@ void ai_scripted_t::rdwr(loadsave_t *file)
 		if (!rdwr_error) {
 			// restore persistent data
 			const char* err = script->eval_string(str);
+			if (err  &&  strcmp(err, "Error compiling string buffer")==0) {
+				// sqai produced invalid table keys up to r9007
+				repair_table_keys(str);
+				dbg->warning("ai_scripted_t::rdwr", "repaired persistent ai data: %s", str.c_str());
+				// close error message
+				destroy_win(magic_script_error);
+				// and try again
+				err = script->eval_string(str);
+			}
 			if (err) {
 				dbg->warning("ai_scripted_t::rdwr", "error [%s] evaluating persistent ai data", err);
 				rdwr_error = true;

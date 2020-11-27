@@ -3,10 +3,11 @@
  * (see LICENSE.txt)
  */
 
-#ifndef simcity_h
-#define simcity_h
+#ifndef SIMCITY_H
+#define SIMCITY_H
 
-#include "simobj.h"
+
+#include "obj/simobj.h"
 #include "obj/gebaeude.h"
 
 #include "tpl/vector_tpl.h"
@@ -28,20 +29,20 @@ class rule_t;
 #define PAX_DESTINATIONS_SIZE (256) // size of the minimap (sparse array)
 
 enum city_cost {
-	HIST_CITICENS=0,// total people
-	HIST_GROWTH,	// growth (just for convenience)
-	HIST_BUILDING,	// number of buildings
-	HIST_CITYCARS,	// number of citycars generated
-	HIST_PAS_TRANSPORTED, // number of passengers who could start their journey
-	HIST_PAS_WALKED,    // direct transfer
-	HIST_PAS_GENERATED,	// total number generated
-	HIST_MAIL_TRANSPORTED,	// letters that could be sent
-	HIST_MAIL_WALKED,       // direct handover
-	HIST_MAIL_GENERATED,	// all letters generated
-	HIST_GOODS_RECEIVED,	// times all storages were not empty
-	HIST_GOODS_NEEDED,	// times storages checked
-	HIST_POWER_RECEIVED,	// power consumption (not used at the moment!)
-	MAX_CITY_HISTORY	// Total number of items in array
+	HIST_CITIZENS = 0,     // total people
+	HIST_GROWTH,           // growth (just for convenience)
+	HIST_BUILDING,         // number of buildings
+	HIST_CITYCARS,         // number of citycars generated
+	HIST_PAS_TRANSPORTED,  // number of passengers who could start their journey
+	HIST_PAS_WALKED,       // direct transfer
+	HIST_PAS_GENERATED,    // total number generated
+	HIST_MAIL_TRANSPORTED, // letters that could be sent
+	HIST_MAIL_WALKED,      // direct handover
+	HIST_MAIL_GENERATED,   // all letters generated
+	HIST_GOODS_RECEIVED,   // times all storages were not empty
+	HIST_GOODS_NEEDED,     // times storages checked
+	HIST_POWER_RECEIVED,   // power consumption (not used at the moment!)
+	MAX_CITY_HISTORY       // Total number of items in array
 };
 
 // The base offset for passenger statistics.
@@ -131,13 +132,13 @@ private:
 	// this counter will increment by one for every change => dialogs can question, if they need to update map
 	uint32 pax_destinations_new_change;
 
-	koord pos;			// Gruendungsplanquadrat der City
-	koord townhall_road; // road in front of townhall
-	koord lo, ur;		// max size of housing area
+	koord pos;             // Gruendungsplanquadrat der City
+	koord townhall_road;   // road in front of townhall
+	koord lo, ur;          // max size of housing area
 	koord last_center;
-	bool  has_low_density;	// in this case extend borders by two
+	bool  has_low_density; // in this case extend borders by two
 
-	bool allow_citygrowth;	// town can be static and will grow (true by default)
+	bool allow_citygrowth; // town can be static and will grow (true by default)
 
 	bool has_townhall;
 	// this counter indicate which building will be processed next
@@ -167,9 +168,9 @@ private:
 	static uint32 cluster_factor;
 
 	// attribute for the population (Bevoelkerung)
-	sint32 bev;	// total population (bevoelkerung)
-	sint32 arb;	// with a job (arbeit)
-	sint32 won;	// with a residence (wohnung)
+	sint32 bev; // total population (bevoelkerung)
+	sint32 arb; // with a job (arbeit)
+	sint32 won; // with a residence (wohnung)
 
 	/**
 	 * Un-supplied city growth needs
@@ -258,9 +259,9 @@ public:
 				sint16 factory_pos_y;
 			};
 		};
-		sint32 demand;		// amount demanded by the factory; shifted by DEMAND_BITS
-		sint32 supply;		// amount that the city can supply
-		sint32 remaining;	// portion of supply which has not realised yet; remaining <= supply
+		sint32 demand;    // amount demanded by the factory; shifted by DEMAND_BITS
+		sint32 supply;    // amount that the city can supply
+		sint32 remaining; // portion of supply which has not realised yet; remaining <= supply
 
 		factory_entry_t() : factory(NULL), demand(0), supply(0), remaining(0) { }
 		factory_entry_t(fabrik_t *_factory) : factory(_factory), demand(0), supply(0), remaining(0) { }
@@ -275,7 +276,7 @@ public:
 	struct factory_set_t
 	{
 		vector_tpl<factory_entry_t> entries;
-		sint32 total_demand;		// shifted by DEMAND_BITS
+		sint32 total_demand;    // shifted by DEMAND_BITS
 		sint32 total_remaining;
 		sint32 total_generated;
 		uint32 generation_ratio;
@@ -320,7 +321,12 @@ private:
 	 */
 	void step_grow_city(bool new_town = false);
 
-	enum pax_return_type { no_return, factory_return, tourist_return, city_return };
+	enum pax_return_type {
+		no_return,
+		factory_return,
+		tourist_return,
+		city_return
+	};
 
 	/**
 	 * verteilt die Passagiere auf die Haltestellen
@@ -358,7 +364,7 @@ private:
 	void renovate_city_building(gebaeude_t *gb);
 
 #ifdef DESTINATION_CITYCARS
-	sint16	number_of_cars; // allowed number of cars to spawn per month
+	sint16 number_of_cars; // allowed number of cars to spawn per month
 	void generate_private_cars(koord pos, koord target);
 #endif
 
@@ -394,9 +400,9 @@ private:
 	void pruefe_grenzen(koord pos);
 
 public:
-	/**
-	 * sucht arbeitsplätze für die Einwohner
-	 */
+	bool is_within_players_network( const player_t* player ) const;
+
+	/// Connects factories to this city.
 	void verbinde_fabriken();
 
 	/**
@@ -441,30 +447,16 @@ public:
 	sint32 get_unemployed() const { return bev - arb; }
 	sint32 get_homeless()   const { return bev - won; }
 
-	/**
-	 * Return the city name.
-	 */
 	const char *get_name() const { return name; }
-
-	/**
-	 * Ermöglicht Zugriff auf Namesnarray
-	 */
 	void set_name( const char *name );
 
-	/**
-	 * gibt einen zufällingen gleichverteilten Punkt innerhalb der
-	 * Citygrenzen zurück
-	 */
+	/// @returns a random point within city borders.
 	koord get_zufallspunkt() const;
 
-	/**
-	 * gibt das pax-statistik-array für letzten monat zurück
-	 */
+	/// @returns passenger destination statistics for the last month
 	const sparse_tpl<PIXVAL>* get_pax_destinations_old() const { return &pax_destinations_old; }
 
-	/**
-	 * gibt das pax-statistik-array für den aktuellen monat zurück
-	 */
+	/// @returns passenger destination statistics for the current month
 	const sparse_tpl<PIXVAL>* get_pax_destinations_new() const { return &pax_destinations_new; }
 
 	/* this counter will increment by one for every change

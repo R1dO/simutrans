@@ -3,8 +3,9 @@
  * (see LICENSE.txt)
  */
 
-#ifndef __WAY_OBJ_DESC_H
-#define __WAY_OBJ_DESC_H
+#ifndef DESCRIPTOR_WAY_OBJ_DESC_H
+#define DESCRIPTOR_WAY_OBJ_DESC_H
+
 
 #include "image_list.h"
 #include "obj_base_desc.h"
@@ -20,15 +21,15 @@ class checksum_t;
  * Way objects type description (like overhead lines).
  *
  * Child nodes:
- *	0	Name
- *	1	Copyright
- *	2	Image on flat ways
- *	3	Image on sloped ways
- *	4	Image on diagonal ways
- *	5	Skin (cursor and icon)
+ *  0  Name
+ *  1  Copyright
+ *  2  Image on flat ways
+ *  3  Image on sloped ways
+ *  4  Image on diagonal ways
+ *  5  Skin (cursor and icon)
  */
 class way_obj_desc_t : public obj_desc_transport_infrastructure_t {
-    friend class way_obj_reader_t;
+	friend class way_obj_reader_t;
 
 private:
 
@@ -56,7 +57,7 @@ public:
 				255, 255, 255, 255, 255, 255, 255, 0,
 				255, 255, 255, 1, 255, 2, 3, 4
 			};
-			return imglist->get_image_id( ribi_to_extra[ribi]+16+(nw*5) );
+			return ribi < 16 ? imglist->get_image_id( ribi_to_extra[ribi]+16+(nw*5) )  : IMG_EMPTY;
 		}
 		// else return standard values
 		return imglist->get_image_id( ribi );

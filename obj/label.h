@@ -3,10 +3,11 @@
  * (see LICENSE.txt)
  */
 
-#ifndef label_h
-#define label_h
+#ifndef OBJ_LABEL_H
+#define OBJ_LABEL_H
 
-#include "../simobj.h"
+
+#include "simobj.h"
 #include "../display/simimg.h"
 
 

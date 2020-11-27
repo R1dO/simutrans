@@ -47,7 +47,7 @@ void gui_aligned_container_t::set_size(scr_size new_size)
 		gui_container_t::set_size(size);
 		return;
 	}
-// 	printf("[%p] new size %d,%d\n", this, new_size.w, new_size.h);
+//	printf("[%p] new size %d,%d\n", this, new_size.w, new_size.h);
 	// calculate min-sizes
 	vector_tpl<scr_coord_val> col_minw, row_minh;
 
@@ -55,11 +55,11 @@ void gui_aligned_container_t::set_size(scr_size new_size)
 
 	scr_size min_size = get_size(col_minw, row_minh);
 
-// 	printf("colmin (spacing %d) ", spacing.w);
-// 	for(uint32 i=0; i<col_minw.get_count(); i++) {
-// 		printf("%d, ", col_minw[i]);
-// 	}
-// 	printf("\n");
+//	printf("colmin (spacing %d) ", spacing.w);
+//	for(uint32 i=0; i<col_minw.get_count(); i++) {
+//		printf("%d, ", col_minw[i]);
+//	}
+//	printf("\n");
 
 	if (min_size.h > new_size.h  ||  min_size.w > new_size.w) {
 		dbg->warning("gui_aligned_container_t::set_size", "new size (%d,%d) smaller than min size (%d,%d)", new_size.w, new_size.h, min_size.w, min_size.h);
@@ -172,10 +172,10 @@ void gui_aligned_container_t::set_size(scr_size new_size)
 		}
 
 
-// 		scr_size max_size = comp->get_max_size();
-// 		printf("[%p] set [%p] to pos %d %d, size %d %d, min %d %d, max %d %d\n", this, comp, comp->get_pos().x, comp->get_pos().y, comp_size.w, comp_size.h, comp->get_min_size().w, comp->get_min_size().h,
-// 			 max_size.w, max_size.h
-// 		);
+//		scr_size max_size = comp->get_max_size();
+//		printf("[%p] set [%p] to pos %d %d, size %d %d, min %d %d, max %d %d\n", this, comp, comp->get_pos().x, comp->get_pos().y, comp_size.w, comp_size.h, comp->get_min_size().w, comp->get_min_size().h,
+//			 max_size.w, max_size.h
+//		);
 
 		if( comp->is_marginless() ) {
 			// marginless component
@@ -215,6 +215,7 @@ void gui_aligned_container_t::compute_sizes(vector_tpl<scr_coord_val>& col_w, ve
 	// second: all elements spanning more than one cell
 	for(int outer = 0; outer < 2; outer++) {
 		uint16 c = 0, r = 0;
+		bool wide_elements = false;
 		for(uint32 i = 0; i<components.get_count(); i++) {
 			gui_component_t* comp = components[i];
 			// fails if span is larger than remaining column space
@@ -242,9 +243,9 @@ void gui_aligned_container_t::compute_sizes(vector_tpl<scr_coord_val>& col_w, ve
 			if (!comp->is_visible()   &&  !comp->is_rigid()) {
 				continue; // not visible - no size reserved
 			}
-// 			printf("outer %d, i %d, c %d, span %d\n", outer,i,c,span);
 
-			scr_size s = calc_max ? comp->get_max_size() : comp->get_min_size();
+			// only compute if necessary
+			scr_size s = outer == 0 ||  span>1 ? (calc_max ? comp->get_max_size() : comp->get_min_size()) : scr_size(0,0);
 
 			if (outer == 0) {
 
@@ -255,7 +256,7 @@ void gui_aligned_container_t::compute_sizes(vector_tpl<scr_coord_val>& col_w, ve
 
 				if (span == 1) {
 					// elements in exactly one cell, define initial size
-	//  				printf(" -- [%p] %p (%d,%d) %d %d \n", this, comp, c,r, s.w, s.h);
+//					printf(" -- [%p] %p (%d,%d) %d %d \n", this, comp, c,r, s.w, s.h);
 					if (c < columns  ||  columns==0) {
 						col_w.append(s.w);
 					}
@@ -267,6 +268,7 @@ void gui_aligned_container_t::compute_sizes(vector_tpl<scr_coord_val>& col_w, ve
 					}
 				}
 				else {
+					wide_elements = true;
 					while (col_w.get_count() <= c % columns) {
 						col_w.append(0);
 					}
@@ -315,6 +317,10 @@ void gui_aligned_container_t::compute_sizes(vector_tpl<scr_coord_val>& col_w, ve
 			}
 
 		}
+		if (!wide_elements) {
+			// no elements spanning more than one column
+			break;
+		}
 	}
 
 	if (force_equal_columns) {
@@ -333,31 +339,28 @@ scr_size gui_aligned_container_t::get_size(vector_tpl<scr_coord_val>& col_w, vec
 {
 	scr_coord_val sinf = scr_size::inf.w;
 	scr_size s = margin_tl + margin_br;
-	scr_coord_val space = 0; // no spacing before first element
-// 	printf("col_w ");
+	s.w += spacing.w * max(col_w.get_count()-1, 0);
+	s.h += spacing.h * max(row_h.get_count()-1, 0);
+
 	FOR(vector_tpl<scr_coord_val>, const w, col_w) {
-// 		printf("%d, ", w);
-		if (s.w > sinf - w - space) {
+		if (s.w > sinf - w) {
 			s.w = sinf;
+			break;
 		}
 		else {
-			s.w += w + space;
+			s.w += w;
 		}
-		space = spacing.w;
 	}
-// 	printf("\nrow_h ");
-	space = 0;
+
 	FOR(vector_tpl<scr_coord_val>, const h, row_h) {
-// 		printf("%d, ", h);
-		if (s.h > sinf - h - space) {
+		if (s.h > sinf - h) {
 			s.h = sinf;
+			break;
 		}
 		else {
-			s.h += h + space;
+			s.h += h;
 		}
-		space = spacing.w;
 	}
-// 	printf("\n");
 	return s;
 }
 
@@ -413,11 +416,11 @@ void gui_aligned_container_t::distribute_extra_space(vector_tpl<scr_coord_val>& 
 			}
 		}
 	}
-// 	printf("distribute ");
-// 	for(uint32 i=0; i<size.get_count(); i++) {
-// 		printf("%d (%d), ", size[i], maxsize[i]);
-// 	}
-// 	printf("\n");
+//	printf("distribute ");
+//	for(uint32 i=0; i<size.get_count(); i++) {
+//		printf("%d (%d), ", size[i], maxsize[i]);
+//	}
+//	printf("\n");
 }
 
 
@@ -431,9 +434,9 @@ scr_size gui_aligned_container_t::get_min_size() const
 
 	compute_sizes(col_w, row_h, false);
 
-// 	scr_size min_size = get_size(col_w, row_h);
-// 	printf("min size %d,%d\n", min_size.w, min_size.h);
-// 	return min_size;
+//	scr_size min_size = get_size(col_w, row_h);
+//	printf("min size %d,%d\n", min_size.w, min_size.h);
+//	return min_size;
 	return get_size(col_w, row_h);
 }
 

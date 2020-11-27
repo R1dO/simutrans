@@ -3,8 +3,9 @@
  * (see LICENSE.txt)
  */
 
-#ifndef _display_settings_h_
-#define _display_settings_h_
+#ifndef GUI_DISPLAY_SETTINGS_H
+#define GUI_DISPLAY_SETTINGS_H
+
 
 #include "gui_frame.h"
 #include "components/gui_divider.h"
@@ -54,7 +55,8 @@ private:
 	gui_combobox_t hide_buildings;
 public:
 	transparency_settings_t();
-	virtual bool action_triggered( gui_action_creator_t *comp, value_t v );
+	virtual bool action_triggered( gui_action_creator_t *comp, value_t v ) OVERRIDE;
+	void draw(scr_coord offset) OVERRIDE;
 };
 
 
@@ -80,12 +82,12 @@ private:
 	station_settings_t station_settings;
 	traffic_settings_t traffic_settings;
 	gui_scrollpane_t scrolly_gui, scrolly_map, scrolly_transparency, scrolly_station, scrolly_traffic;
-	gui_tab_panel_t	tabs;
+	gui_tab_panel_t tabs;
 
 public:
 	color_gui_t();
 
-	virtual bool has_min_sizer() const {return true;}
+	virtual bool has_min_sizer() const OVERRIDE {return true;}
 
 	/**
 	 * Some windows have associated help text.

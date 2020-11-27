@@ -4,7 +4,7 @@
  */
 
 #include "../simdebug.h"
-#include "../simsys.h"
+#include "../sys/simsys.h"
 
 #include "scenario_frame.h"
 #include "scenario_info.h"
@@ -29,7 +29,7 @@ scenario_frame_t::scenario_frame_t() : savegame_frame_t(NULL, true, NULL, false)
 	static cbuffer_t addons_scenario;
 
 	pakset_scenario.clear();
-	pakset_scenario.printf("%s%sscenario/", env_t::program_dir, env_t::objfilename.c_str());
+	pakset_scenario.printf("%s%sscenario/", env_t::data_dir, env_t::objfilename.c_str());
 
 	addons_scenario.clear();
 	addons_scenario.printf("addons/%sscenario/", env_t::objfilename.c_str());

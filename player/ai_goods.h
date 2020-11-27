@@ -3,8 +3,9 @@
  * (see LICENSE.txt)
  */
 
-#ifndef AI_GOODS_H
-#define AI_GOODS_H
+#ifndef PLAYER_AI_GOODS_H
+#define PLAYER_AI_GOODS_H
+
 
 #include "ai.h"
 
@@ -67,7 +68,7 @@ private:
 	class fabconnection_t{
 		friend class ai_goods_t;
 		fabrik_t *fab1;
-		fabrik_t *fab2;	// koord1 must be always "smaller" than koord2
+		fabrik_t *fab2; // koord1 must be always "smaller" than koord2
 		const goods_desc_t *ware;
 
 	public:

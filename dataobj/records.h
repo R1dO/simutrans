@@ -3,8 +3,9 @@
  * (see LICENSE.txt)
  */
 
-#ifndef records_h
-#define records_h
+#ifndef DATAOBJ_RECORDS_H
+#define DATAOBJ_RECORDS_H
+
 
 #include "koord.h"
 #include "../convoihandle_t.h"
@@ -41,10 +42,10 @@ private:
 	class speed_record_t {
 	public:
 		convoihandle_t cnv;
-		sint32	speed;
-		koord	pos;
+		sint32    speed;
+		koord     pos;
 		player_t *owner;  // Owner
-		uint32 year_month;
+		uint32    year_month;
 
 		speed_record_t() : cnv(), speed(0), pos(koord::invalid), owner(NULL), year_month(0) {}
 	};

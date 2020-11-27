@@ -6,6 +6,7 @@
 #ifndef UNICODE_H
 #define UNICODE_H
 
+
 #include <stddef.h>
 #include "simtypes.h"
 
@@ -29,7 +30,7 @@ public:
 	// Constructs a UTF-8 decoder for the given C string.
 	utf8_decoder_t(utf8 const *str);
 
-	/** 
+	/**
 	 * Decodes a Unicode code point from the byte sequence pointed to by buff.
 	 * On return buff has been advanced to point at the beginning of the next Unicode code point.
 	 * Does not respect NUL terminator character, care should be taken to detect the emmited UNICODE_NUL when decoding C strings to avoid buffer over run errors.
@@ -37,7 +38,7 @@ public:
 	 */
 	static utf32 decode(utf8 const *&buff);
 
-	/** 
+	/**
 	 * Decodes a Unicode code point from the byte sequence pointed to by buff.
 	 * On return len contains the length of the Unicode character in bytes.
 	 * Does not respect NUL terminator character, care should be taken to detect the emmited UNICODE_NUL when decoding C strings to avoid buffer over run errors.
@@ -67,11 +68,15 @@ public:
 size_t utf8_get_next_char(const utf8 *text, size_t pos);
 sint32 utf8_get_prev_char(const utf8 *text, sint32 pos);
 
-int	utf16_to_utf8(utf16 unicode, utf8 *out);
+int utf16_to_utf8(utf16 unicode, utf8 *out);
 
 // returns latin2 or 0 for error
 uint8 unicode_to_latin2( utf16 chr );
 utf16 latin2_to_unicode( uint8 chr );
+
+// caseless strstr with utf8
+const utf8 *utf8caseutf8( const utf8 *haystack_start, const utf8 *needle_start );
+const char *utf8caseutf8( const char *haystack, const char *needle );
 
 
 #endif

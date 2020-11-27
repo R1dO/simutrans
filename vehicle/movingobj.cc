@@ -8,7 +8,7 @@
 
 #include "../simdebug.h"
 #include "../simworld.h"
-#include "../simobj.h"
+#include "../obj/simobj.h"
 #include "../display/simimg.h"
 #include "../player/simplay.h"
 #include "../simtypes.h"
@@ -161,7 +161,7 @@ movingobj_t::movingobj_t(koord3d pos, const groundobj_desc_t *b ) : vehicle_base
 {
 	movingobjtype = movingobj_typen.index_of(b);
 	weg_next = 0;
-	timetochange = 0;	// will do random direct change anyway during next step
+	timetochange = 0; // will do random direct change anyway during next step
 	direction = calc_set_direction( koord3d(0,0,0), koord3d(koord::west,0) );
 	calc_image();
 	welt->sync.add( this );
@@ -235,10 +235,6 @@ void movingobj_t::rdwr(loadsave_t *file)
 }
 
 
-
-/**
- * Open a new observation window for the object.
- */
 void movingobj_t::show_info()
 {
 	if(env_t::tree_info) {
@@ -247,11 +243,6 @@ void movingobj_t::show_info()
 }
 
 
-
-/**
- * @return Einen Beschreibungsstring für das Objekt, der z.B. in einem
- * Beobachtungsfenster angezeigt wird.
- */
 void movingobj_t::info(cbuffer_t & buf) const
 {
 	obj_t::info(buf);
@@ -269,14 +260,11 @@ void movingobj_t::info(cbuffer_t & buf) const
 }
 
 
-
 void movingobj_t::cleanup(player_t *player)
 {
 	player_t::book_construction_costs(player, -get_desc()->get_price(), get_pos().get_2d(), ignore_wt);
 	mark_image_dirty( get_image(), 0 );
 }
-
-
 
 
 sync_result movingobj_t::sync_step(uint32 delta_t)
@@ -285,7 +273,6 @@ sync_result movingobj_t::sync_step(uint32 delta_t)
 	weg_next -= do_drive( weg_next );
 	return SYNC_OK;
 }
-
 
 
 /* essential to find out about next step
@@ -374,7 +361,7 @@ grund_t* movingobj_t::hop_check()
 		uint8 until=0;
 		// find all tiles we can go
 		for(  int i=0;  i<4;  i++  ) {
-			const grund_t *check = welt->lookup_kartenboden(pos+koord::nsew[i]);
+			const grund_t *check = welt->lookup_kartenboden(pos+koord::nesw[i]);
 			if(check_next_tile(check)  &&  check->get_pos()!=get_pos()) {
 				to[until++] = check;
 			}

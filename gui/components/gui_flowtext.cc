@@ -8,7 +8,6 @@
 #include "../../simcolor.h"
 #include "../../simevent.h"
 #include "../../display/simgraph.h"
-#include "../../dataobj/translator.h"
 #include "../../utils/simstring.h"
 #include "../gui_theme.h"
 
@@ -64,7 +63,7 @@ private:
 	enum attributes
 	{
 		ATT_NONE,
-		ATT_NO_SPACE,	// same as none, but no trailing space
+		ATT_NO_SPACE, // same as none, but no trailing space
 		ATT_NEWLINE,
 		ATT_A_START,      ATT_A_END,
 		ATT_H1_START,     ATT_H1_END,
@@ -120,7 +119,7 @@ void gui_flowtext_intern_t::set_text(const char *text)
 	nodes.clear();
 	links.clear();
 
-	// danger here, longest word in text must not exceed 511 chars!
+	// danger here, longest word in text must not exceed stoarge space!
 	char word[512];
 	attributes att = ATT_NONE;
 
@@ -140,8 +139,8 @@ void gui_flowtext_intern_t::set_text(const char *text)
 				tail++;
 			}
 
-			// parse a tag (not allowed to exceed 511 letters)
-			for (int i = 0; *lead != '>' && *lead > 0 && i < 511; i++) {
+			// parse a tag (not allowed to exceed sizeof(word) letters)
+			for (uint i = 0; *lead != '>' && *lead > 0 && i+2 < sizeof(word); i++) {
 				lead++;
 			}
 
@@ -150,6 +149,7 @@ void gui_flowtext_intern_t::set_text(const char *text)
 			lead++;
 
 			if (word[0] == 'p' || (word[0] == 'b' && word[1] == 'r')) {
+				// unlike http, we can have as many newlines as we like
 				att = ATT_NEWLINE;
 			}
 			else if (word[0] == 'a') {
@@ -251,7 +251,7 @@ void gui_flowtext_intern_t::set_text(const char *text)
 
 			// parse a word (and obey limits)
 			att = ATT_NONE;
-			for(  int i = 0;  *lead != '<'  &&  (*lead > 32  ||  (i==0  &&  *lead==32))  &&  i < 511  &&  *lead != '&'; i++) {
+			for(  uint i = 0;  *lead != '<'  &&  (*lead > 32  ||  (i==0  &&  *lead==32))  &&  i+1 < sizeof(word)  &&  *lead != '&'; i++) {
 				if(  *lead>128  ) {
 					size_t len = 0;
 					utf32 symbol = utf8_decoder_t::decode(lead, len);
@@ -364,9 +364,9 @@ scr_size gui_flowtext_intern_t::output(scr_coord offset, bool doit, bool return_
 	PIXVAL color        = SYSCOL_TEXT;
 	PIXVAL double_color = SYSCOL_TEXT_SHADOW;
 	bool double_it      = false;
-	bool link_it        = false;	// true, if currently underlining for a link
-	int extra_pixel     = 0;		// extra pixel before next line
-	int last_link_x     = 0;		// at this position ye need to continue underline drawing
+	bool link_it        = false; // true, if currently underlining for a link
+	int extra_pixel     = 0;     // extra pixel before next line
+	int last_link_x     = 0;     // at this position ye need to continue underline drawing
 	int max_width    = width;
 	int text_width   = width;
 	const int space_width = proportional_string_width(" ");
@@ -508,9 +508,7 @@ scr_size gui_flowtext_intern_t::output(scr_coord offset, bool doit, bool return_
 			default: break;
 		}
 	}
-	if (xpos > 0) {
-		ypos += LINESPACE;
-	}
+	ypos += LINESPACE;
 	if(dirty) {
 		mark_rect_dirty_wc( offset.x + D_MARGIN_LEFT, offset.y, offset.x+max_width + D_MARGIN_LEFT, offset.y+ypos );
 		dirty = false;

@@ -16,7 +16,7 @@ static pthread_mutex_t add_to_city_mutex = PTHREAD_MUTEX_INITIALIZER;
 #include "../bauer/hausbauer.h"
 #include "../gui/headquarter_info.h"
 #include "../simworld.h"
-#include "../simobj.h"
+#include "simobj.h"
 #include "../simfab.h"
 #include "../display/simimg.h"
 #include "../display/simgraph.h"
@@ -89,13 +89,13 @@ gebaeude_t::gebaeude_t(loadsave_t *file) : obj_t()
 
 
 gebaeude_t::gebaeude_t(koord3d pos, player_t *player, const building_tile_desc_t *t) :
-    obj_t(pos)
+	obj_t(pos)
 {
 	set_owner( player );
 
 	init();
 	if(t) {
-		set_tile(t,true);	// this will set init time etc.
+		set_tile(t,true); // this will set init time etc.
 		player_t::add_maintenance(get_owner(), tile->get_desc()->get_maintenance(welt), tile->get_desc()->get_finance_waytype() );
 	}
 
@@ -321,7 +321,7 @@ sync_result gebaeude_t::sync_step(uint32 delta_t)
 					image_id image = tile->get_foreground( anim_frame, season );
 					mark_image_dirty( image, 0 );
 				}
- 			}
+			}
 		}
 	}
 	return SYNC_OK;
@@ -573,6 +573,46 @@ void gebaeude_t::show_info()
 		}
 	}
 }
+
+
+
+// returns true, if there is a halt serving at least one tile
+bool gebaeude_t::is_within_players_network(const player_t* player) const
+{
+	if(  get_fabrik()  ) {
+		return ptr.fab->is_within_players_network( player );
+	}
+	if(  is_townhall()  ) {
+		ptr.stadt->is_within_players_network( player );
+	}
+
+	// normal building: iterate over all tiles
+	const building_desc_t* const building_desc = tile->get_desc();
+	const uint8 layout = tile->get_layout();
+	koord k;
+	for (k.x = 0; k.x<building_desc->get_x(layout); k.x++) {
+		for (k.y = 0; k.y<building_desc->get_y(layout); k.y++) {
+			// check for hole in the building ...
+			const building_tile_desc_t *tile = building_desc->get_tile(layout, k.x, k.y);
+			if (tile == NULL || !tile->has_image()) {
+				continue;
+			}
+			// now search for stops serving this tile
+			if(  const planquadrat_t *plan = welt->access( get_pos().get_2d() - get_tile()->get_offset() + k )  ) {
+				if(  plan->get_haltlist_count() > 0   ) {
+					const halthandle_t *const halt_list = plan->get_haltlist();
+					for(  int h = 0;  h < plan->get_haltlist_count();  h++  ) {
+						if(  halt_list[h].is_bound()  &&  (halt_list[h]->get_pax_enabled()  || halt_list[h]->get_mail_enabled() )  &&  halt_list[h]->has_available_network(player)  ) {
+							return true;
+						}
+					}
+				}
+			}
+		}
+	}
+	return false;
+}
+
 
 
 bool gebaeude_t::is_same_building(const gebaeude_t* other) const
@@ -844,7 +884,9 @@ void gebaeude_t::rdwr(loadsave_t *file)
 						welt->add_missing_paks( buf, karte_t::MISSING_BUILDING );
 				}
 			}
-		}	// here we should have a valid tile pointer or nothing ...
+		}
+
+		// here we should have a valid tile pointer or nothing ...
 
 		/* avoid double construction of monuments:
 		 * remove them from selection lists
@@ -888,10 +930,6 @@ void gebaeude_t::rdwr(loadsave_t *file)
 }
 
 
-/**
- * Wird nach dem Laden der Welt aufgerufen - üblicherweise benutzt
- * um das Aussehen des Dings an Boden und Umgebung anzupassen
- */
 void gebaeude_t::finish_rd()
 {
 	player_t::add_maintenance(get_owner(), tile->get_desc()->get_maintenance(welt), tile->get_desc()->get_finance_waytype());

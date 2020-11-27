@@ -6,6 +6,7 @@
 #ifndef SIMTYPES_H
 #define SIMTYPES_H
 
+
 #include "utils/for.h"
 #include <limits.h>
 
@@ -74,6 +75,9 @@
 #	define OVERRIDE
 #endif
 
+#include <stdint.h> // intptr_t (standard)
+#include <stddef.h> // ptrdiff_t, intptr_t (Microsoft)
+
 #define ENUM_BITSET(T) \
 	static inline T operator ~  (T  a)      { return     (T)~(unsigned)a;                } \
 	static inline T operator &  (T  a, T b) { return     (T)((unsigned)a & (unsigned)b); } \
@@ -112,7 +116,17 @@ enum climate_bits
 	all_but_arctic_climate = ALL_CLIMATES & ~arctic_climate_bit
 };
 
-enum sound_type_t { TOOL_SOUND=0, TRAFFIC_SOUND=1, AMBIENT_SOUND=2, FACTORY_SOUND=3, CROSSING_SOUND=4, CASH_SOUND=5, MAX_SOUND_TYPES, ALL_SOUND=255 };
+enum sound_type_t {
+	TOOL_SOUND     = 0,
+	TRAFFIC_SOUND  = 1,
+	AMBIENT_SOUND  = 2,
+	FACTORY_SOUND  = 3,
+	CROSSING_SOUND = 4,
+	CASH_SOUND     = 5,
+	MAX_SOUND_TYPES,
+
+	ALL_SOUND = 0xFF
+};
 
 /**
  * Vordefinierte Wegtypen.
@@ -137,19 +151,14 @@ enum waytype_t {
  * System types for ways
  */
 enum systemtype_t {
-	type_flat     = 0,	///< flat track
-	type_elevated = 1,	///< flag for elevated ways
-	type_runway   = 1,	///< flag for runway (only aircrafts)
-	type_tram     = 7,	///< tram track (waytype = track_wt)
-	type_river    = 255,	///< flag for river
-	type_all      = 255,	///< special ?
+	type_flat     = 0,   ///< flat track
+	type_elevated = 1,   ///< flag for elevated ways
+	type_runway   = 1,   ///< flag for runway (only aircrafts)
+	type_tram     = 7,   ///< tram track (waytype = track_wt)
+	type_river    = 255, ///< flag for river
+	type_all      = 255  ///< special ?
 };
 
-
-// makros are not very safe: thus use these macro like functions
-// otherwise things may fail or functions are called uneccessarily twice
-
-#define CLIP(wert,mini,maxi)  min(max((wert),(mini)),(maxi))
 
 // define machine independent types
 typedef unsigned int        uint;
@@ -216,7 +225,7 @@ static inline uint16 endian(uint16 v)
 static inline uint32 endian(uint32 v)
 {
 #ifdef SIM_BIG_ENDIAN
-	v =   (v << 16)                | (v >> 16);              // 0x22330011
+	v =   (v << 16)                |   (v >> 16);                // 0x22330011
 	v = ( (v <<  8) & 0xFF00FF00 ) | ( (v >>  8) & 0x00FF00FF ); // 0x33221100
 #endif
 	return v;
@@ -225,7 +234,7 @@ static inline uint32 endian(uint32 v)
 static inline uint64 endian(uint64 v)
 {
 #ifdef SIM_BIG_ENDIAN
-	v =   (v << 32)                           | (v >> 32);                         // 0x4455667700112233
+	v =   (v << 32)                           |   (v >> 32);                           // 0x4455667700112233
 	v = ( (v << 16) & 0xFFFF0000FFFF0000ULL ) | ( (v >> 16) & 0x0000FFFF0000FFFFULL ); // 0x6677445522330011
 	v = ( (v <<  8) & 0xFF00FF00FF00FF00ULL ) | ( (v >>  8) & 0x00FF00FF00FF00FFULL ); // 0x7766554433221100
 #endif

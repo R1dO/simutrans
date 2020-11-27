@@ -3,10 +3,11 @@
  * (see LICENSE.txt)
  */
 
-#ifndef obj_roadsign_h
-#define obj_roadsign_h
+#ifndef OBJ_ROADSIGN_H
+#define OBJ_ROADSIGN_H
 
-#include "../simobj.h"
+
+#include "simobj.h"
 #include "../simtypes.h"
 #include "../descriptor/roadsign_desc.h"
 #include "../ifc/sync_steppable.h"
@@ -24,9 +25,13 @@ protected:
 	image_id image;
 	image_id foreground_image;
 
-	enum { SHOW_FONT=1, SHOW_BACK=2, SWITCH_AUTOMATIC=16 };
+	enum {
+		SHOW_FONT        = 1,
+		SHOW_BACK        = 2,
+		SWITCH_AUTOMATIC = 16
+	};
 
-	uint8 state:2;	// counter for steps ...
+	uint8 state:2; // counter for steps ...
 	uint8 dir:4;
 
 	uint8 automatic:1;
@@ -41,12 +46,16 @@ protected:
 
 	ribi_t::ribi calc_mask() const { return ribi_t::is_single(dir) ? dir : (ribi_t::ribi)ribi_t::none; }
 public:
-	enum signalstate {rot=0, gruen=1, naechste_rot=2 };
+	enum signalstate {
+		rot          = 0,
+		gruen        = 1,
+		naechste_rot = 2
+	};
 
 	/**
 	 * return direction or the state of the traffic light
 	 */
-	ribi_t::ribi get_dir() const 	{ return dir; }
+	ribi_t::ribi get_dir() const { return dir; }
 
 	/*
 	* sets ribi mask of the sign
@@ -82,10 +91,7 @@ public:
 	// since traffic lights need their own window
 	void show_info() OVERRIDE;
 
-	/**
-	 * @return Einen Beschreibungsstring für das Objekt, der z.B. in einem
-	 * Beobachtungsfenster angezeigt wird.
-	 */
+	/// @copydoc obj_t::info
 	void info(cbuffer_t & buf) const OVERRIDE;
 
 	/**

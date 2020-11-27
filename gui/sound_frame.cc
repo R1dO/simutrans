@@ -25,6 +25,7 @@ void sound_frame_t::update_song_name()
 		song_name_label.buf().printf("Music playing disabled/not available" );
 	}
 	song_name_label.update();
+	song_name_label.set_size( song_name_label.get_min_size() );
 }
 
 
@@ -38,9 +39,9 @@ const char *specific_volume_names[ MAX_SOUND_TYPES ] = {
 };
 
 
-sound_frame_t::sound_frame_t()
-  : gui_frame_t( translator::translate("Sound settings") ),
-    sound_volume_scrollbar(scrollbar_t::horizontal),
+sound_frame_t::sound_frame_t() :
+	gui_frame_t( translator::translate("Sound settings") ),
+	sound_volume_scrollbar(scrollbar_t::horizontal),
 	music_volume_scrollbar(scrollbar_t::horizontal)
 {
 	set_table_layout(1,0);
@@ -63,12 +64,12 @@ sound_frame_t::sound_frame_t()
 
 		new_component<gui_label_t>( "Sound range:" );
 
-		sound_range.set_value( env_t::sound_distance_scaling); 
+		sound_range.set_value( env_t::sound_distance_scaling);
 		sound_range.set_limits( 1, 32 );
 		sound_range.add_listener(this);
 //		sound_range.set_tooltip( "Lower values mean more local sounds" )
 		add_component(&sound_range);
-		
+
 		for( int i = 0; i < MAX_SOUND_TYPES; i++ ) {
 			new_component<gui_label_t>( specific_volume_names[i] );
 

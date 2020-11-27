@@ -16,7 +16,7 @@
 #include "simmenu.h"
 #include "player/simplay.h"
 #include "simsound.h"
-#include "simsys.h"
+#include "sys/simsys.h"
 #include "simticker.h"
 #include "gui/simwin.h"
 #include "simworld.h"
@@ -81,7 +81,7 @@ void interaction_t::move_cursor( const event_t &ev )
 		if (!tool->move_has_effects()) {
 			is_dragging = false;
 		}
-		else if(  !env_t::networkmode  ||  tool->is_move_network_save(world->get_active_player())) {
+		else if(  !env_t::networkmode  ||  tool->is_move_network_safe(world->get_active_player())) {
 			tool->flags = event_get_last_control_shift() | tool_t::WFL_LOCAL;
 			if(tool->check_pos( world->get_active_player(), zeiger->get_pos() )==NULL) {
 				if(  ev.button_state == 0  ) {
@@ -111,52 +111,48 @@ void interaction_t::move_cursor( const event_t &ev )
 		if(  (ev.button_state&7)==0  ) {
 			// time, since mouse got here
 			world->set_mouse_rest_time(dr_time());
-			world->set_sound_wait_time(AMBIENT_SOUND_INTERVALL);	// 13s no movement: play sound
+			world->set_sound_wait_time(AMBIENT_SOUND_INTERVALL); // 13s no movement: play sound
 		}
 	}
 }
 
 
 void interaction_t::interactive_event( const event_t &ev )
- {
+{
 	if(ev.ev_class == EVENT_KEYBOARD) {
 		DBG_MESSAGE("interaction_t::interactive_event()","Keyboard event with code %d '%c'", ev.ev_code, (ev.ev_code>=32  &&  ev.ev_code<=126) ? ev.ev_code : '?' );
 
 		switch(ev.ev_code) {
 
 			// cursor movements
-			case '9':
+			case SIM_KEY_UPRIGHT:
 				viewport->change_world_position(viewport->get_world_position() + koord::north);
 				world->set_dirty();
 				break;
-			case '1':
+			case SIM_KEY_DOWNLEFT:
 				viewport->change_world_position(viewport->get_world_position() + koord::south);
 				world->set_dirty();
 				break;
-			case '7':
+			case SIM_KEY_UPLEFT:
 				viewport->change_world_position(viewport->get_world_position() + koord::west);
 				world->set_dirty();
 				break;
-			case '3':
+			case SIM_KEY_DOWNRIGHT:
 				viewport->change_world_position(viewport->get_world_position() + koord::east);
 				world->set_dirty();
 				break;
-			case '6':
 			case SIM_KEY_RIGHT:
 				viewport->change_world_position(viewport->get_world_position() + koord(+1,-1));
 				world->set_dirty();
 				break;
-			case '2':
 			case SIM_KEY_DOWN:
 				viewport->change_world_position(viewport->get_world_position() + koord(+1,+1));
 				world->set_dirty();
 				break;
-			case '8':
 			case SIM_KEY_UP:
 				viewport->change_world_position(viewport->get_world_position() + koord(-1,-1));
 				world->set_dirty();
 				break;
-			case '4':
 			case SIM_KEY_LEFT:
 				viewport->change_world_position(viewport->get_world_position() + koord(-1,+1));
 				world->set_dirty();
@@ -287,7 +283,7 @@ void interaction_t::interactive_event( const event_t &ev )
 			viewport->change_world_position(cursor_pos, koord(0,0), s);
 
 			//and move cursor to the new position under the mouse
- 			move_cursor(ev);
+			move_cursor(ev);
 
 			world->set_dirty();
 		}
@@ -314,7 +310,7 @@ bool interaction_t::process_event( event_t &ev )
 			char fn[256];
 			sprintf( fn, "server%d-pwdhash.sve", env_t::server );
 			loadsave_t file;
-			if(file.wr_open(fn, loadsave_t::zipped, 1, "hashes", SAVEGAME_VER_NR )) {
+			if(  file.wr_open(fn, loadsave_t::zipped, 1, "hashes", SAVEGAME_VER_NR ) == loadsave_t::FILE_STATUS_OK  ) {
 				world->rdwr_player_password_hashes( &file );
 				file.close();
 			}

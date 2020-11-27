@@ -36,6 +36,8 @@
 #include "../dataobj/translator.h"
 #include "../dataobj/environment.h"
 
+#include "../network/network_socket_list.h"
+
 #include "../obj/bruecke.h"
 #include "../obj/gebaeude.h"
 #include "../obj/leitung2.h"
@@ -47,7 +49,7 @@
 #include "../utils/cbuffer_t.h"
 #include "../utils/simstring.h"
 
-#include "../vehicle/simvehicle.h"
+#include "../vehicle/air_vehicle.h"
 
 #include "simplay.h"
 #include "finance.h"
@@ -65,8 +67,8 @@ player_t::player_t(uint8 nr) :
 	finance = new finance_t(this, welt);
 	player_nr = nr;
 	player_age = 0;
-	active = false;		// Don't start as an AI player
-	locked = false;			// allowed to change anything
+	active = false; // Don't start as an AI player
+	locked = false; // allowed to change anything
 	unlock_pending = false;
 
 	headquarter_pos = koord::invalid;
@@ -287,8 +289,6 @@ bool player_t::new_month()
 
 	finance->calc_finance_history();
 
-	simlinemgmt.new_month();
-
 	// Bankrupt ?
 	if(  finance->get_account_balance() < 0  ) {
 		finance->increase_account_overdrawn();
@@ -369,6 +369,11 @@ bool player_t::new_month()
 			}
 			// never changed convoi, never built => abandoned
 			if(  abandoned  ) {
+				if (env_t::server) {
+					// server: unlock this player for all clients
+					socket_list_t::unlock_player_all(player_nr, true);
+				}
+				// clients: local unlock
 				pwd_hash.clear();
 				locked = false;
 				unlock_pending = false;
@@ -376,8 +381,12 @@ bool player_t::new_month()
 		}
 	}
 
+	// update line info
+	simlinemgmt.new_month();
+
 	// subtract maintenance after bankruptcy check
 	finance->book_account( -finance->get_maintenance_with_bits(TT_ALL) );
+
 	// company gets older ...
 	player_age ++;
 

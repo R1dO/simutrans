@@ -3,10 +3,11 @@
  * (see LICENSE.txt)
  */
 
-#ifndef obj_pillar_h
-#define obj_pillar_h
+#ifndef OBJ_PILLAR_H
+#define OBJ_PILLAR_H
 
-#include "../simobj.h"
+
+#include "simobj.h"
 #include "../descriptor/bridge_desc.h"
 
 class loadsave_t;

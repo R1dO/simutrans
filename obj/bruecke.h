@@ -3,13 +3,14 @@
  * (see LICENSE.txt)
  */
 
-#ifndef obj_bruecke_h
-#define obj_bruecke_h
+#ifndef OBJ_BRUECKE_H
+#define OBJ_BRUECKE_H
+
 
 class karte_t;
 
 #include "../descriptor/bridge_desc.h"
-#include "../simobj.h"
+#include "simobj.h"
 
 /**
  * Bridges (visible)

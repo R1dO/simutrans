@@ -6,7 +6,11 @@
 #ifndef MACROS_H
 #define MACROS_H
 
+
 #include "simtypes.h"
+
+#include <cstring>
+
 
 // XXX Workaround: Old GCCs choke on type check.
 #if !defined __GNUC__ || GCC_ATLEAST(3, 0)
@@ -26,15 +30,9 @@ template <typename T, unsigned N> static inline void lengthof_check(T (&)[N]) {}
 #define MEMZERO(obj)     MEMZERON(&(obj), 1)
 
 // make sure, a value in within the borders
-static inline int clamp(int x, int min, int max)
+template<typename T> static inline T clamp(T v, T l, T u)
 {
-	if (x <= min) {
-		return min;
-	}
-	if (x >= max) {
-		return max;
-	}
-	return x;
+	return v < l ? l : (v > u ? u :v);
 }
 
 

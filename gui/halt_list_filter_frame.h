@@ -3,13 +3,19 @@
  * (see LICENSE.txt)
  */
 
+#ifndef GUI_HALT_LIST_FILTER_FRAME_H
+#define GUI_HALT_LIST_FILTER_FRAME_H
+
+
 #include "gui_frame.h"
+#include "components/action_listener.h"
+#include "components/gui_aligned_container.h"
+#include "components/gui_button.h"
 #include "components/gui_label.h"
 #include "components/gui_scrollpane.h"
-#include "components/action_listener.h"
-#include "components/gui_button.h"
-#include "halt_list_frame.h"
+#include "components/gui_tab_panel.h"
 #include "components/gui_textinput.h"
+#include "halt_list_frame.h"
 
 class player_t;
 
@@ -38,10 +44,11 @@ private:
 
 		bool infowin_event(event_t const* const ev) OVERRIDE
 		{
-			if(IS_LEFTRELEASE(ev)) {
-				parent->ware_item_triggered(ware_ab, ware_an);
+			bool swallow = button_t::infowin_event( ev );
+			if(  swallow  &&  IS_LEFTRELEASE(ev)  ) {	// only handle, if we are hit!
+				parent->ware_item_triggered( ware_ab, ware_an );
 			}
-			return button_t::infowin_event(ev);
+			return swallow;
 		}
 		void draw(scr_coord offset) OVERRIDE {
 			if(ware_ab) {
@@ -58,7 +65,9 @@ private:
 	 * As long we do not have resource scripts, we display make
 	 * some tables for the main attributes of each button.
 	 */
-	enum { FILTER_BUTTONS=16 };
+	enum {
+		FILTER_BUTTONS = 16
+	};
 
 	static halt_list_frame_t::filter_flag_t filter_buttons_types[FILTER_BUTTONS];
 	static const char *filter_buttons_text[FILTER_BUTTONS];
@@ -72,6 +81,9 @@ private:
 	 * All gui elements of this dialog:
 	 */
 	button_t filter_buttons[FILTER_BUTTONS];
+
+	gui_aligned_container_t name_filter, accepts_filter, sends_filter;
+	gui_tab_panel_t tabs;
 
 	gui_textinput_t name_filter_input;
 
@@ -127,3 +139,5 @@ public:
 
 	bool action_triggered(gui_action_creator_t*, value_t) OVERRIDE;
 };
+
+#endif

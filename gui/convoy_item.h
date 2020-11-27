@@ -3,8 +3,9 @@
  * (see LICENSE.txt)
  */
 
-#ifndef convoy_scrollitem_h
-#define convoy_scrollitem_h
+#ifndef GUI_CONVOY_ITEM_H
+#define GUI_CONVOY_ITEM_H
+
 
 #include "components/gui_scrolled_list.h"
 #include "../convoihandle_t.h"
@@ -23,7 +24,7 @@ public:
 	char const* get_text() const OVERRIDE;
 	void set_text(char const*) OVERRIDE;
 	bool is_editable() const OVERRIDE { return true; }
-	bool is_valid() const OVERRIDE { return cnv.is_bound(); }	//  can be used to indicate invalid entries
+	bool is_valid() const OVERRIDE { return cnv.is_bound(); } //  can be used to indicate invalid entries
 };
 
 #endif

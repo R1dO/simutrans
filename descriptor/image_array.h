@@ -3,18 +3,19 @@
  * (see LICENSE.txt)
  */
 
-#ifndef __IMAGELIST2D_DESC_H
-#define __IMAGELIST2D_DESC_H
+#ifndef DESCRIPTOR_IMAGE_ARRAY_H
+#define DESCRIPTOR_IMAGE_ARRAY_H
+
 
 #include "image_list.h"
 
 /**
  * Two-dimensional array of images
  *
- *  Child nodes:
- *	0   1st Image-list
- *	1   2nd Image-list
- *	... ...
+ * Child nodes:
+ *  0   1st Image-list
+ *  1   2nd Image-list
+ * ... ...
  */
 class image_array_t : public obj_desc_t {
 	friend class imagelist2d_reader_t;

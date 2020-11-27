@@ -3,6 +3,10 @@
  * (see LICENSE.txt)
  */
 
+#ifndef GUI_SOUND_FRAME_H
+#define GUI_SOUND_FRAME_H
+
+
 #include "gui_frame.h"
 #include "components/gui_scrollbar.h"
 #include "components/gui_label.h"
@@ -33,12 +37,14 @@ private:
 public:
 	const char *get_help_filename() const OVERRIDE {return "sound.txt";}
 
-    sound_frame_t();
+	sound_frame_t();
 
 	virtual ~sound_frame_t();
-		
+
 	// used for updating the song title
 	void draw(scr_coord pos, scr_size size) OVERRIDE;
 
 	bool action_triggered(gui_action_creator_t*, value_t) OVERRIDE;
 };
+
+#endif

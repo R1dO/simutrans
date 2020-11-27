@@ -3,8 +3,9 @@
  * (see LICENSE.txt)
  */
 
-#ifndef goods_frame_t_h
-#define goods_frame_t_h
+#ifndef GUI_GOODS_FRAME_T_H
+#define GUI_GOODS_FRAME_T_H
+
 
 #include "gui_frame.h"
 #include "components/gui_button.h"
@@ -26,7 +27,14 @@ class goods_desc_t;
 class goods_frame_t : public gui_frame_t, private action_listener_t
 {
 private:
-	enum sort_mode_t { unsortiert=0, nach_name=1, nach_gewinn=2, nach_bonus=3, nach_catg=4, SORT_MODES=5 };
+	enum sort_mode_t {
+		unsortiert  = 0,
+		nach_name   = 1,
+		nach_gewinn = 2,
+		nach_bonus  = 3,
+		nach_catg   = 4,
+		SORT_MODES  = 5
+	};
 	static const char *sort_text[SORT_MODES];
 
 	// Variables used for remembering last state of window when closed.
@@ -60,19 +68,19 @@ private:
 
 	static simline_t::linetype last_scheduletype;
 
-	cbuffer_t	speed_message;
+	cbuffer_t speed_message;
 	vector_tpl<const goods_desc_t*> good_list;
 
-	button_t	sortedby;
-	button_t	sorteddir;
+	button_t sortedby;
+	button_t sorteddir;
 
-	gui_numberinput_t	speed;
-	gui_combobox_t	scheduletype;
+	gui_numberinput_t speed;
+	gui_combobox_t    scheduletype;
 
 	gui_textarea_t speed_text;
 	gui_aligned_container_t *sort_row;
 
-	button_t	filter_goods_toggle;
+	button_t filter_goods_toggle;
 
 	goods_stats_t goods_stats;
 	gui_scrollpane_t scrolly;

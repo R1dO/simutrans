@@ -3,8 +3,9 @@
  * (see LICENSE.txt)
  */
 
-#ifndef simware_h
-#define simware_h
+#ifndef SIMWARE_H
+#define SIMWARE_H
+
 
 #include "halthandle_t.h"
 #include "dataobj/koord.h"
@@ -77,9 +78,7 @@ public:
 	ware_t(const goods_desc_t *typ);
 	ware_t(loadsave_t *file);
 
-	/**
-	 * gibt den nicht-uebersetzten warennamen zurück
-	 */
+	/// @returns the non-translated name of the ware.
 	const char *get_name() const { return get_desc()->get_name(); }
 	const char *get_mass() const { return get_desc()->get_mass(); }
 	uint8 get_catg() const { return get_desc()->get_catg(); }
@@ -105,7 +104,7 @@ public:
 			zielpos == w.zielpos;
 	}
 
-	int operator!=(const ware_t &w) { return !(*this == w); 	}
+	int operator!=(const ware_t &w) { return !(*this == w); }
 
 	// mail and passengers just care about target station
 	// freight needs to obey coordinates (since more than one factory might by connected!)

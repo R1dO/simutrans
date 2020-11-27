@@ -43,11 +43,11 @@ static stringhashtable_tpl<tunnel_desc_t *> tunnel_by_name;
 void tunnel_builder_t::register_desc(tunnel_desc_t *desc)
 {
 	// avoid duplicates with same name
-	if( const tunnel_desc_t *old_desc = tunnel_by_name.get(desc->get_name()) ) {
+	if( const tunnel_desc_t *old_desc = tunnel_by_name.remove(desc->get_name()) ) {
 		dbg->doubled( "tunnel", desc->get_name() );
 		tool_t::general_tool.remove( old_desc->get_builder() );
 		delete old_desc->get_builder();
-//		delete old_desc; because deleting PowerTunnel seems to corrupt memory, and the small memory loss in not really worth the troubles
+		// we cannot delete old_desc, since then xref-resolving will crash
 	}
 	// add the tool
 	tool_build_tunnel_t *tool = new tool_build_tunnel_t();
@@ -204,7 +204,7 @@ koord3d tunnel_builder_t::find_end_pos(player_t *player, koord3d pos, koord zv, 
 		if(  gr == NULL  ) {
 			// check for slope down ...
 			gr = welt->lookup(pos + koord3d(0,0,-1));
- 			if(  !gr  ) {
+			if(  !gr  ) {
 				gr = welt->lookup(pos + koord3d(0,0,-2));
 			}
 			if(  gr  &&  gr->get_weg_hang() == slope_t::flat  ) {
@@ -284,7 +284,7 @@ koord3d tunnel_builder_t::find_end_pos(player_t *player, koord3d pos, koord zv, 
 			}
 			if(  !ribi  ) {
 				// End of the slope - Missing end rail or has no ribis
-				// we still consider if we interfere with a way (original: prüfen noch, ob uns dort ein anderer Weg stört)
+				// we still consider if we interfere with a way
 				if(wegtyp != powerline_wt) {
 					if(  !gr->hat_wege()  ||  gr->hat_weg(wegtyp)  ) {
 						return pos;
@@ -349,7 +349,7 @@ const char *tunnel_builder_t::build( player_t *player, koord pos, const tunnel_d
 /************************************** FIX ME ***************************************************
 ********************** THIS MUST BE RATHER A PROPERTY OF THE TUNNEL IN QUESTION ! ****************/
 	// for conversion factor 1, must be single height, for conversion factor 2, must be double
-	if(  (env_t::pak_height_conversion_factor == 1  &&  !(slope & 7))  ||  (env_t::pak_height_conversion_factor == 2  &&  (slope & 7))  ) {
+	if(  (env_t::pak_height_conversion_factor == 1  &&  !is_one_high(slope))  ||  (env_t::pak_height_conversion_factor == 2  &&  is_one_high(slope))  ) {
 		return "Tunnel muss an\neinfachem\nHang beginnen!\n";
 	}
 
@@ -646,8 +646,7 @@ const char *tunnel_builder_t::remove(player_t *player, koord3d start, waytype_t 
 	slist_tpl<koord3d>  tmp_list;
 	koord3d   pos = start;
 
-	// Erstmal das ganze Außmaß des Tunnels bestimmen und sehen,
-	// ob uns was im Weg ist.
+	// First check if all tunnel parts can be removed
 	tmp_list.insert(pos);
 	grund_t *from = welt->lookup(pos);
 	marker.mark(from);
@@ -669,7 +668,7 @@ const char *tunnel_builder_t::remove(player_t *player, koord3d start, waytype_t 
 		else {
 			part_list.insert(pos);
 		}
-		// Alle Tunnelteile auf Entfernbarkeit prüfen!
+
 		if(  from->kann_alle_obj_entfernen(player)  ) {
 			return "Der Tunnel ist nicht frei!\n";
 		}
@@ -689,8 +688,8 @@ const char *tunnel_builder_t::remove(player_t *player, koord3d start, waytype_t 
 
 		// Nachbarn raussuchen
 		for(int r = 0; r < 4; r++) {
-			if((zv == koord::invalid || zv == koord::nsew[r]) &&
-				from->get_neighbour(to, delete_wegtyp, ribi_t::nsew[r]) &&
+			if((zv == koord::invalid || zv == koord::nesw[r]) &&
+				from->get_neighbour(to, delete_wegtyp, ribi_t::nesw[r]) &&
 				!marker.is_marked(to) &&
 				(wegtyp != powerline_wt || to->get_leitung()))
 			{
@@ -700,7 +699,7 @@ const char *tunnel_builder_t::remove(player_t *player, koord3d start, waytype_t 
 		}
 	} while (!tmp_list.empty());
 
-	// Jetzt geht es ans löschen der Tunnel
+	// Now we can delete the tunnel grounds
 	while (!part_list.empty()) {
 		pos = part_list.remove_first();
 		grund_t *gr = welt->lookup(pos);
@@ -708,7 +707,7 @@ const char *tunnel_builder_t::remove(player_t *player, koord3d start, waytype_t 
 		if(gr->get_weg_nr(1)) {
 			gr->remove_everything_from_way(player,gr->get_weg_nr(1)->get_waytype(),ribi_t::none);
 		}
-		gr->remove_everything_from_way(player,wegtyp,ribi_t::none);	// removes stop and signals correctly
+		gr->remove_everything_from_way(player,wegtyp,ribi_t::none); // removes stop and signals correctly
 		// remove everything else
 		gr->obj_loesche_alle(player);
 		gr->mark_image_dirty();
@@ -718,7 +717,7 @@ const char *tunnel_builder_t::remove(player_t *player, koord3d start, waytype_t 
 		minimap_t::get_instance()->calc_map_pixel( pos.get_2d() );
 	}
 
-	// Und die Tunnelenden am Schluß
+	// And now we can delete the tunnel ends
 	while (!end_list.empty()) {
 		pos = end_list.remove_first();
 
@@ -750,7 +749,7 @@ const char *tunnel_builder_t::remove(player_t *player, koord3d start, waytype_t 
 
 			tunnel_t *t = gr->find<tunnel_t>();
 			uint8 broad_type = t->get_broad_type();
-			gr->remove_everything_from_way(player,wegtyp,ribi);	// removes stop and signals correctly
+			gr->remove_everything_from_way(player,wegtyp,ribi); // removes stop and signals correctly
 
 			// remove tunnel portals
 			t = gr->find<tunnel_t>();

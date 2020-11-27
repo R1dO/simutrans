@@ -3,8 +3,9 @@
  * (see LICENSE.txt)
  */
 
-#ifndef simgraph_h
-#define simgraph_h
+#ifndef DISPLAY_SIMGRAPH_H
+#define DISPLAY_SIMGRAPH_H
+
 
 #include "../simcolor.h"
 #include "../unicode.h"
@@ -14,11 +15,19 @@
 #include "scr_coord.h"
 
 
-extern int large_font_ascent;
-extern int large_font_total_height;
+#if COLOUR_DEPTH != 0
 
-#define LINEASCENT (large_font_ascent)
-#define LINESPACE (large_font_total_height)
+extern int default_font_ascent;
+extern int default_font_linespace;
+
+#  define LINEASCENT (default_font_ascent)
+#  define LINESPACE  (default_font_linespace)
+#else
+#  define LINEASCENT 0
+// a font height of zero could cause division by zero errors, even though it should not be used in a server
+#  define LINESPACE  1
+#endif
+
 
 /**
 * Alignment enum to align controls against each other
@@ -122,17 +131,17 @@ int zoom_factor_down();
 /**
  * Initialises the graphics module
  */
-void simgraph_init(KOORD_VAL width, KOORD_VAL height, int fullscreen);
-int is_display_init();
+void simgraph_init(scr_size window_size, bool fullscreen);
+bool is_display_init();
 void simgraph_exit();
-void simgraph_resize(KOORD_VAL w, KOORD_VAL h);
+void simgraph_resize(scr_size new_window_size);
 
 
 /**
  * Loads the font, returns the number of characters in it
  * @param reload if true forces reload
  */
-uint16 display_load_font(const char* fname, bool reload = false);
+bool display_load_font(const char *fname, bool reload = false);
 
 image_id get_image_count();
 void register_image(class image_t *);
@@ -328,7 +337,7 @@ int display_text_proportional_len_clip_rgb(KOORD_VAL x, KOORD_VAL y, const char*
 
 
 /*
- * Display a string that if abbreviated by the (language specific) ellipsis character if too wide
+ * Display a string that is abbreviated by the (language specific) ellipsis character if too wide
  * If enough space is given, it just display the full string
  * @returns screen_width
  */
@@ -345,6 +354,8 @@ void display_direct_line_dotted_rgb(const KOORD_VAL x, const KOORD_VAL y, const 
 void display_circle_rgb( KOORD_VAL x0, KOORD_VAL  y0, int radius, const PIXVAL color );
 void display_filled_circle_rgb( KOORD_VAL x0, KOORD_VAL  y0, int radius, const PIXVAL color );
 void draw_bezier_rgb(KOORD_VAL Ax, KOORD_VAL Ay, KOORD_VAL Bx, KOORD_VAL By, KOORD_VAL ADx, KOORD_VAL ADy, KOORD_VAL BDx, KOORD_VAL BDy, const PIXVAL colore, KOORD_VAL draw, KOORD_VAL dontDraw);
+
+void display_right_triangle_rgb(KOORD_VAL x, KOORD_VAL y, KOORD_VAL height, const PIXVAL colval, const bool dirty);
 
 void display_set_clip_wh(KOORD_VAL x, KOORD_VAL y, KOORD_VAL w, KOORD_VAL h  CLIP_NUM_DEF CLIP_NUM_DEFAULT_ZERO, bool fit = false);
 clip_dimension display_get_clip_wh(CLIP_NUM_DEF0 CLIP_NUM_DEFAULT_ZERO);

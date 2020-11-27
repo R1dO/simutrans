@@ -3,12 +3,9 @@
  * (see LICENSE.txt)
  */
 
-/*
- * Convoi info stats, like loading status bar
- */
+#ifndef GUI_COMPONENTS_GUI_CONVOIINFO_H
+#define GUI_COMPONENTS_GUI_CONVOIINFO_H
 
-#ifndef gui_convoiinfo_h
-#define gui_convoiinfo_h
 
 #include "gui_aligned_container.h"
 #include "gui_label.h"
@@ -17,6 +14,7 @@
 #include "../../convoihandle_t.h"
 
 /**
+ * Convoi info stats, like loading status bar
  * One element of the vehicle list display
  */
 class gui_convoiinfo_t : public gui_aligned_container_t, public gui_scrolled_list_t::scrollitem_t
@@ -28,7 +26,10 @@ private:
 	convoihandle_t cnv;
 
 	gui_speedbar_t filled_bar;
-	gui_label_buf_t label_name, label_profit, label_line;
+	gui_label_t label_name, label_next_halt;
+	gui_label_buf_t label_line, label_profit;
+	button_t pos_next_halt;
+	gui_aligned_container_t *container_next_halt;
 
 public:
 	/**

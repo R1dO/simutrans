@@ -416,7 +416,7 @@ void fabrik_t::update_scaled_pax_demand()
 	// then, scaling based on month length
 	scaled_pax_demand = (uint32)welt->scale_with_month_length(pax_demand);
 	if(  scaled_pax_demand == 0  &&  desc_pax_demand > 0  ) {
-		scaled_pax_demand = 1;	// since desc pax demand > 0 -> ensure no less than 1
+		scaled_pax_demand = 1; // since desc pax demand > 0 -> ensure no less than 1
 	}
 	// pax demand for fixed period length
 	arrival_stats_pax.set_scaled_demand( pax_demand );
@@ -433,7 +433,7 @@ void fabrik_t::update_scaled_mail_demand()
 	// then, scaling based on month length
 	scaled_mail_demand = (uint32)welt->scale_with_month_length(mail_demand);
 	if(  scaled_mail_demand == 0  &&  desc_mail_demand > 0  ) {
-		scaled_mail_demand = 1;	// since desc mail demand > 0 -> ensure no less than 1
+		scaled_mail_demand = 1; // since desc mail demand > 0 -> ensure no less than 1
 	}
 	// mail demand for fixed period length
 	arrival_stats_mail.set_scaled_demand( mail_demand );
@@ -695,6 +695,25 @@ void fabrik_t::unlink_halt(halthandle_t halt)
 		plan->remove_from_haltlist(halt);
 	}
 }
+
+
+// returns true, if there is a freight halt serving us
+bool fabrik_t::is_within_players_network( const player_t* player ) const
+{
+	if( const planquadrat_t *plan = welt->access( pos.get_2d() ) ) {
+		if( plan->get_haltlist_count() > 0 ) {
+			const halthandle_t *const halt_list = plan->get_haltlist();
+			for( int h = 0; h < plan->get_haltlist_count(); h++ ) {
+				halthandle_t halt = halt_list[h];
+				if(  halt.is_bound()  &&  halt->is_enabled(haltestelle_t::WARE)  &&  halt->has_available_network(player)  ) {
+					return true;
+				}
+			}
+		}
+	}
+	return false;
+}
+
 
 
 void fabrik_t::add_lieferziel(koord ziel)
@@ -1529,19 +1548,21 @@ DBG_DEBUG("fabrik_t::rdwr()","loading factory '%s'",s);
 /**
  * let the chimney smoke, if there is something to produce
  */
-void fabrik_t::smoke() const
+void fabrik_t::smoke()
 {
 	const smoke_desc_t *rada = desc->get_smoke();
 	if(rada) {
 		const uint8 rot = (4-rotate)%desc->get_building()->get_all_layouts();
 		grund_t *gr = welt->lookup_kartenboden(pos_origin.get_2d()+desc->get_smoketile( rot ));
-		const koord offset = (( desc->get_smokeoffset(rot) + koord(sim_async_rand(7)-3,sim_async_rand(7)-3) )*OBJECT_OFFSET_STEPS)/16;
-		wolke_t *smoke =  new wolke_t(gr->get_pos(), offset.x, offset.y, desc->get_smokelifetime(), desc->get_smokeuplift(), rada->get_images() );
+		const koord offset = ( desc->get_smokeoffset(rot)*OBJECT_OFFSET_STEPS)/16;
+		wolke_t *smoke =  new wolke_t(gr->get_pos(), offset.x, 0, offset.y, desc->get_smokelifetime(), desc->get_smokeuplift(), rada->get_images() );
 		gr->obj_add(smoke);
 		welt->sync_way_eyecandy.add( smoke );
 	}
+
 	// maybe sound?
 	if(  desc->get_sound()!=NO_SOUND  &&  welt->get_ticks()>last_sound_ms+desc->get_sound_interval_ms()  ) {
+		last_sound_ms = welt->get_ticks();
 		welt->play_sound_area_clipped( get_pos().get_2d(), desc->get_sound(), FACTORY_SOUND );
 	}
 }
@@ -1817,10 +1838,10 @@ void fabrik_t::step(uint32 delta_t)
 				// limit increase rate
 				prodfactor_electric += prodfactor_change;
 			}
-			//else if(  prodfactor_delta  <  -prodfactor_change  ) {
-				// limit decrease rate, off because of possible exploit
-			//	prodfactor_electric -= prodfactor_change;
-			//}
+			// limit decrease rate, off because of possible exploit
+//			else if(  prodfactor_delta  <  -prodfactor_change  ) {
+//				prodfactor_electric -= prodfactor_change;
+//			}
 			else {
 				// no limit
 				prodfactor_electric = prodfactor_want;
@@ -1882,7 +1903,7 @@ void fabrik_t::step(uint32 delta_t)
 							// to find out, if storage changed
 							delta_menge += p;
 							output[product].menge += p;
-							output[product].book_stat((sint64)p * (sint64)desc->get_product(0)->get_factor(), FAB_GOODS_PRODUCED);
+							output[product].book_stat((sint64)p * (sint64)desc->get_product(product)->get_factor(), FAB_GOODS_PRODUCED);
 							// if less than 3/4 filled we neary always consume power
 							currently_producing |= (output[product].menge*4 < output[product].max*3);
 						}
@@ -2493,7 +2514,6 @@ void fabrik_t::verteile_waren(const uint32 product)
 			continue;
 		}
 
-		// Über alle Ziele iterieren
 		for(  uint32 n=0;  n<lieferziele.get_count();  n++  ) {
 			// this way, the halt, that is tried first, will change. As a result, if all destinations are empty, it will be spread evenly
 			const koord lieferziel = lieferziele[(n + output[product].index_offset) % lieferziele.get_count()];
@@ -2767,13 +2787,13 @@ void fabrik_t::recalc_factory_status()
 			status = nothing;
 		}
 		else if(  status_aus&FL_WARE_ALLEUEBER75  ||  status_aus&FL_WARE_UEBER75  ) {
-			status = inactive;	// not connected?
+			status = inactive; // not connected?
 			if(haltcount>0) {
 				if(status_aus&FL_WARE_ALLEUEBER75) {
-					status = bad;	// connect => needs better service
+					status = bad; // connect => needs better service
 				}
 				else {
-					status = medium;	// connect => needs better service for at least one product
+					status = medium; // connect => needs better service for at least one product
 				}
 			}
 		}
@@ -2793,7 +2813,7 @@ void fabrik_t::recalc_factory_status()
 			status = medium;
 		}
 		else if(status_ein&FL_WARE_ALLENULL) {
-			status = inactive;	// assume not served
+			status = inactive; // assume not served
 			if(haltcount>0) {
 				// there is a halt => needs better service
 				status = bad;

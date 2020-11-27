@@ -3,8 +3,9 @@
  * (see LICENSE.txt)
  */
 
-#ifndef money_frame_h
-#define money_frame_h
+#ifndef GUI_MONEY_FRAME_H
+#define GUI_MONEY_FRAME_H
+
 
 #include "gui_frame.h"
 #include "components/action_listener.h"
@@ -34,11 +35,10 @@ private:
 
 	gui_chart_t chart, mchart;
 
-
-	gui_label_buf_t	maintenance_money,
-	                scenario_desc,
-					scenario_completion,
-					warn;
+	gui_label_buf_t maintenance_money;
+	gui_label_buf_t scenario_desc;
+	gui_label_buf_t scenario_completion;
+	gui_label_buf_t warn;
 
 	gui_aligned_container_t container_year, container_month;
 

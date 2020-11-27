@@ -85,7 +85,7 @@ gameinfo_t::gameinfo_t(karte_t *welt) :
 	bits_per_month = s.get_bits_per_month();
 
 	// names of the stations ...
-	memcpy(language_code_names, translator::get_langs()[s.get_name_language_id()].iso, lengthof(language_code_names));
+	tstrncpy(language_code_names, translator::get_langs()[s.get_name_language_id()].iso, lengthof(language_code_names));
 
 	// will contain server-IP/name for network games
 	file_name = s.get_filename();
@@ -162,7 +162,7 @@ void gameinfo_t::rdwr(loadsave_t *file)
 
 	char temp[PATH_MAX];
 	tstrncpy( temp, game_comment.c_str(), lengthof(temp) );
-	file->rdwr_str( temp, lengthof(temp) );	// game_comment
+	file->rdwr_str( temp, lengthof(temp) ); // game_comment
 	if(  file->is_loading()  ) {
 		game_comment = temp;
 	}

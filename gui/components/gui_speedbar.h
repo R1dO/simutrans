@@ -3,8 +3,9 @@
  * (see LICENSE.txt)
  */
 
-#ifndef gui_components_gui_speedbar_h
-#define gui_components_gui_speedbar_h
+#ifndef GUI_COMPONENTS_GUI_SPEEDBAR_H
+#define GUI_COMPONENTS_GUI_SPEEDBAR_H
+
 
 #include "gui_component.h"
 #include "../../tpl/slist_tpl.h"
@@ -32,6 +33,32 @@ public:
 	void set_base(sint32 base);
 
 	void set_vertical(bool vertical) { this->vertical = vertical; }
+
+	/**
+	 * Draw the component
+	 */
+	void draw(scr_coord offset) OVERRIDE;
+
+	scr_size get_min_size() const OVERRIDE;
+
+	scr_size get_max_size() const OVERRIDE;
+};
+
+
+// route progress bar
+class gui_routebar_t : public gui_component_t
+{
+private:
+	const sint32 *value;
+	sint32 base;
+	uint8 state;
+
+public:
+	gui_routebar_t() { base = 100; state = 0; }
+	void set_base(sint32 base);
+	void init(const sint32 *value, uint8 state);
+
+	void set_state(uint8 state);
 
 	/**
 	 * Draw the component

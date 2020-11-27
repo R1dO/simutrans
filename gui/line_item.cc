@@ -5,6 +5,7 @@
 
 #include <algorithm>
 
+#include "simwin.h"
 #include "line_item.h"
 #include "../simline.h"
 #include "../simmenu.h"
@@ -41,6 +42,13 @@ void line_scrollitem_t::set_text(char const* const t)
 }
 
 
+void line_scrollitem_t::draw( scr_coord offset )
+{
+	selected = win_get_magic( (ptrdiff_t)line.get_rep() );
+
+	gui_scrolled_list_t::const_text_scrollitem_t::draw( offset );
+}
+
 // static helper function for sorting lineintems
 
 line_scrollitem_t::sort_modes_t line_scrollitem_t::sort_mode = line_scrollitem_t::SORT_BY_NAME;
@@ -55,7 +63,7 @@ bool line_scrollitem_t::compare(const gui_component_t *aa, const gui_component_t
 
 	if(  sort_mode != SORT_BY_NAME  ) {
 		switch(  sort_mode  ) {
-			case SORT_BY_NAME:	// default
+			case SORT_BY_NAME: // default
 				break;
 			case SORT_BY_ID:
 				return (a->get_line().get_id(),b->get_line().get_id())<0;

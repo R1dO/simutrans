@@ -3,8 +3,9 @@
  * (see LICENSE.txt)
  */
 
-#ifndef gui_depot_frame2_t_h
-#define gui_depot_frame2_t_h
+#ifndef GUI_DEPOT_FRAME_H
+#define GUI_DEPOT_FRAME_H
+
 
 #include "gui_frame.h"
 #include "components/gui_label.h"
@@ -48,8 +49,7 @@ public:
 /**
  * Depot frame, handles all interaction with a vehicle depot.
  */
-class depot_frame_t : public gui_frame_t,
-                      public action_listener_t
+class depot_frame_t : public gui_frame_t, public action_listener_t
 {
 private:
 	/**
@@ -81,7 +81,7 @@ private:
 	const char* new_convoy_text;
 	gui_combobox_t convoy_selector;
 
-	button_t line_button;	// goto line ...
+	button_t line_button; // goto line ...
 
 	gui_label_t lb_convoi_count;
 
@@ -188,7 +188,11 @@ private:
 	scr_coord_val second_column_x; // x position of the second text column
 	scr_coord_val second_column_w;
 
-	enum { va_append, va_insert, va_sell };
+	enum {
+		va_append,
+		va_insert,
+		va_sell
+	};
 	uint8 veh_action;
 
 	/**

@@ -8,6 +8,26 @@
 /** @page changelog Changelog
  *
  * @section api-trunk Current trunk
+ *
+ * - Feature: scripted tools
+ * - Added @ref debug::pause, @ref debug::set_pause_on_error
+ * - Added more tool ids
+ * - Added @ref convoy_x::is_waiting, @ref convoy_x::is_loading
+ * - Added @ref rules::gui_needs_update
+ * - Added @ref convoy_x::get_tile_length
+ * - Added @ref settings::get_pay_for_total_distance_mode, @ref settings::get_drive_on_left
+ * - Added @ref halt_x::get_connections
+ * - Added @ref command_x::can_set_slope
+ * - Added @ref halt_x::get_halt
+ * - Changed possible direction parameter of @ref command_x::build_station (useful for flat docks)
+ * - Added @ref depot_x::get_depot_list
+ * - Added @ref vehicle_desc_x::needs_electrification
+ * - Added @ref command_x::build_road
+ * - Added fields: @ref field_x
+ * - Added powerlines: @ref powerline_x, @ref transformer_x, @ref factory_x::get_transformer, @ref factory_x::is_transformer_connected
+ *
+ * @section api-121 Release 120.1
+ *
  * - Added functions to mark tiles, see @ref tile_x::mark
  * - Added @ref convoy_x::is_schedule_editor_open
  *

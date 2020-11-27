@@ -1,3 +1,22 @@
+	FIX: map enlargement crashes with new climate generator
+	FIX: Wrong tooltip when building something with the finance window opened
+	CHG: Sound now plays on GDI via Xaudio2 for individual volume control
+	ADD: map only moves when numlock off, new tool to move to map view (simple_tool[36]=,keybinding,-1|0)
+	ADD: new option in simuconf.tab "numpad_always_moves_map" regardsless of numlock state
+	FIX: Wrong loading of 24 bit BMP heightmaps
+	FIX: Wrong loading of 8 bit greyscale BMP heightmaps if width is not divisible by 4
+	ADD: New height conversion modes when loading heightmaps
+	CHG: schedule/line now tab of convoi window instead independent window
+	CHG: new line list, overhauled convoi list
+	CHG: rivers now go to the sea and pass through lakes. A tiny stream becomes navigatavble after a lake or merging with another stream
+	FIX: MessageOptions can be three single images (id=0,1,2) instead of one large image
+	FIX: Potential hang when loading zstd compressed save files when multi-threading is enabled
+	CHG: crossing speed is now the max speed. No crossing, if one speed higher than maxspeed
+	ADD: construction cost tooltip also for normal tunnel construction (clicking on slopes)
+	FIX: Graphical glitches when resizing SDL2 window with -autodpi
+
+
+Release of 122.0 (r9274 on 10-Oct-2020):
 	FIX: Rotation of multi-tile buildings at street corners
 	ADD: different volumes for different sounds, realistic distance scaling (independent from screen size)
 	CHG: Fade sounds with one over square root distance, and remove the dependency from display and tile size
@@ -6,14 +25,45 @@
 	ADD: Vehicle list as dialog tool 33 (to see also upcoming vehicles)
 	ADD: goods waiting bar with now configurable: gui_waitingbar_width
 	ADD: button to copy the last 20 messages to the clipboard
-	CHG: factory smake location now depend on factory. Four parameters smoketile[], smokeoffset[] (koord), and smokeuplift (16) and smokelifetime (2499)
+	CHG: factory smoke location now depended on factory. Four parameters smoketile[], smokeoffset[] (koord), and smokeuplift (16) and smokelifetime (2499)
 	FIX: several list stored wrong coordinates after map rotation
+	FIX: Too new pak file version check now enforced for all objects
+	FIX: airplane should stuck much less upon runway rebuilds
+	CHG: block reserver tool will also start a route search of any convoi on its tile (no matter the owner!)
+	ADD: timeline switches off after 2999 to prevent retiring of everything
+	ADD: new parameter for buildings "preservation_year" and "preservation_month" after that the building is excluded from renovation during town growth
+	ADD: if shift is pressed during road building then city roads or faster ways will not be overbuilt
+	ADD: more folders searched for fonts on non-windows systems
+	FIX: broken connection could kill (especially server) games on Linux
+	ADD: customisable loading bar colors with gui_color_loadingbar_inner and gui_color_loadingbar_progress
+	CHG: record messages and some status messages are now not saved, while stuck and full stations expire after a month on server chat to keep overview
+	ADD: new button in minimap to hide contour for higher contrast of other stuff
+	CHG: Option to show convoi name and line name as overlay
+	ADD: (inspired by Ranran) Option in city, curiosity, and factory lists to show only towns/factories already served by a player
+	ADD: two more theme colors: gui_color_obsolete, gui_color_empty for lines and server
+	ADD: (Yona-TNT) configurable offsets for player colors for gui elements
+	ADD: convois (in convoi list and schedule) also show their next stop with a posbutton to jump there
+	ADD: caseless matching in depots, lines, halt and convoi list dialogs even with umlaute
+	CHG: fixed vehicle costs are now booked as running costs at the begin of a month, also convoi details changed to accomodate
+	CHG: a server will pause without clients if '-pause' is set on the command line
+	ADD: freight type filter on line window
+	CHG: speedup of map generation by reorganising and multithreading lake code
+	ADD: defining overlapping climate height limits will generate maps with climate patches at these heights
+	FIX: (extremly old bug) after removing a house on a slope the world height grid was not restored
+	FIX: factory extension during city growth could no cope with more than one supplier for two goods
+	ADD: scripted tools (initial patch by THLeaderH)
+	ADD: Humidity based climates (originally from kireon green) Attention, winter snowline set temperature at sea level, so important!
+	ADD: (FrankP) happy signs for system fonts
+	ADD: (ranran) new GUI element routebar
+	FIX: space.w added in container not space.h for vertical distance
+	CHG: On consequeutive traffic lights, only the first is obeyed to allow turns on four traffic lights crossings
+
 
 Release of 121.0 (r8870 on 1-Dec-2019):
-    ADD: Map number is shown in the enlarge map window.
-    FIX: Text area GUI components no longer suffer from line wrap around when displaying an extreme number of lines.
-    FIX: Stop information window waiting list in "via (amount)" order will no longer count incorrectly when more than 8,388,607 units are headed to a single destination.
-    FIX: SDL2 build running on Windows 10 in fullscreen mode now minimizes and maximizes responsively.
+	ADD: Map number is shown in the enlarge map window.
+	FIX: Text area GUI components no longer suffer from line wrap around when displaying an extreme number of lines.
+	FIX: Stop information window waiting list in "via (amount)" order will no longer count incorrectly when more than 8,388,607 units are headed to a single destination.
+	FIX: SDL2 build running on Windows 10 in fullscreen mode now minimizes and maximizes responsively.
 	CHG: gui overhaul: automatic placement and size calculation of elements
 	ADD: use animated water graphics on shores
 	FIX: Do not call DefWindowsProc for IME to mitigate crash on Windows1809
@@ -34,6 +84,7 @@ Release of 121.0 (r8870 on 1-Dec-2019):
 	FIX: IP4 address query for easyserver (to detect IP4 changes sometimes occuring for ADSL connections)
 	ADD: new simuconf.tab parameter follow_convoi_underground to slice through grounds to follow a convoi in sliced mode oder full underground mode
 	ADD: search for midi files first in pak folder, then user folder, then program folder
+	ADD: GUI for pakset install script
 
 
 Release of 120.4.1 (r8600 on 23-Sep-2018):
@@ -576,6 +627,9 @@ Release of 102.2.1 (r2928)
 	FIX: withdraw all with convois in depot causes crash (and maybe also not withdraw all)
 	FIX: several issues with tram signals
 	CHANGE: info windows now open less important first resp. for single window topmost object first (usually most important)
+	ADD: toolbar, which did not fit their space can be scrolled (either manu menu or when toolbar_max_height = 1)
+	ADD: new parameter for icons in windows title bars: gui_gadgetwidth and gui_gadget_height (although the latter is unused for now)
+	FIX: Labelist with own player filter works again
 
 
 

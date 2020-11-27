@@ -21,10 +21,12 @@
  *
  */
 
-#ifndef _SHA1_H_
-#define _SHA1_H_
+#ifndef UTILS_SHA1_H
+#define UTILS_SHA1_H
 
-#include "../simtypes.h"
+
+#include "sha1_hash.h"
+
 
 class SHA1
 {
@@ -39,9 +41,9 @@ class SHA1
         void Reset();
 
         /*
-         *  Returns the message digest (must be 20 bytes long!)
+         *  Returns the message digest
          */
-        bool Result(uint8 *message_digest_array );
+        bool Result(sha1_hash_t &result_digest);
 
         /*
          *  Provide input to SHA1

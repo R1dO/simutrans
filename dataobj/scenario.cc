@@ -3,7 +3,7 @@
  * (see LICENSE.txt)
  */
 
-#include "../simsys.h"
+#include "../sys/simsys.h"
 #include "../simconst.h"
 #include "../simtypes.h"
 #include "../simdebug.h"
@@ -29,7 +29,7 @@
 
 // scripting
 #include "../script/script.h"
-#include "../script/export_objs.h"
+#include "../script/script_loader.h"
 #include "../script/api/api.h"
 #include "../script/api_param.h"
 #include "../script/api_class.h"
@@ -117,7 +117,7 @@ const char* scenario_t::init( const char *scenario_base, const char *scenario_na
 		script_api::coordinate_transform_t::initialize();
 	}
 
-	load_compatibility_script();
+	script_loader_t::load_compatibility_script(script);
 
 	// load translations
 	translator::load_files_from_folder( scenario_path.c_str(), "scenario" );
@@ -149,38 +149,11 @@ const char* scenario_t::init( const char *scenario_base, const char *scenario_na
 }
 
 
-bool load_base_script(script_vm_t *script, const char* base)
-{
-	cbuffer_t buf;
-	buf.printf("%sscript/%s", env_t::program_dir, base);
-	if (const char* err = script->call_script(buf)) {
-		// should not happen
-		dbg->error("load_base_script", "error [%s] calling %s", err, (const char*)buf);
-		return false;
-	}
-	return true;
-}
-
-
 bool scenario_t::load_script(const char* filename)
 {
-	script = new script_vm_t(scenario_path.c_str(), "script-scenario.log");
-	// load global stuff
-	// constants must be known compile time
-	export_global_constants(script->get_vm());
-	// load scripting base definitions
-	if (!load_base_script(script, "script_base.nut")) {
-		return false;
-	}
-	// load scenario base definitions
-	if (!load_base_script(script, "scenario_base.nut")) {
-		return false;
-	}
-
-	// register api functions
-	register_export_function(script->get_vm(), true);
-	if (script->get_error()) {
-		dbg->error("scenario_t::load_script", "error [%s] calling register_export_function", script->get_error());
+	// start vm
+	script = script_loader_t::start_vm("scenario_base.nut", "script-scenario.log", scenario_path.c_str(), true);
+	if (script == NULL) {
 		return false;
 	}
 
@@ -197,27 +170,6 @@ bool scenario_t::load_script(const char* filename)
 		return false;
 	}
 	return true;
-}
-
-
-void scenario_t::load_compatibility_script()
-{
-	// check api version
-	plainstring api_version;
-	if (const char* err = script->call_function(script_vm_t::FORCE, "get_api_version", api_version)) {
-		dbg->warning("scenario_t::init", "error [%s] calling get_api_version", err);
-		api_version = "120.1";
-	}
-	if (api_version != "*") {
-		// load scenario compatibility script
-		if (load_base_script(script, "script_compat.nut")) {
-			plainstring dummy;
-			// call compatibility function
-			if (const char* err = script->call_function(script_vm_t::FORCE, "compat", dummy, api_version) ) {
-				dbg->warning("scenario_t::init", "error [%s] calling compat", err);
-			}
-		}
-	}
 }
 
 
@@ -658,6 +610,18 @@ void scenario_t::step()
 	if (need_toolbar_update) {
 		tool_t::update_toolbars();
 		need_toolbar_update = false;
+
+		// reset active tool if now forbidden
+		// check scenario conditions for all players
+		for(uint8 player_nr = 0; player_nr < PLAYER_UNOWNED; player_nr++) {
+			if (player_t *player = welt->get_player(player_nr)) {
+				tool_t *tool = welt->get_tool(player_nr);
+
+				if (!is_tool_allowed(player, tool->get_id(), tool->get_waytype())) {
+					welt->local_set_tool(tool_t::general_tool[TOOL_QUERY], player);
+				}
+			}
+		}
 	}
 }
 
@@ -833,14 +797,14 @@ void scenario_t::rdwr(loadsave_t *file)
 
 				// failed, try scenario from pakset directory
 				if (rdwr_error) {
-					scenario_path = (env_t::program_dir + env_t::objfilename + "scenario/" + scenario_name.c_str() + "/").c_str();
+					scenario_path = (env_t::data_dir + env_t::objfilename + "scenario/" + scenario_name.c_str() + "/").c_str();
 					script_filename.clear();
 					script_filename.printf("%sscenario.nut", scenario_path.c_str());
 					rdwr_error = !load_script(script_filename);
 				}
 
 				if (!rdwr_error) {
-					load_compatibility_script();
+					script_loader_t::load_compatibility_script(script);
 					// restore persistent data
 					const char* err = script->eval_string(str);
 					if (err) {
@@ -890,6 +854,11 @@ void scenario_t::rdwr(loadsave_t *file)
 			dbg->warning("scenario_t::rdwr", "error [%s] calling resume_game", err);
 			rdwr_error = true;
 		}
+	}
+	// client side of scripted game but not on a client
+	if ( (what_scenario == SCRIPTED_NETWORK)  ^  (env_t::networkmode  &&  env_t::server==0) ) {
+		what_scenario = 0;
+		rdwr_error = true;
 	}
 }
 

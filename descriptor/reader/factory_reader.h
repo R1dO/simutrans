@@ -3,8 +3,9 @@
  * (see LICENSE.txt)
  */
 
-#ifndef __FACTORY_READER_H
-#define __FACTORY_READER_H
+#ifndef DESCRIPTOR_READER_FACTORY_READER_H
+#define DESCRIPTOR_READER_FACTORY_READER_H
+
 
 #include "obj_reader.h"
 
@@ -13,7 +14,7 @@ class field_class_desc_t;
 
 // new reader for field class desc
 class factory_field_class_reader_t : public obj_reader_t {
-	friend class factory_field_group_reader_t;	// this is a special case due to desc restructuring
+	friend class factory_field_group_reader_t; // this is a special case due to desc restructuring
 
 	static factory_field_class_reader_t the_instance;
 

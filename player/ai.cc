@@ -29,7 +29,7 @@
 
 #include "../utils/cbuffer_t.h"
 
-#include "../vehicle/simvehicle.h"
+#include "../vehicle/vehicle.h"
 
 
 /* The flesh for the place with road for headquarters searcher ... */
@@ -171,7 +171,7 @@ bool ai_t::suche_platz(koord &start, koord &size, koord target, koord off)
 {
 	// distance of last found point
 	int dist=0x7FFFFFFF;
-	koord	platz;
+	koord platz;
 	int const cov = welt->get_settings().get_station_coverage();
 	int xpos = start.x;
 	int ypos = start.y;

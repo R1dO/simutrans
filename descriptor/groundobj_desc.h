@@ -3,8 +3,9 @@
  * (see LICENSE.txt)
  */
 
-#ifndef __GROUNDOBJ_DESC_H
-#define __GROUNDOBJ_DESC_H
+#ifndef DESCRIPTOR_GROUNDOBJ_DESC_H
+#define DESCRIPTOR_GROUNDOBJ_DESC_H
+
 
 #include "../simtypes.h"
 #include "obj_base_desc.h"
@@ -17,14 +18,13 @@
  * or move around the map (water_t=only on water, air_t=everywhere)
  * They are removable with certain costs.
  *
- *  Child nodes:
- *	0   Name
- *	1   Copyright
- *	2   Image-array
+ * Child nodes:
+ *  0   Name
+ *  1   Copyright
+ *  2   Image-array
  */
-
-
-class groundobj_desc_t : public obj_named_desc_t {
+class groundobj_desc_t : public obj_named_desc_t
+{
 	friend class groundobj_reader_t;
 	friend class groundobj_t;
 	friend class movingobj_t;

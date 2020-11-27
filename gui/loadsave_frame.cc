@@ -9,7 +9,7 @@
 
 #include "loadsave_frame.h"
 
-#include "../simsys.h"
+#include "../sys/simsys.h"
 #include "../simworld.h"
 #include "../simversion.h"
 #include "../pathes.h"
@@ -50,7 +50,7 @@ void sve_info_t::rdwr(loadsave_t *file)
 	const char *s = strdup(pak.c_str());
 	file->rdwr_str(s);
 	if (file->is_loading()) {
-		pak = s;
+		pak = s ? s : "<unknown pak>";
 	}
 	free(const_cast<char *>(s));
 	file->rdwr_longlong(mod_time);
@@ -124,11 +124,11 @@ loadsave_frame_t::loadsave_frame_t(bool do_load) : savegame_frame_t(".sve",false
 	// load cached entries
 	if (cached_info.empty()) {
 		loadsave_t file;
-		/* We rename the old chace file and remove any incomplete read version.
+		/* We rename the old cache file and remove any incomplete read version.
 		 * Upon an error the cache will be rebuilt then next time.
 		 */
 		dr_rename( SAVE_PATH_X "_cached.xml", SAVE_PATH_X "_load_cached.xml" );
-		if(  file.rd_open(SAVE_PATH_X "_load_cached.xml")  ) {
+		if(  file.rd_open(SAVE_PATH_X "_load_cached.xml") == loadsave_t::FILE_STATUS_OK  ) {
 			// ignore comment
 			const char *text=NULL;
 			file.rdwr_str(text);
@@ -171,15 +171,17 @@ const char *loadsave_frame_t::get_help_filename() const
 const char *loadsave_frame_t::get_info(const char *fname)
 {
 	static char date[1024];
-	date[0] = 0;
-	const char *pak_extension = NULL;
+
+	std::string pak_extension;
 
 	// get file information
 	struct stat  sb;
 	if(dr_stat(fname, &sb) != 0) {
 		// file not found?
+		date[0] = 0;
 		return date;
 	}
+
 	// check hash table
 	sve_info_t *svei = cached_info.get(fname);
 	if (svei   &&  svei->file_size == sb.st_size  &&  svei->mod_time == sb.st_mtime) {
@@ -197,7 +199,7 @@ const char *loadsave_frame_t::get_info(const char *fname)
 		pak_extension = test.get_pak_extension();
 
 		// now insert in hash_table
-		sve_info_t *svei_new = new sve_info_t(pak_extension, sb.st_mtime, sb.st_size );
+		sve_info_t *svei_new = new sve_info_t(pak_extension.c_str(), sb.st_mtime, sb.st_size );
 		// copy filename
 		char *key = strdup(fname);
 		sve_info_t *svei_old = cached_info.set(key, svei_new);
@@ -206,7 +208,7 @@ const char *loadsave_frame_t::get_info(const char *fname)
 
 	// write everything in string
 	// add pak extension
-	size_t n = sprintf( date, "%s - ", pak_extension);
+	const size_t n = snprintf( date, lengthof(date), "%s - ", pak_extension.c_str());
 
 	// add the time too
 	struct tm *tm = localtime(&sb.st_mtime);
@@ -216,6 +218,8 @@ const char *loadsave_frame_t::get_info(const char *fname)
 	else {
 		tstrncpy(date, "??.??.???? ??:??", lengthof(date));
 	}
+
+	date[lengthof(date)-1] = 0;
 	return date;
 }
 
@@ -225,7 +229,8 @@ loadsave_frame_t::~loadsave_frame_t()
 	// save hashtable
 	loadsave_t file;
 	const char *cache_file = SAVE_PATH_X "_cached.xml";
-	if(  file.wr_open(cache_file, loadsave_t::xml, 0, "cache", SAVEGAME_VER_NR)  ) {
+
+	if(  file.wr_open(cache_file, loadsave_t::xml, 0, "cache", SAVEGAME_VER_NR) == loadsave_t::FILE_STATUS_OK  ) {
 		const char *text="Automatically generated file. Do not edit. An invalid file may crash the game. Deleting is allowed though.";
 		file.rdwr_str(text);
 		FOR(stringhashtable_tpl<sve_info_t*>, const& i, cached_info) {

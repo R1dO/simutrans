@@ -3,8 +3,8 @@
  * (see LICENSE.txt)
  */
 
-#ifndef _SCEN_INFO_H_
-#define _SCEN_INFO_H_
+#ifndef GUI_SCENARIO_INFO_H
+#define GUI_SCENARIO_INFO_H
 
 
 #include "gui_frame.h"
@@ -19,7 +19,7 @@ class dynamic_string;
 class scenario_info_t : public gui_frame_t, private action_listener_t
 {
 private:
-	gui_tab_panel_t	tabs;
+	gui_tab_panel_t tabs;
 
 	gui_flowtext_t info, goal, rule, result, about, error, debug_msg;
 

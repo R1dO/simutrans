@@ -13,7 +13,9 @@
 #include "../boden/wasser.h"
 #include "../boden/fundament.h"
 
+#include "../dataobj/ribi.h"
 #include "../dataobj/scenario.h"
+
 #include "../obj/leitung2.h"
 #include "../obj/tunnel.h"
 #include "../obj/zeiger.h"
@@ -463,6 +465,7 @@ void hausbauer_t::remove( player_t *player, gebaeude_t *gb )
 							if(grund_t *gr = welt->lookup_kartenboden(newk+koord::south)) {
 								gr->calc_image();
 							}
+							welt->set_grid_hgt( pos.get_2d(), pos.z+corner_nw(new_slope) );
 						}
 					}
 					else if (wasser_t* sea = dynamic_cast<wasser_t*>(gr)) {
@@ -592,7 +595,7 @@ gebaeude_t* hausbauer_t::build(player_t* player, koord3d pos, int org_layout, co
 
 gebaeude_t *hausbauer_t::build_station_extension_depot(player_t *player, koord3d pos, int built_layout, const building_desc_t *desc, void *param)
 {
-	uint8 corner_layout = 6;	// assume single building (for more than 4 layouts)
+	uint8 corner_layout = 6; // assume single building (for more than 4 layouts)
 
 	// adjust layout of neighbouring building
 	if(desc->is_transport_building()  &&  desc->get_all_layouts()>1) {

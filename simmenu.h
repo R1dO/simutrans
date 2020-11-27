@@ -3,10 +3,9 @@
  * (see LICENSE.txt)
  */
 
-/// New configurable OOP tool system
+#ifndef SIMMENU_H
+#define SIMMENU_H
 
-#ifndef simmenu_h
-#define simmenu_h
 
 #include <string>
 #include "descriptor/sound_desc.h"
@@ -16,6 +15,8 @@
 
 #include "simtypes.h"
 #include "display/simimg.h"
+
+/// New configurable OOP tool system
 
 
 template<class T> class vector_tpl;
@@ -73,6 +74,8 @@ enum {
 	TOOL_SET_CLIMATE,
 	TOOL_ROTATE_BUILDING,
 	TOOL_MERGE_STOP,
+	TOOL_EXEC_SCRIPT,
+	TOOL_EXEC_TWO_CLICK_SCRIPT,
 	GENERAL_TOOL_COUNT,
 	GENERAL_TOOL = 0x1000
 };
@@ -115,6 +118,8 @@ enum {
 	TOOL_TOGGLE_RESERVATION,
 	TOOL_VIEW_OWNER,
 	TOOL_HIDE_UNDER_CURSOR,
+	TOOL_MOVE_MAP,
+	TOOL_ROLLUP_ALL_WIN,
 	SIMPLE_TOOL_COUNT,
 	SIMPLE_TOOL = 0x2000
 };
@@ -155,6 +160,7 @@ enum {
 	DIALOG_SCENARIO_INFO,
 	DIALOG_LIST_DEPOT,
 	DIALOG_LIST_VEHICLE,
+	DIALOG_SCRIPT_TOOL,
 	DIALOGE_TOOL_COUNT,
 	DIALOGE_TOOL = 0x4000
 };
@@ -206,11 +212,11 @@ public:
 	uint32 callback_id;
 
 	enum {
-		WFL_SHIFT  = 1, ///< shift-key was pressed when mouse-click happened
-		WFL_CTRL   = 2, ///< ctrl-key was pressed when mouse-click happened
-		WFL_LOCAL  = 4, ///< tool call was issued by local client
-		WFL_SCRIPT = 8, ///< tool call was issued by script
-		WFL_NO_CHK = 16, ///< tool call needs no password or scenario checks
+		WFL_SHIFT  = 1 << 0, ///< shift-key was pressed when mouse-click happened
+		WFL_CTRL   = 1 << 1, ///< ctrl-key was pressed when mouse-click happened
+		WFL_LOCAL  = 1 << 2, ///< tool call was issued by local client
+		WFL_SCRIPT = 1 << 3, ///< tool call was issued by script
+		WFL_NO_CHK = 1 << 4  ///< tool call needs no password or scenario checks
 	};
 	uint8 flags; // flags are set before init/work/move is called
 
@@ -269,14 +275,14 @@ public:
 	virtual bool is_selected() const;
 
 	// when true, local execution would do no harm
-	virtual bool is_init_network_save() const { return false; }
-	virtual bool is_move_network_save(player_t *) const { return true; }
+	virtual bool is_init_network_safe() const { return false; }
+	virtual bool is_move_network_safe(player_t *) const { return true; }
 
-	// if is_work_network_save()==false
-	// and is_work_here_network_save(...)==false
+	// if is_work_network_safe()==false
+	// and is_work_here_network_safe(...)==false
 	// then work-command is sent over network
-	virtual bool is_work_network_save() const { return false; }
-	virtual bool is_work_here_network_save(player_t *, koord3d) { return false; }
+	virtual bool is_work_network_safe() const { return false; }
+	virtual bool is_work_here_network_safe(player_t *, koord3d) { return false; }
 
 	// will draw a dark frame, if selected
 	virtual void draw_after(scr_coord pos, bool dirty) const;
@@ -365,7 +371,7 @@ public:
 	char const* move(player_t*, uint16 /* buttonstate */, koord3d) OVERRIDE;
 	bool move_has_effects() const OVERRIDE { return true; }
 
-	bool is_work_here_network_save(player_t *, koord3d) OVERRIDE;
+	bool is_work_here_network_safe(player_t *, koord3d) OVERRIDE;
 
 	/**
 	 * @returns true if cleanup() needs to be called before another tool can be executed
@@ -410,7 +416,7 @@ private:
 	 */
 	virtual uint8 is_valid_pos( player_t *, const koord3d &pos, const char *&error, const koord3d &start ) = 0;
 
-	virtual image_id get_marker_image();
+	virtual image_id get_marker_image() const;
 
 	bool first_click_var;
 	koord3d start;
@@ -440,13 +446,13 @@ public:
 	tool_selector_t *get_tool_selector() const { return tool_selector; }
 	image_id get_icon(player_t*) const OVERRIDE;
 	bool is_selected() const OVERRIDE;
-	bool is_init_network_save() const OVERRIDE { return true; }
-	bool is_work_network_save() const OVERRIDE { return true; }
+	bool is_init_network_safe() const OVERRIDE { return true; }
+	bool is_work_network_safe() const OVERRIDE { return true; }
 	// show this toolbar
 	bool init(player_t*) OVERRIDE;
 	// close this toolbar
 	bool exit(player_t*) OVERRIDE;
-	virtual void update(player_t *);	// just refresh content
+	virtual void update(player_t *); // just refresh content
 	void append(tool_t *tool) { tools.append(tool); }
 };
 
@@ -458,7 +464,7 @@ private:
 public:
 	toolbar_last_used_t(uint16 const id, char const* const t, char const* const h) : toolbar_t(id,t,h) {}
 	static toolbar_last_used_t *last_used_tools;
-	void update(player_t *) OVERRIDE;	// just refresh content
+	void update(player_t *) OVERRIDE; // just refresh content
 	void append(tool_t *, player_t *);
 	void clear();
 };

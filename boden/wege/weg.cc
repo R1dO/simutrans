@@ -20,7 +20,7 @@
 #include "../../simworld.h"
 #include "../../display/simimg.h"
 #include "../../simhalt.h"
-#include "../../simobj.h"
+#include "../../obj/simobj.h"
 #include "../../player/simplay.h"
 #include "../../obj/roadsign.h"
 #include "../../obj/signal.h"
@@ -95,14 +95,14 @@ weg_t* weg_t::alloc(waytype_t wt)
 const char *weg_t::waytype_to_string(waytype_t wt)
 {
 	switch(wt) {
-		case tram_wt:	return "tram_track";
-		case track_wt:	return "track";
-		case monorail_wt: return "monorail_track";
-		case maglev_wt: return "maglev_track";
+		case tram_wt:        return "tram_track";
+		case track_wt:       return "track";
+		case monorail_wt:    return "monorail_track";
+		case maglev_wt:      return "maglev_track";
 		case narrowgauge_wt: return "narrowgauge_track";
-		case road_wt:	return "road";
-		case water_wt:	return "water";
-		case air_wt:	return "air";
+		case road_wt:        return "road";
+		case water_wt:       return "water";
+		case air_wt:         return "air_wt";
 		default:
 			// keep compiler happy; should never reach here anyway
 			break;
@@ -111,10 +111,6 @@ const char *weg_t::waytype_to_string(waytype_t wt)
 }
 
 
-/**
- * Setzt neue Description. Ersetzt alte Höchstgeschwindigkeit
- * mit wert aus Description.
- */
 void weg_t::set_desc(const way_desc_t *b)
 {
 	desc = b;
@@ -181,8 +177,8 @@ void weg_t::rdwr(loadsave_t *file)
 	uint8 dummy8 = ribi;
 	file->rdwr_byte(dummy8);
 	if(  file->is_loading()  ) {
-		ribi = dummy8 & 15;	// before: high bits was maske
-		ribi_maske = 0;	// maske will be restored by signal/roadsing
+		ribi = dummy8 & 15; // before: high bits was maske
+		ribi_maske = 0; // maske will be restored by signal/roadsing
 	}
 
 	uint16 dummy16=max_speed;
@@ -209,9 +205,6 @@ void weg_t::rdwr(loadsave_t *file)
 }
 
 
-/**
- * Info-text für diesen Weg
- */
 void weg_t::info(cbuffer_t & buf) const
 {
 	obj_t::info(buf);
@@ -424,12 +417,12 @@ void weg_t::calc_image()
 #ifdef MULTI_THREAD
 		pthread_mutex_unlock( &weg_calc_image_mutex );
 #endif
-		return;	// otherwise crashing during enlargement
+		return; // otherwise crashing during enlargement
 	}
 	else if(  from->ist_tunnel() &&  from->ist_karten_boden()  &&  (grund_t::underground_mode==grund_t::ugm_none || (grund_t::underground_mode==grund_t::ugm_level && from->get_hoehe()<grund_t::underground_level))  ) {
-		// in tunnel mouth, no underground mode
-		set_image(IMG_EMPTY);
-		set_foreground_image(IMG_EMPTY);
+		// handled by tunnel mouth, no underground mode
+//		set_image(IMG_EMPTY);
+//		set_foreground_image(IMG_EMPTY);
 	}
 	else if(  from->ist_bruecke()  &&  from->obj_bei(0)==this  ) {
 		// first way on a bridge (bruecke_t will set the image)
@@ -461,7 +454,7 @@ void weg_t::calc_image()
 			if(recursion == 0) {
 				recursion++;
 				for(int r = 0; r < 4; r++) {
-					if(  from->get_neighbour(to, get_waytype(), ribi_t::nsew[r])  ) {
+					if(  from->get_neighbour(to, get_waytype(), ribi_t::nesw[r])  ) {
 						// can fail on water tiles
 						if(  weg_t *w=to->get_weg(get_waytype())  )  {
 							// and will only change the outcome, if it has a diagonal image ...

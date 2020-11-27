@@ -3,15 +3,20 @@
  * (see LICENSE.txt)
  */
 
-#ifndef obj_crossing_h
-#define obj_crossing_h
+#ifndef OBJ_CROSSING_H
+#define OBJ_CROSSING_H
+
+
+#include "simobj.h"
 
 #include "../simtypes.h"
 #include "../display/simimg.h"
 #include "../descriptor/crossing_desc.h"
 #include "../dataobj/crossing_logic.h"
 
+
 class vehicle_base_t;
+
 
 /**
  * road sign for traffic (one way minimum speed, traffic lights)
@@ -20,8 +25,8 @@ class crossing_t : public obj_no_info_t
 {
 protected:
 	image_id foreground_image, image;
-	uint8 ns;				// direction
-	uint8 state;	// only needed for loading ...
+	uint8 ns;       // direction
+	uint8 state;    // only needed for loading ...
 	crossing_logic_t *logic;
 	const crossing_desc_t *desc;
 

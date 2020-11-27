@@ -3,14 +3,14 @@
  * (see LICENSE.txt)
  */
 
-#ifndef gui_optionen_h
-#define gui_optionen_h
+#ifndef GUI_OPTIONEN_H
+#define GUI_OPTIONEN_H
 
 
-class gui_frame_t;
-class action_listener_t;
-class button_t;
-class gui_action_creator_t;
+#include "components/action_listener.h"
+#include "components/gui_button.h"
+#include "gui_frame.h"
+
 
 /*
  * Settings in the game

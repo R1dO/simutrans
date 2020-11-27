@@ -47,7 +47,7 @@ void factory_field_group_writer_t::write_obj(FILE* outfp, obj_node_t& parent, ta
 		const char *field_name = obj.get("fields");
 		int snow_image = obj.get_int("has_snow", 1);
 		int production = obj.get_int("production_per_field", 16);
-		int capacity = obj.get_int("storage_capacity", 0);		// default is 0 to avoid breaking the balance of existing pakset objects
+		int capacity = obj.get_int("storage_capacity", 0); // default is 0 to avoid breaking the balance of existing pakset objects
 		int weight = obj.get_int("spawn_weight", 1000);
 
 		factory_field_class_writer_t::instance()->write_obj(outfp, node, field_name, snow_image, production, capacity, weight);
@@ -68,7 +68,7 @@ void factory_field_group_writer_t::write_obj(FILE* outfp, obj_node_t& parent, ta
 			sprintf(buf, "production_per_field[%d]", field_classes);
 			int production = obj.get_int(buf, 16);
 			sprintf(buf, "storage_capacity[%d]", field_classes);
-			int capacity = obj.get_int(buf, 0);		// default is 0 to avoid breaking the balance of existing pakset objects
+			int capacity = obj.get_int(buf, 0); // default is 0 to avoid breaking the balance of existing pakset objects
 			sprintf(buf, "spawn_weight[%d]", field_classes);
 			int weight = obj.get_int(buf, 1000);
 
@@ -77,10 +77,15 @@ void factory_field_group_writer_t::write_obj(FILE* outfp, obj_node_t& parent, ta
 	}
 
 	// common, shared field data
-	uint16 const probability  = obj.get_int("probability_to_spawn", 10); // 0,1 %
+	uint16       probability  = obj.get_int("probability_to_spawn", 10); // 0,1 %
 	uint16 const max_fields   = obj.get_int("max_fields",           25);
 	uint16 const min_fields   = obj.get_int("min_fields",            5);
 	uint16 const start_fields = obj.get_int("start_fields",          5);
+
+	if (probability >= 10000) {
+		printf("probability_to_spawn too large, set to 10,000\n");
+		probability = 10000;
+	}
 
 	node.write_uint16(outfp, 0x8003,        0); // version
 	node.write_uint16(outfp, probability,   2);
@@ -167,7 +172,12 @@ void factory_writer_t::write_obj(FILE* fp, obj_node_t& parent, tabfileobj_t& obj
 	}
 	uint16 const pax_level = obj.get_int("pax_level", 12);
 
-	uint16 const expand_probability = obj.get_int("expand_probability", 0);
+	uint16 expand_probability = obj.get_int("expand_probability", 0);
+	if (expand_probability >= 10000) {
+		printf("expand_probability too large, set to 10,000\n");
+		expand_probability = 10000;
+	}
+
 	uint16 const expand_minimum     = obj.get_int("expand_minimum",     0);
 	uint16 const expand_range       = obj.get_int("expand_range",       0);
 	uint16 const expand_times       = obj.get_int("expand_times",       0);
@@ -277,18 +287,18 @@ void factory_writer_t::write_obj(FILE* fp, obj_node_t& parent, tabfileobj_t& obj
 	sint16 const smokelifetime = obj.get_int("smokelifetime", DEFAULT_FACTORYSMOKE_TIME );
 	char str_smoketile[] = "smoketile[0]";
 	char str_smokeoffset[] = "smokeoffset[0]";
-	if(  obj.get( str_smoketile )  ) {
+	if(  *obj.get( str_smoketile )  ) {
 		for( int i = 0; i < 4;  i++  ) {
 			str_smoketile[10] = '0' + i;
 			str_smokeoffset[12] = '0' + i;
-			if( !obj.get( str_smoketile ) ) {
+			if( !*obj.get( str_smoketile ) ) {
 				break;
 			}
 			pos_off[ i ] = obj.get_koord( str_smoketile, koord( 0, 0 ) );
-			if( !obj.get( str_smokeoffset ) ) {
+			if( !*obj.get( str_smokeoffset ) ) {
 				dbg->error( "factory_writer_t::write_obj", "%s defined but not %s!", str_smoketile, str_smokeoffset );
 			}
-			pos_off[ i ] = obj.get_koord( str_smoketile, koord( 0, 0 ) );
+			xy_off[ i ] = obj.get_koord( str_smokeoffset, koord( 0, 0 ) );
 			num_smoke_offsets++;
 		}
 	}
@@ -331,11 +341,11 @@ void factory_writer_t::write_obj(FILE* fp, obj_node_t& parent, tabfileobj_t& obj
 	node.write_sint16(fp, smokeuplift,       76);
 	node.write_sint16(fp, smokelifetime,     78);
 
-	// this should ne always at the end
+	// this should be always at the end
 	sint8 sound_str_len = sound_str.size();
 	if (sound_str_len > 0) {
-		node.write_sint8  (fp, sound_str_len, 79);
-		node.write_data_at(fp, sound_str.c_str(), 80, sound_str_len);
+		node.write_sint8  (fp, sound_str_len, 80);
+		node.write_data_at(fp, sound_str.c_str(), 81, sound_str_len);
 	}
 
 	node.write(fp);

@@ -3,8 +3,9 @@
  * (see LICENSE.txt)
  */
 
-#ifndef simline_h
-#define simline_h
+#ifndef SIMLINE_H
+#define SIMLINE_H
+
 
 #include "simtypes.h"
 #include "simcolor.h"
@@ -17,16 +18,16 @@
 
 #define MAX_MONTHS     12 // Max history
 
-#define LINE_CAPACITY   0 // the amount of ware that could be transported, theoretically
+#define LINE_CAPACITY          0 // the amount of ware that could be transported, theoretically
 #define LINE_TRANSPORTED_GOODS 1 // the amount of ware that has been transported
-#define LINE_CONVOIS		2 // number of convois for this line
-#define LINE_REVENUE		3 // the income this line generated
-#define LINE_OPERATIONS     4 // the cost of operations this line generated
-#define LINE_PROFIT         5 // total profit of line
-#define LINE_DISTANCE       6 // distance covered by all convois
-#define LINE_MAXSPEED       7 // maximum speed for bonus calculation of all convois
-#define LINE_WAYTOLL        8 // way toll paid by vehicles of line
-#define MAX_LINE_COST   9 // Total number of cost items
+#define LINE_CONVOIS           2 // number of convois for this line
+#define LINE_REVENUE           3 // the income this line generated
+#define LINE_OPERATIONS        4 // the cost of operations this line generated
+#define LINE_PROFIT            5 // total profit of line
+#define LINE_DISTANCE          6 // distance covered by all convois
+#define LINE_MAXSPEED          7 // maximum speed for bonus calculation of all convois
+#define LINE_WAYTOLL           8 // way toll paid by vehicles of line
+#define MAX_LINE_COST          9 // Total number of cost items
 
 class karte_ptr_t;
 class loadsave_t;
@@ -36,7 +37,18 @@ class schedule_t;
 class simline_t {
 
 public:
-	enum linetype { line = 0, truckline = 1, trainline = 2, shipline = 3, airline = 4, monorailline=5, tramline=6, maglevline=7, narrowgaugeline=8, MAX_LINE_TYPE};
+	enum linetype {
+		line            = 0,
+		truckline       = 1,
+		trainline       = 2,
+		shipline        = 3,
+		airline         = 4,
+		monorailline    = 5,
+		tramline        = 6,
+		maglevline      = 7,
+		narrowgaugeline = 8,
+		MAX_LINE_TYPE
+	};
 
 protected:
 	schedule_t * schedule;

@@ -3,8 +3,9 @@
  * (see LICENSE.txt)
  */
 
-#ifndef gui_map_frame_h
-#define gui_map_frame_h
+#ifndef GUI_MAP_FRAME_H
+#define GUI_MAP_FRAME_H
+
 
 #include "gui_frame.h"
 #include "simwin.h"
@@ -66,21 +67,22 @@ private:
 
 	gui_scrollpane_t* p_scrolly;
 
-	button_t	filter_buttons[MAP_MAX_BUTTONS],
-				zoom_buttons[2],
-				b_rotate45,
-				b_show_legend,
-				b_show_scale,
-				b_show_directory,
-				b_overlay_networks,
-				b_overlay_networks_load_factor,
-				b_filter_factory_list;
+	button_t filter_buttons[MAP_MAX_BUTTONS];
+	button_t zoom_buttons[2];
+	button_t b_rotate45;
+	button_t b_show_legend;
+	button_t b_show_scale;
+	gui_combobox_t c_show_outlines;
+	button_t b_show_directory;
+	button_t b_overlay_networks;
+	button_t b_overlay_networks_load_factor;
+	button_t b_filter_factory_list;
 
 	gui_label_buf_t zoom_value_label;
 
-	gui_combobox_t	viewed_player_c,
-					transport_type_c,
-					freight_type_c;
+	gui_combobox_t viewed_player_c;
+	gui_combobox_t transport_type_c;
+	gui_combobox_t freight_type_c;
 
 	void zoom(bool zoom_out);
 	void update_buttons();
@@ -90,7 +92,6 @@ private:
 	void show_hide_directory(const bool show);
 
 public:
-
 	/**
 	 * Set the window associated helptext
 	 * @return the filename for the helptext, or NULL

@@ -10,7 +10,7 @@
 #include "../simmesg.h"
 #include "../simconvoi.h"
 #include "../utils/cbuffer_t.h"
-#include "../vehicle/simvehicle.h"
+#include "../vehicle/vehicle.h"
 
 sint32 records_t::get_record_speed( waytype_t w ) const
 {
@@ -91,7 +91,7 @@ void records_t::notify_record( convoihandle_t cnv, sint32 max_speed, koord k, ui
 			}
 			cbuffer_t buf;
 			buf.printf( translator::translate(text), speed_to_kmh(10*sr->speed)/10.0, sr->cnv->get_name() );
-			msg->add_message( buf, sr->pos, message_t::new_vehicle, PLAYER_FLAG|sr->owner->get_player_nr() );
+			msg->add_message( buf, sr->pos, message_t::new_vehicle|message_t::do_not_rdwr_flag, PLAYER_FLAG|sr->owner->get_player_nr() );
 		}
 	}
 }

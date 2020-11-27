@@ -6,7 +6,7 @@
 #include "../simevent.h"
 #include "../simcolor.h"
 #include "../simconvoi.h"
-#include "../vehicle/simvehicle.h"
+#include "../vehicle/vehicle.h"
 #include "../simworld.h"
 #include "../simdepot.h"
 #include "../simhalt.h"
@@ -347,7 +347,7 @@ static void display_airport( const scr_coord_val xx, const scr_coord_val yy, con
 static void display_harbor( const scr_coord_val xx, const scr_coord_val yy, const FLAGGED_PIXVAL color )
 {
 	int x = xx + 5;
-	int y = yy - 11 + 13;	//to not overwrite airline symbol
+	int y = yy - 11 + 13; //to not overwrite airline symbol
 
 	if ( y < 0 ) {
 		y = 0;
@@ -695,7 +695,8 @@ PIXVAL minimap_t::calc_height_color(const sint16 hoehe, const sint16 groundwater
 			// to avoid relative_index==0
 			relative_index += 1;
 		}
-	} else {
+	}
+	else {
 		relative_index = hoehe-groundwater;
 	}
 	return color_idx_to_rgb(map_type_color[clamp( relative_index+MAX_MAP_TYPE_WATER-1, 0, MAX_MAP_TYPE_WATER+MAX_MAP_TYPE_LAND-1 )]);
@@ -711,9 +712,10 @@ PIXVAL minimap_t::calc_ground_color(const grund_t *gr)
 
 #ifdef DEBUG_ROUTES
 	/* for debug purposes only ...*/
-	if(world->ist_markiert(gr)) {
+	if(gr->get_flag(grund_t::marked)) {
 		color = color_idx_to_rgb(COL_PURPLE);
-	}else
+	}
+	else
 #endif
 	if(gr->get_halt().is_bound()) {
 		color = COL_HALT;
@@ -748,9 +750,14 @@ PIXVAL minimap_t::calc_ground_color(const grund_t *gr)
 					gebaeude_t *gb = gr->find<gebaeude_t>();
 					fabrik_t *fab = gb ? gb->get_fabrik() : NULL;
 					if(fab==NULL) {
-						sint16 height = (gr->get_grund_hang()%3);
-						color = calc_height_color( world->lookup_hgt( gr->get_pos().get_2d() ) + height, world->get_water_hgt( gr->get_pos().get_2d() ) );
-						//color = color_idx_to_rgb(COL_BLUE);	// water with boat?
+						sint16 height = corner_sw(gr->get_grund_hang());
+						if( mode&MAP_HIDE_CONTOUR ) {
+							color = color_idx_to_rgb(map_type_color[1]); // second deep water color
+						}
+						else {
+							color = calc_height_color( world->lookup_hgt( gr->get_pos().get_2d() ) + height, world->get_water_hgt( gr->get_pos().get_2d() ) );
+						}
+						//color = color_idx_to_rgb(COL_BLUE); // water with boat?
 					}
 					else {
 						color = fab->get_color();
@@ -767,7 +774,7 @@ PIXVAL minimap_t::calc_ground_color(const grund_t *gr)
 						case water_wt: color = COL_CANAL; break;
 						case air_wt: color = COL_RUNWAY; break;
 						case monorail_wt:
-						default:	// all other ways light red ...
+						default: // all other ways light red ...
 							color = 135; break;
 							break;
 					}
@@ -778,12 +785,21 @@ PIXVAL minimap_t::calc_ground_color(const grund_t *gr)
 						color = COL_POWERLINE;
 					}
 					else {
-						sint16 height = (gr->get_grund_hang()%3);
-						if(  gr->get_hoehe() > world->get_groundwater()  ) {
-							color = calc_height_color( gr->get_hoehe() + height, world->get_groundwater() );
+						if( mode&MAP_HIDE_CONTOUR ) {
+							color = color_idx_to_rgb(map_type_color[MAX_MAP_TYPE_WATER+2]); // lowest land color
+						}
+						else if( mode&MAP_CLIMATES ) {
+							static uint8 climate_color[ 8 ] = { 0, COL_YELLOW, COL_LIGHT_GREEN, COL_GREEN, COL_DARK_GREEN, COL_DARK_YELLOW, COL_BROWN, COL_GREY4 };
+							color = color_idx_to_rgb( climate_color[ world->get_climate(gr->get_pos().get_2d()) ] );
 						}
 						else {
-							color = calc_height_color( gr->get_hoehe() + height, gr->get_hoehe() + height - 1);
+							sint16 height = corner_sw(gr->get_grund_hang());
+							if(  gr->get_hoehe() > world->get_groundwater()  ) {
+								color = calc_height_color( gr->get_hoehe() + height, world->get_groundwater() );
+							}
+							else {
+								color = calc_height_color( gr->get_hoehe() + height, gr->get_hoehe() + height - 1);
+							}
 						}
 					}
 				}
@@ -820,10 +836,11 @@ void minimap_t::calc_map_pixel(const koord k)
 		// show passenger coverage
 		// display coverage
 		case MAP_PASSENGER:
-			if(  plan->get_haltlist_count()>0  ) {
-				halthandle_t halt = plan->get_haltlist()[0];
+			for( int i = 0; i < plan->get_haltlist_count(); i++  ) {
+				halthandle_t halt = plan->get_haltlist()[i];
 				if (halt->get_pax_enabled() && !halt->get_pax_connections().empty()) {
 					set_map_color( k, color_idx_to_rgb(halt->get_owner()->get_player_color1() + 3) );
+					break;
 				}
 			}
 			break;
@@ -831,10 +848,11 @@ void minimap_t::calc_map_pixel(const koord k)
 		// show mail coverage
 		// display coverage
 		case MAP_MAIL:
-			if(  plan->get_haltlist_count()>0  ) {
-				halthandle_t halt = plan->get_haltlist()[0];
+			for( int i = 0; i < plan->get_haltlist_count(); i++  ) {
+				halthandle_t halt = plan->get_haltlist()[i];
 				if (halt->get_mail_enabled() && !halt->get_mail_connections().empty()) {
 					set_map_color( k, color_idx_to_rgb(halt->get_owner()->get_player_color1() + 3) );
+					break;
 				}
 			}
 			break;
@@ -1140,11 +1158,11 @@ const fabrik_t* minimap_t::get_factory_near( const koord, bool enlarge ) const
 {
 	const fabrik_t *fab = fabrik_t::get_fab(last_world_pos);
 	for(  int i=0;  i<4  && fab==NULL;  i++  ) {
-		fab = fabrik_t::get_fab( last_world_pos+koord::nsew[i] );
+		fab = fabrik_t::get_fab( last_world_pos+koord::nesw[i] );
 	}
 	if(  enlarge  ) {
 		for(  int i=0;  i<4  && fab==NULL;  i++  ) {
-			fab = fabrik_t::get_fab( last_world_pos+koord::nsew[i]*2 );
+			fab = fabrik_t::get_fab( last_world_pos+koord::nesw[i]*2 );
 		}
 	}
 	return fab;
@@ -1603,7 +1621,7 @@ void minimap_t::draw(scr_coord pos)
 		temp_stop = temp_stop + pos;
 		display_ddd_proportional_clip( temp_stop.x + 10, temp_stop.y + 7, proportional_string_width( display_station->get_name() ) + 8, 0, color_idx_to_rgb(display_station->get_owner()->get_player_color1()+3), color_idx_to_rgb(COL_WHITE), display_station->get_name(), false );
 	}
-	max_waiting_change = new_max_waiting_change;	// update waiting tendencies
+	max_waiting_change = new_max_waiting_change; // update waiting tendencies
 
 	// if we do not do this here, vehicles would erase the town names
 	// ADD: if CRTL key is pressed, temporary show the name

@@ -3,23 +3,24 @@
  * (see LICENSE.txt)
  */
 
-#ifndef __IMAGELIST_DESC_H
-#define __IMAGELIST_DESC_H
+#ifndef DESCRIPTOR_IMAGE_LIST_H
+#define DESCRIPTOR_IMAGE_LIST_H
+
 
 #include "image.h"
 
 /**
  * One-dimensional image list.
  *
- *  Child nodes:
- *	0   1st Image
- *	1   2nd Image
- *	... ...
+ * Child nodes:
+ *  0   1st Image
+ *  1   2nd Image
+ * ... ...
  */
 class image_list_t : public obj_desc_t {
-    friend class imagelist_reader_t;
+	friend class imagelist_reader_t;
 
-    uint16  count;
+	uint16  count;
 
 public:
 	image_list_t() : count(0) {}

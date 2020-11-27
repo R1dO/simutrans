@@ -3,10 +3,11 @@
  * (see LICENSE.txt)
  */
 
-#ifndef obj_tunnel_h
-#define obj_tunnel_h
+#ifndef OBJ_TUNNEL_H
+#define OBJ_TUNNEL_H
 
-#include "../simobj.h"
+
+#include "simobj.h"
 #include "../display/simimg.h"
 
 class tunnel_desc_t;

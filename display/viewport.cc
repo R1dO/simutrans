@@ -32,7 +32,7 @@ koord viewport_t::get_map2d_coord( const koord3d &viewpos ) const
 	else {
 		lines = (new_yoff - (cached_img_size/4))/(cached_img_size/2);
 	}
-	return viewpos.get_2d() - koord( lines, lines );
+	return world->get_closest_coordinate( viewpos.get_2d() - koord( lines, lines ) );
 }
 
 
@@ -75,8 +75,6 @@ void viewport_t::change_world_position( koord new_ij, sint16 new_xoff, sint16 ne
 	new_ij.y += new_xoff/cached_img_size;
 	new_xoff %= cached_img_size;
 
-	new_ij = world->get_closest_coordinate(new_ij);
-
 	// truncate new_yoff, modify new_ij.y
 	int lines = 0;
 	if(new_yoff>0) {
@@ -87,6 +85,8 @@ void viewport_t::change_world_position( koord new_ij, sint16 new_xoff, sint16 ne
 	}
 	new_ij -= koord( lines, lines );
 	new_yoff -= (cached_img_size/2)*lines;
+
+	new_ij = world->get_closest_coordinate(new_ij);
 
 	//position changed? => update and mark dirty
 	if(new_ij!=ij_off  ||  new_xoff!=x_off  ||  new_yoff!=y_off) {
@@ -286,7 +286,7 @@ void viewport_t::metrics_updated()
 	cached_disp_height = display_get_height();
 	cached_img_size = get_tile_raster_width();
 
-	set_viewport_ij_offset(	koord(
+	set_viewport_ij_offset(koord(
 		- cached_disp_width/(2*cached_img_size) - cached_disp_height/cached_img_size,
 		  cached_disp_width/(2*cached_img_size) - cached_disp_height/cached_img_size
 		) );
@@ -301,7 +301,7 @@ void viewport_t::rotate90( sint16 y_size )
 
 
 viewport_t::viewport_t( karte_t *world, const koord ij_off , sint16 x_off , sint16 y_off )
-	: prepared_rect() 
+	: prepared_rect()
 {
 	this->world = world;
 	assert(world);

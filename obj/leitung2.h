@@ -3,18 +3,20 @@
  * (see LICENSE.txt)
  */
 
-#ifndef obj_leitung_t
-#define obj_leitung_t
+#ifndef OBJ_LEITUNG2_H
+#define OBJ_LEITUNG2_H
 
 
 #include "../ifc/sync_steppable.h"
 #include "../dataobj/koord3d.h"
 #include "../dataobj/ribi.h"
-#include "../simobj.h"
+#include "simobj.h"
 #include "../tpl/slist_tpl.h"
 
 // bitshift for converting internal power values to MW for display
 extern const uint32 POWER_TO_MW;
+
+#define CREDIT_PER_MWS 2
 
 class powernet_t;
 class player_t;
@@ -90,10 +92,7 @@ public:
 	 */
 	waytype_t get_waytype() const OVERRIDE { return powerline_wt; }
 
-	/**
-	* @return Einen Beschreibungsstring für das Objekt, der z.B. in einem
-	* Beobachtungsfenster angezeigt wird.
-	*/
+	/// @copydoc obj_t::info
 	void info(cbuffer_t & buf) const OVERRIDE;
 
 	ribi_t::ribi get_ribi() const { return ribi; }
@@ -153,7 +152,7 @@ public:
 	uint32 get_power_supply() const {return power_supply;}
 
 	/**
- 	 * Get the normalized satisfaction value of the power consumed, updated every tick.
+	 * Get the normalized satisfaction value of the power consumed, updated every tick.
 	 * Return value is fixed point with FRACTION_PRECISION fractional bits.
 	 */
 	sint32 get_power_consumption() const;
@@ -167,7 +166,7 @@ public:
 	void rdwr(loadsave_t *file) OVERRIDE;
 	void finish_rd() OVERRIDE;
 
-	void calc_image() OVERRIDE {}	// otherwise it will change to leitung
+	void calc_image() OVERRIDE {} // empty; otherwise it will change to leitung
 
 	const fabrik_t* get_factory() const { return fab; }
 };
@@ -254,7 +253,7 @@ public:
 	void rdwr(loadsave_t *file) OVERRIDE;
 	void finish_rd() OVERRIDE;
 
-	void calc_image() OVERRIDE {}	// otherwise it will change to leitung
+	void calc_image() OVERRIDE {} // empty; otherwise it will change to leitung
 
 	const fabrik_t* get_factory() const { return fab; }
 };

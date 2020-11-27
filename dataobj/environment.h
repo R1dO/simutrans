@@ -3,8 +3,9 @@
  * (see LICENSE.txt)
  */
 
-#ifndef dataobj_environment_h
-#define dataobj_environment_h
+#ifndef DATAOBJ_ENVIRONMENT_H
+#define DATAOBJ_ENVIRONMENT_H
+
 
 #include <string>
 #include "../simtypes.h"
@@ -27,8 +28,9 @@
 class env_t
 {
 public:
-	/// points to the current simutrans data directory
-	static char program_dir[PATH_MAX];
+	/// Points to the current simutrans data directory. Usually this is the same directory
+	/// where the executable is located, unless -use_workdir is specified.
+	static char data_dir[PATH_MAX];
 
 	/// points to the current user directory for loading and saving
 	static const char *user_dir;
@@ -145,6 +147,9 @@ public:
 	/// controls scrolling speed and scrolling direction
 	static sint16 scroll_multi;
 
+	/// converts numpad keys to arrows no matter of numlock state
+	static bool numpad_always_moves_map;
+
 	/// open info windows for pedestrian and private cars
 	static bool road_user_info;
 
@@ -209,8 +214,8 @@ public:
 	static uint32 tooltip_duration;
 
 	/// limit width and height of menu toolbars
-	static uint8 toolbar_max_width;
-	static uint8 toolbar_max_height;
+	static sint8 toolbar_max_width;
+	static sint8 toolbar_max_height;
 
 	// how to highlight topped (untopped windows)
 	static bool window_frame_active;
@@ -221,6 +226,9 @@ public:
 	static uint32 default_window_title_color_rgb;
 	static PIXVAL default_window_title_color;
 	static uint8 bottom_window_darkness;
+
+	static uint8 gui_player_color_dark;
+	static uint8 gui_player_color_bright;
 
 	// default font name and -size
 	static std::string fontname;
@@ -264,7 +272,7 @@ public:
 
 	/// Three states to control hiding of building
 	enum hide_buildings_states {
-		NOT_HIDE=0,           ///< show all buildings
+		NOT_HIDE = 0,         ///< show all buildings
 		SOME_HIDDEN_BUILDING, ///< hide buildings near cursor
 		ALL_HIDDEN_BUILDING   ///< hide all buildings
 	};
@@ -289,7 +297,7 @@ public:
 	static uint32 cursor_overlay_color_rgb;
 	static PIXVAL cursor_overlay_color;
 
-	static sint8 show_money_message; 
+	static sint8 show_money_message;
 
 	/// color used for solid background draw
 	static uint32 background_color_rgb;
@@ -321,8 +329,16 @@ public:
 	/// Only use during loading of old games!
 	static sint8 pak_height_conversion_factor;
 
-	// load old height maps (false) or use as many available height levels as possible
-	static bool new_height_map_conversion;
+	enum height_conversion_mode
+	{
+		HEIGHT_CONV_LEGACY_SMALL, ///< Old (fixed) height conversion, small height difference
+		HEIGHT_CONV_LEGACY_LARGE, ///< Old (fixed) height conversion, larger height difference
+		HEIGHT_CONV_LINEAR,       ///< linear interpolation between min_/max_allowed_height
+		HEIGHT_CONV_CLAMP,        ///< Use 1 height level per 1 greyscale level, clamp to allowed height (cut off mountains)
+		NUM_HEIGHT_CONV_MODES
+	};
+
+	static height_conversion_mode height_conv_mode;
 
 	/// use the faster drawing routine (and allow for clipping errors)
 	static bool simple_drawing;
@@ -338,11 +354,11 @@ public:
 
 	/// format in which date is shown
 	enum date_fmt {
-		DATE_FMT_SEASON   = 0,
-		DATE_FMT_MONTH    = 1,
-		DATE_FMT_JAPANESE = 2,
-		DATE_FMT_US       = 3,
-		DATE_FMT_GERMAN   = 4,
+		DATE_FMT_SEASON             = 0,
+		DATE_FMT_MONTH              = 1,
+		DATE_FMT_JAPANESE           = 2,
+		DATE_FMT_US                 = 3,
+		DATE_FMT_GERMAN             = 4,
 		DATE_FMT_JAPANESE_NO_SEASON = 5,
 		DATE_FMT_US_NO_SEASON       = 6,
 		DATE_FMT_GERMAN_NO_SEASON   = 7
@@ -361,8 +377,10 @@ public:
 	 */
 	/// @{
 
-	/// set the frame rate for the display
-	static uint32 fps;
+	static uint32 fps;                ///< target frame rate
+	static uint32 ff_fps;             ///< target fps during fast forward
+	static const uint32 min_fps = 5;  ///< minimum target fps (actual fps may be lower for large zoom out on slow machines)
+	static const uint32 max_fps = 100;
 
 	/// maximum acceleration with fast forward
 	static sint16 max_acceleration;

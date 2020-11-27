@@ -3,10 +3,11 @@
  * (see LICENSE.txt)
  */
 
-#ifndef obj_field_h
-#define obj_field_h
+#ifndef OBJ_FIELD_H
+#define OBJ_FIELD_H
 
-#include "../simobj.h"
+
+#include "simobj.h"
 #include "../display/simimg.h"
 
 
@@ -27,10 +28,7 @@ public:
 
 	image_id get_image() const OVERRIDE;
 
-	/**
-	 * @return Einen Beschreibungsstring für das Objekt, der z.B. in einem
-	 * Beobachtungsfenster angezeigt wird.
-	 */
+	/// @copydoc obj_t::show_info
 	void show_info() OVERRIDE;
 
 	/**
@@ -39,6 +37,8 @@ public:
 	const char * is_deletable(const player_t *) OVERRIDE;
 
 	void cleanup(player_t *player) OVERRIDE;
+
+	fabrik_t* get_factory() const { return fab; }
 };
 
 #endif

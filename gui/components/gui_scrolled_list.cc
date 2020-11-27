@@ -40,12 +40,12 @@ scr_size gui_scrolled_list_t::const_text_scrollitem_t::get_min_size() const
 
 scr_size gui_scrolled_list_t::const_text_scrollitem_t::get_max_size() const
 {
-// 	if (!is_editable()) {
-// 		return get_min_size();
-// 	}
-// 	else {
+//	if (!is_editable()) {
+//		return get_min_size();
+//	}
+//	else {
 		return scr_size(scr_size::inf.w, LINESPACE);
-// 	}
+//	}
 }
 
 // draws a single line of text
@@ -69,6 +69,9 @@ gui_scrolled_list_t::gui_scrolled_list_t(enum type type, item_compare_func cmp) 
 	item_list(container.get_components())
 {
 	container.set_table_layout(1,0);
+	container.set_margin( scr_size( D_H_SPACE, 0 ), scr_size( D_H_SPACE, 0 ) );
+	container.set_spacing( scr_size( D_H_SPACE, 0 ) );
+
 	set_component(&container);
 
 	this->type = type;
@@ -92,10 +95,11 @@ void gui_scrolled_list_t::show_selection(int sel)
 void gui_scrolled_list_t::set_selection(int s)
 {
 	if (s<0  ||  ((uint32)s)>=item_list.get_count()) {
+		container.set_focus(NULL);
 		return;
 	}
 	gui_component_t* new_focus = item_list[s];
-	
+
 	// reset selected status
 	FOR(vector_tpl<gui_component_t*>, v, item_list) {
 		scrollitem_t* item = dynamic_cast<scrollitem_t*>(v);
@@ -143,6 +147,7 @@ void gui_scrolled_list_t::sort( int offset )
 	cleanup_elements();
 
 	if (compare == 0  ||  item_list.get_count() <= 1) {
+		reset_container_size();
 		return;
 	}
 
@@ -178,7 +183,11 @@ void gui_scrolled_list_t::set_size(scr_size size)
 void gui_scrolled_list_t::reset_container_size()
 {
 	// reset element positioning
+	container.set_margin( scr_size( D_H_SPACE, 0 ), scr_size( D_H_SPACE, 0 ) );
+	container.set_spacing( scr_size( D_H_SPACE, 0 ) );
+
 	scr_size csize = container.get_min_size();
+
 	container.set_size( csize );
 }
 

@@ -3,10 +3,13 @@
  * (see LICENSE.txt)
  */
 
-#ifndef _overtaker_h
-#define _overtaker_h
+#ifndef VEHICLE_OVERTAKER_H
+#define VEHICLE_OVERTAKER_H
+
 
 #include "../simtypes.h"
+#include "../simunits.h"
+
 
 /**
  * Class dealing with overtaking

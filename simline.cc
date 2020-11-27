@@ -15,7 +15,7 @@
 #include "gui/gui_theme.h"
 #include "player/simplay.h"
 #include "player/finance.h" // convert_money
-#include "vehicle/simvehicle.h"
+#include "vehicle/vehicle.h"
 #include "simconvoi.h"
 #include "convoihandle_t.h"
 #include "simlinemgmt.h"
@@ -410,16 +410,16 @@ void simline_t::recalc_status()
 {
 	if(financial_history[0][LINE_CONVOIS]==0) {
 		// no convois assigned to this line
-		state_color = SYSCOL_TEXT_HIGHLIGHT;
+		state_color = SYSCOL_EMPTY;
 		withdraw = false;
 	}
 	else if(financial_history[0][LINE_PROFIT]<0) {
 		// ok, not performing best
-		state_color = color_idx_to_rgb(COL_RED);
+		state_color = MONEY_MINUS;
 	}
 	else if((financial_history[0][LINE_OPERATIONS]|financial_history[1][LINE_OPERATIONS])==0) {
 		// nothing moved
-		state_color = color_idx_to_rgb(COL_YELLOW);
+		state_color = SYSCOL_TEXT_UNUSED;
 	}
 	else if(welt->use_timeline()) {
 		// convois has obsolete vehicles?
@@ -429,7 +429,7 @@ void simline_t::recalc_status()
 			if (has_obsolete) break;
 		}
 		// now we have to set it
-		state_color = has_obsolete ? color_idx_to_rgb(COL_DARK_BLUE) : SYSCOL_TEXT;
+		state_color = has_obsolete ? SYSCOL_OBSOLETE : SYSCOL_TEXT;
 	}
 	else {
 		// normal state
@@ -483,7 +483,7 @@ void simline_t::set_withdraw( bool yes_no )
 	withdraw = yes_no && !line_managed_convoys.empty();
 	// convois in depots will be immediately destroyed, thus we go backwards
 	for (size_t i = line_managed_convoys.get_count(); i-- != 0;) {
-		line_managed_convoys[i]->set_no_load(yes_no);	// must be first, since set withdraw might destroy convoi if in depot!
+		line_managed_convoys[i]->set_no_load(yes_no); // must be first, since set withdraw might destroy convoi if in depot!
 		line_managed_convoys[i]->set_withdraw(yes_no);
 	}
 }

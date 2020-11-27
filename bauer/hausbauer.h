@@ -3,8 +3,9 @@
  * (see LICENSE.txt)
  */
 
-#ifndef HAUSBAUER_H
-#define HAUSBAUER_H
+#ifndef BAUER_HAUSBAUER_H
+#define BAUER_HAUSBAUER_H
+
 
 #include "../descriptor/building_desc.h"
 #include "../dataobj/koord3d.h"
@@ -76,7 +77,7 @@ public:
 	/**
 	 * Fills menu with icons of buildings of a given waytype.
 	 * This is needed for station extensions and headquarters.
- 	 */
+	 */
 	static void fill_menu(tool_selector_t* tool_selector, building_desc_t::btype, waytype_t wt, sint16 sound_ok);
 
 	/// @returns a random commercial building matching the requirements.
@@ -131,7 +132,7 @@ public:
 	 * Building size can be larger than 1x1.
 	 * Also the underlying ground will be changed to foundation.
 	 * @param param if building a factory, pointer to the factory,
-	 * 				if building a stop, pointer to the halt handle.
+	 *              if building a stop, pointer to the halt handle.
 	 *
 	 * @return The first built part of the building. Usually at @p pos, if this
 	 *         building tile is not empty.

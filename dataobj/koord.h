@@ -3,8 +3,9 @@
  * (see LICENSE.txt)
  */
 
-#ifndef KOORD_H
-#define KOORD_H
+#ifndef DATAOBJ_KOORD_H
+#define DATAOBJ_KOORD_H
+
 
 #include "ribi.h"
 #include "../simtypes.h"
@@ -27,7 +28,7 @@ public:
 
 	koord() : x(0), y(0) {}
 
-	koord(short xp, short yp) : x(xp), y(yp) {}
+	koord(sint16 xp, sint16 yp) : x(xp), y(yp) {}
 	koord(ribi_t::ribi ribi) { *this = from_ribi[ribi]; }
 	koord(slope_t::type slope) { *this = from_hang[slope]; }
 
@@ -38,7 +39,7 @@ public:
 	void rdwr(loadsave_t *file);
 
 	const char *get_str() const;
-	const char *get_fullstr() const;	// including brackets
+	const char *get_fullstr() const; // including brackets
 
 	const koord& operator += (const koord & k)
 	{
@@ -91,7 +92,7 @@ public:
 	static const koord east;
 	static const koord west;
 	// the 4 basic directions as an Array
-	static const koord nsew[4];
+	static const koord nesw[4];
 	// 8 next neighbours
 	static const koord neighbours[8];
 

@@ -3,8 +3,8 @@
  * (see LICENSE.txt)
  */
 
-#ifndef vehicle_builder_t_h
-#define vehicle_builder_t_h
+#ifndef BAUER_VEHIKELBAUER_H
+#define BAUER_VEHIKELBAUER_H
 
 
 #include "../dataobj/koord3d.h"
@@ -35,7 +35,8 @@ public:
 		sb_price,
 		sb_cost,
 		sb_cost_per_unit,
-		sb_speed, sb_power,
+		sb_speed,
+		sb_power,
 		sb_weight,
 		sb_intro_date,
 		sb_retire_date,

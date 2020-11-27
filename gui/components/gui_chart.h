@@ -3,8 +3,9 @@
  * (see LICENSE.txt)
  */
 
-#ifndef gui_chart_h
-#define gui_chart_h
+#ifndef GUI_COMPONENTS_GUI_CHART_H
+#define GUI_COMPONENTS_GUI_CHART_H
+
 
 #include "../../simtypes.h"
 #include "gui_component.h"
@@ -102,11 +103,11 @@ private:
 		int offset;
 		int elements;
 		bool show;
-		bool show_value; // show first value of curve as number on chart?
-		int type; // 0 = standard, 1 = money, 2 = percent
+		bool show_value;      // show first value of curve as number on chart?
+		int type;             // 0 = standard, 1 = money, 2 = percent
 		const char* suffix;
-		int precision;	// how many numbers ...
-		convert_proc convert;	// procedure for converting supplied values before use
+		int precision;        // how many numbers ...
+		convert_proc convert; // procedure for converting supplied values before use
 	};
 
 	slist_tpl <curve_t> curves;

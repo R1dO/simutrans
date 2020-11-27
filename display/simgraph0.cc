@@ -4,14 +4,11 @@
  */
 
 #include "../simconst.h"
-#include "../simsys.h"
+#include "../sys/simsys.h"
 #include "../descriptor/image.h"
 
 #include "simgraph.h"
 
-int large_font_height = 10;
-int large_font_total_height = 11;
-int large_font_ascent = 9;
 
 KOORD_VAL tile_raster_width = 16; // zoomed
 KOORD_VAL base_tile_raster_width = 16; // original
@@ -72,9 +69,9 @@ void display_mark_img_dirty(image_id, KOORD_VAL, KOORD_VAL)
 {
 }
 
-uint16 display_load_font(const char*, bool)
+bool display_load_font(const char*, bool)
 {
-	return 1;
+	return true;
 }
 
 sint16 display_get_width()
@@ -103,7 +100,7 @@ void display_set_player_color_scheme(const int, const uint8, const uint8)
 {
 }
 
-void register_image(struct image_t* image)
+void register_image(image_t* image)
 {
 	image->imageid = 1;
 }
@@ -343,11 +340,11 @@ void display_show_load_pointer(int)
 {
 }
 
-void simgraph_init(KOORD_VAL, KOORD_VAL, int)
+void simgraph_init(scr_size, bool)
 {
 }
 
-int is_display_init()
+bool is_display_init()
 {
 	return false;
 }
@@ -361,7 +358,7 @@ void simgraph_exit()
 	dr_os_close();
 }
 
-void simgraph_resize(KOORD_VAL, KOORD_VAL)
+void simgraph_resize(scr_size)
 {
 }
 
@@ -386,6 +383,10 @@ void display_filled_circle_rgb( KOORD_VAL, KOORD_VAL, int, const PIXVAL )
 }
 
 void draw_bezier_rgb(KOORD_VAL, KOORD_VAL, KOORD_VAL, KOORD_VAL, KOORD_VAL, KOORD_VAL, KOORD_VAL, KOORD_VAL, const PIXVAL, KOORD_VAL, KOORD_VAL )
+{
+}
+
+void display_right_triangle_rgb(KOORD_VAL, KOORD_VAL, KOORD_VAL, const PIXVAL, const bool)
 {
 }
 

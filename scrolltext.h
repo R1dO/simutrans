@@ -3,6 +3,10 @@
  * (see LICENSE.txt)
  */
 
+#ifndef SCROLLTEXT_H
+#define SCROLLTEXT_H
+
+
 /* first part is left, second part right side */
 
 "","",
@@ -30,7 +34,7 @@
 " Owen Rudge","MIDI, patches",
 " Tomas Kubes","patches",
 " Rainer Bertram","patches",
-" Andreas Röver","patches",
+" Andreas RÃ¶ver","patches",
 " Tilman Raatz","patches",
 " Pasi Ruhanen","BeOS, SDL",
 " Mat Hounsell","GUI",
@@ -53,7 +57,7 @@
 "","",
 " Flor Wauters","",
 " Georg 'MHz' Moers","",
-" Hansjörg Malthaner","",
+" HansjÃ¶rg Malthaner","",
 " James Starr","",
 " Manfred Tomaschitz","",
 " Oskari 'TPI' Saarekas","",
@@ -73,18 +77,18 @@
 "","",
 " Alberto Beccaria","Italian",
 " George Dragon","Hungarian",
-" Hansjörg Malthaner","German",
+" HansjÃ¶rg Malthaner","German",
 " Marcal Guardiola","Spanish",
 " Niels Roest","Dutch",
 " Pasi Ruhanen","Finnish",
-" Rémi Denis-Courmont","French",
+" RÃ©mi Denis-Courmont","French",
 " Ferencz Szekely","Hungary & Romanian",
 " Alex Revo","Russian",
-" Roman Schwörer","French & German",
+" Roman SchwÃ¶rer","French & German",
 " Yannis Kaskamanid", "Greek",
 " Igor Eliezer", "Portuguese",
 " Joan-Josep Bargues", "Catalan",
-" Susanna Björverud", "Swedish",
+" Susanna BjÃ¶rverud", "Swedish",
 " Xavier Paz", "Spanish",
 " Wim Vreeswijk", "Dutch",
 " Paul Color", "Swedish",
@@ -128,3 +132,5 @@
 "","",
 "","",
 0
+
+#endif

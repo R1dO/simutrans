@@ -32,7 +32,7 @@
 
 
 #ifdef DEBUG_ROUTES
-#include "../simsys.h"
+#include "../sys/simsys.h"
 #endif
 
 
@@ -201,11 +201,11 @@ bool route_t::find_route(karte_t *welt, const koord3d start, test_driver_t *tdri
 		for(  int r=0;  r<4;  r++  ) {
 			// a way goes here, and it is not marked (i.e. in the closed list)
 			grund_t* to;
-			if(  (ribi & ribi_t::nsew[r] )!=0 // do not go backwards
-				&& koord_distance(start, gr->get_pos() + koord::nsew[r])<max_depth	// not too far away
-				&& gr->get_neighbour(to, wegtyp, ribi_t::nsew[r])  // is connected
-				&& !marker.is_marked(to) // not already tested
-				&& tdriver->check_next_tile(to)	// can be driven on
+			if(  (ribi & ribi_t::nesw[r] )!=0 // do not go backwards
+			    && koord_distance(start, gr->get_pos() + koord::nesw[r])<max_depth // not too far away
+			    && gr->get_neighbour(to, wegtyp, ribi_t::nesw[r])  // is connected
+			    && !marker.is_marked(to) // not already tested
+			    && tdriver->check_next_tile(to) // can be driven on
 			) {
 				// not in there or taken out => add new
 				ANode* k = &nodes[step++];
@@ -214,16 +214,16 @@ bool route_t::find_route(karte_t *welt, const koord3d start, test_driver_t *tdri
 				k->gr = to;
 				k->count = tmp->count+1;
 				k->f = 0;
-				k->g = tmp->g + tdriver->get_cost(to, to->get_weg(wegtyp), max_khm, ribi_t::nsew[r]);
-				k->ribi_from = ribi_t::nsew[r];
+				k->g = tmp->g + tdriver->get_cost(to, to->get_weg(wegtyp), max_khm, ribi_t::nesw[r]);
+				k->ribi_from = ribi_t::nesw[r];
 
-				uint8 current_dir = ribi_t::nsew[r];
+				uint8 current_dir = ribi_t::nesw[r];
 				if(tmp->parent!=NULL) {
 					current_dir |= tmp->ribi_from;
 					if(tmp->dir!=current_dir) {
 						k->g += 3;
 						if(tmp->parent->dir!=tmp->dir  &&  tmp->parent->parent!=NULL) {
-							// discourage 90° turns
+							// discourage 90 degree turns
 							k->g += 10;
 						}
 						else if(ribi_t::is_perpendicular(tmp->dir,current_dir)) {
@@ -430,7 +430,7 @@ bool route_t::intern_calc_route(karte_t *welt, const koord3d ziel, const koord3d
 					if(tmp->dir!=current_dir) {
 						new_g += 3;
 						if(tmp->parent->dir!=tmp->dir  &&  tmp->parent->parent!=NULL) {
-							// discourage 90° turns
+							// discourage 90 degree turns
 							new_g += 10;
 						}
 						else if(ribi_t::is_perpendicular(tmp->dir,current_dir)) {
@@ -676,9 +676,14 @@ route_t::route_result_t route_t::calc_route(karte_t *welt, const koord3d ziel, c
 
 	INT_CHECK("route 336");
 
+#ifdef DEBUG_ROUTES
+	const uint32 ms = dr_time();
+#endif
 	bool ok = intern_calc_route(welt, start, ziel, tdriver, max_khm, 0xFFFFFFFFul );
 #ifdef DEBUG_ROUTES
-	if(tdriver->get_waytype()==water_wt) {DBG_DEBUG("route_t::calc_route()","route from %d,%d to %d,%d with %i steps in %u ms found.",start.x, start.y, ziel.x, ziel.y, route.get_count()-1, dr_time()-ms );}
+	if(tdriver->get_waytype()==water_wt) {
+		DBG_DEBUG("route_t::calc_route()", "route from %d,%d to %d,%d with %i steps in %u ms found.", start.x, start.y, ziel.x, ziel.y, route.get_count()-1, dr_time()-ms );
+	}
 #endif
 
 	INT_CHECK("route 343");

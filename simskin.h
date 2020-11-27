@@ -3,8 +3,9 @@
  * (see LICENSE.txt)
  */
 
-#ifndef __SIMSKIN_H
-#define __SIMSKIN_H
+#ifndef SIMSKIN_H
+#define SIMSKIN_H
+
 
 #include "simcolor.h"
 
@@ -24,7 +25,13 @@ class skin_desc_t;
 
 class skinverwaltung_t {
 public:
-	enum skintyp_t { nothing, menu, cursor, symbol, misc };
+	enum skintyp_t {
+		nothing,
+		menu,
+		cursor,
+		symbol,
+		misc
+	};
 
 	/// @name icons used in the toolbars
 	/// @{
@@ -109,6 +116,13 @@ public:
 	static const skin_desc_t *goods;
 	/// @}
 
+	/// @name icons used to passenger evaluations happy / unhappy / no route
+	/// @{
+	static const skin_desc_t *happy;
+	static const skin_desc_t *unhappy;
+	static const skin_desc_t *no_route;
+	/// @}
+
 	/// images shown in display of lines in mini-map
 	static const skin_desc_t *station_type;
 
@@ -151,11 +165,12 @@ public:
 	 * @param len length of string
 	 * @return pointer to skin object or NULL if nothing found
 	 */
-	static const skin_desc_t *get_extra( const char *str, int len );
+	static const skin_desc_t *get_extra( const char *str, int len, skintyp_t type = menu );
 
 private:
-	/// holds objects from paks with type 'menu'
-	static slist_tpl<const skin_desc_t *>extra_obj;
+	/// holds objects from paks with type 'menu' and 'cursor'
+	static slist_tpl<const skin_desc_t *>extra_menu_obj;
+	static slist_tpl<const skin_desc_t *>extra_cursor_obj;
 };
 
 #endif

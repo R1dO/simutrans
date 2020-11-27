@@ -13,7 +13,7 @@
 static char thousand_sep = ',';
 static char fraction_sep = '.';
 static const char *large_number_string = "M";
-static double large_number_factor = 1e99;	// off
+static double large_number_factor = 1e99; // off
 static int thousand_sep_exponent = 3;
 
 
@@ -35,6 +35,7 @@ void set_thousand_sep_exponent(int new_thousand_sep_exponent)
 {
 	thousand_sep_exponent = new_thousand_sep_exponent>0 ? new_thousand_sep_exponent : 3;
 }
+
 
 
 /**
@@ -270,6 +271,12 @@ char *make_single_line_string(const char *in,int number_of_lines)
  */
 char *tstrncpy(char *dest, const char *src, size_t n)
 {
+	if (dest == src) {
+		// source and destination are the same
+		// avoid copying overlapping memory regions
+		return dest;
+	}
+
 	strncpy(dest, src, n);
 	dest[n-1] = '\0';
 

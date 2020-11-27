@@ -3,8 +3,9 @@
  * (see LICENSE.txt)
  */
 
-#ifndef simworld_h
-#define simworld_h
+#ifndef SIMWORLD_H
+#define SIMWORLD_H
+
 
 #include "simconst.h"
 #include "simtypes.h"
@@ -14,17 +15,21 @@
 #include "halthandle_t.h"
 
 #include "tpl/weighted_vector_tpl.h"
+#include "tpl/array2d_tpl.h"
 #include "tpl/vector_tpl.h"
 #include "tpl/slist_tpl.h"
 
 #include "dataobj/settings.h"
-#include "network/pwd_hash.h"
 #include "dataobj/loadsave.h"
 #include "dataobj/rect.h"
 
-#include "simplan.h"
+#include "utils/checklist.h"
+#include "utils/sha1_hash.h"
 
+#include "simplan.h"
 #include "simdebug.h"
+
+
 
 struct sound_info;
 class stadt_t;
@@ -45,27 +50,6 @@ class goods_desc_t;
 class memory_rw_t;
 class viewport_t;
 class records_t;
-
-struct checklist_t
-{
-	uint32 random_seed;
-	uint16 halt_entry;
-	uint16 line_entry;
-	uint16 convoy_entry;
-
-	checklist_t() : random_seed(0), halt_entry(0), line_entry(0), convoy_entry(0) { }
-	checklist_t(uint32 _random_seed, uint16 _halt_entry, uint16 _line_entry, uint16 _convoy_entry)
-		: random_seed(_random_seed), halt_entry(_halt_entry), line_entry(_line_entry), convoy_entry(_convoy_entry) { }
-
-	bool operator == (const checklist_t &other) const
-	{
-		return ( random_seed==other.random_seed && halt_entry==other.halt_entry && line_entry==other.line_entry && convoy_entry==other.convoy_entry );
-	}
-	bool operator != (const checklist_t &other) const { return !( (*this)==other ); }
-
-	void rdwr(memory_rw_t *buffer);
-	int print(char *buffer, const char *entity) const;
-};
 
 
 /**
@@ -100,31 +84,46 @@ public:
 	void perlin_hoehe_loop(sint16, sint16, sint16, sint16);
 
 	enum player_cost {
-		WORLD_CITICENS=0,		//!< total people
-		WORLD_GROWTH,			//!< growth (just for convenience)
-		WORLD_TOWNS,			//!< number of all cities
-		WORLD_FACTORIES,		//!< number of all consuming only factories
-		WORLD_CONVOIS,			//!< total number of convois
-		WORLD_CITYCARS,			//!< number of citycars generated
-		WORLD_PAS_RATIO,		//!< percentage of passengers that started successful
-		WORLD_PAS_GENERATED,	//!< total number generated
-		WORLD_MAIL_RATIO,		//!< percentage of mail that started successful
-		WORLD_MAIL_GENERATED,	//!< all letters generated
-		WORLD_GOODS_RATIO,		//!< ratio of chain completeness
-		WORLD_TRANSPORTED_GOODS,//!< all transported goods
+		WORLD_CITIZENS = 0,      ///< total people
+		WORLD_GROWTH,            ///< growth (just for convenience)
+		WORLD_TOWNS,             ///< number of all cities
+		WORLD_FACTORIES,         ///< number of all consuming only factories
+		WORLD_CONVOIS,           ///< total number of convois
+		WORLD_CITYCARS,          ///< number of citycars generated
+		WORLD_PAS_RATIO,         ///< percentage of passengers that started successful
+		WORLD_PAS_GENERATED,     ///< total number generated
+		WORLD_MAIL_RATIO,        ///< percentage of mail that started successful
+		WORLD_MAIL_GENERATED,    ///< all letters generated
+		WORLD_GOODS_RATIO,       ///< ratio of chain completeness
+		WORLD_TRANSPORTED_GOODS, ///< all transported goods
 		MAX_WORLD_COST
 	};
 
-	#define MAX_WORLD_HISTORY_YEARS  (12) // number of years to keep history
+	#define MAX_WORLD_HISTORY_YEARS   (12) // number of years to keep history
 	#define MAX_WORLD_HISTORY_MONTHS  (12) // number of months to keep history
 
-	enum { NORMAL=0, PAUSE_FLAG = 0x01, FAST_FORWARD=0x02, FIX_RATIO=0x04 };
+	enum {
+		NORMAL       = 0,
+		PAUSE_FLAG   = 1 << 0,
+		FAST_FORWARD = 1 << 1,
+		FIX_RATIO    = 1 << 2
+	};
 
 	/**
 	 * Missing things during loading:
 	 * factories, vehicles, roadsigns or catenary may be severe
 	 */
-	enum missing_level_t { NOT_MISSING=0, MISSING_FACTORY=1, MISSING_VEHICLE=2, MISSING_SIGN=3, MISSING_WAYOBJ=4, MISSING_ERROR=4, MISSING_BRIDGE, MISSING_BUILDING, MISSING_WAY };
+	enum missing_level_t {
+		NOT_MISSING     = 0,
+		MISSING_FACTORY = 1,
+		MISSING_VEHICLE = 2,
+		MISSING_SIGN    = 3,
+		MISSING_WAYOBJ  = 4,
+		MISSING_ERROR   = 4,
+		MISSING_BRIDGE,
+		MISSING_BUILDING,
+		MISSING_WAY
+	};
 
 private:
 	/**
@@ -255,6 +254,19 @@ private:
 	 * Table for fast conversion from height to climate.
 	 */
 	uint8 height_to_climate[128];
+	uint8 num_climates_at_height[128];
+
+	/**
+	* Contains the intended climate for a tile
+	* (needed to restore tiles after height changes)
+	*/
+	array2d_tpl<uint8>climate_map;
+
+	/**
+	* Contains the intended climate for a tile
+	* (needed to restore tiles after height changes)
+	*/
+	array2d_tpl<uint8>humidity_map;
 
 	/**
 	 * Array containing the convois.
@@ -648,9 +660,14 @@ private:
 	void create_rivers(sint16 number);
 
 	/**
+	 * Will create lakes (multithreaded).
+	 */
+	void create_lakes_loop(sint16, sint16, sint16, sint16);
+
+	/**
 	 * Will create lakes.
 	 */
-	void create_lakes( int xoff, int yoff );
+	void create_lakes( int xoff, int yoff, sint8 max_lake_height );
 
 	/**
 	 * Will create beaches.
@@ -669,7 +686,10 @@ private:
 	 */
 	uint32 server_last_announce_time;
 
-	enum { SYNCX_FLAG = 0x01, GRIDS_FLAG = 0x02 };
+	enum {
+		SYNCX_FLAG = 1 << 0,
+		GRIDS_FLAG = 1 << 1
+	};
 
 	void world_xy_loop(xy_loop_func func, uint8 flags);
 	static void *world_xy_loop_thread(void *);
@@ -884,7 +904,13 @@ public:
 	 */
 	void call_change_player_tool(uint8 cmd, uint8 player_nr, uint16 param, bool scripted_call=false);
 
-	enum change_player_tool_cmds { new_player=1, toggle_freeplay=2, delete_player=3 };
+	enum change_player_tool_cmds {
+		new_player           = 1,
+		toggle_freeplay      = 2,
+		delete_player        = 3,
+		toggle_player_active = 4
+	};
+
 	/**
 	 * @param exec If false checks whether execution is allowed, if true executes tool.
 	 * @returns Whether execution is allowed.
@@ -1116,7 +1142,7 @@ private:
 	 * lakes are left where there is no drainage
 	 */
 	void drain_tile(koord k, sint8 water_height);
-	bool can_flood_to_depth(koord k, sint8 new_water_height, sint8 *stage, sint8 *our_stage) const;
+	bool can_flood_to_depth(koord k, sint8 new_water_height, sint8 *stage, sint8 *our_stage, sint16, sint16, sint16, sint16) const;
 
 public:
 	void flood_to_depth(sint8 new_water_height, sint8 *stage);
@@ -1319,18 +1345,17 @@ public:
 	 * @return The natural slope at a position.
 	 * @note Uses the corner height for the best slope.
 	 */
-	uint8	recalc_natural_slope( const koord k, sint8 &new_height ) const;
+	uint8 recalc_natural_slope( const koord k, sint8 &new_height ) const;
 
 	/**
 	 * Returns the natural slope a a position using the grid.
 	 * @note No checking, and only using the grind for calculation.
 	 */
-	uint8	calc_natural_slope( const koord k ) const;
+	uint8 calc_natural_slope( const koord k ) const;
 
 	 /**
 	  * Initialize map.
 	  * @param sets Game settings.
-	  * @param preselected_players Defines which players the user has selected before he started the game.
 	  */
 	void init(settings_t*, sint8 const* heights);
 
@@ -1341,8 +1366,6 @@ public:
 	karte_t();
 
 	~karte_t();
-
-
 
 	/**
 	 * File version used when loading (or current if generated)
@@ -1527,7 +1550,8 @@ public:
 	/**
 	 * Synchronous stepping of objects like vehicles.
 	 */
-	void sync_step(uint32 delta_t, bool sync, bool display );	// advance also the timer
+	void sync_step(uint32 delta_t, bool sync, bool display ); // advance also the timer
+
 	/**
 	 * Tasks that are more time-consuming, like route search of vehicles and production of factories.
 	 */
@@ -1615,6 +1639,26 @@ public:
 	void calc_climate(koord k, bool recalc);
 
 	/**
+	* Calculates appropriate climate for a region using elliptic areas for each
+	*/
+	void calc_climate_map_region( sint16 xtop, sint16 ytop, sint16 xbottom, sint16 ybottom );
+
+	/**
+	* Calculates appropriate climate for a region using elliptic areas for each
+	*/
+	void calc_humidity_map_region( sint16 xtop, sint16 ytop, sint16 xbottom, sint16 ybottom );
+
+	/**
+	 * assign climated from the climate map to a region
+	 */
+	void assign_climate_map_region( sint16 xtop, sint16 ytop, sint16 xbottom, sint16 ybottom );
+
+	/**
+	 * Since the trees follow humidity, we have to redistribute them only in the new region
+	 */
+	void distribute_trees_region( sint16 xtop, sint16 ytop, sint16 xbottom, sint16 ybottom );
+
+	/**
 	 * Rotates climate and water transitions for a tile
 	 */
 	void rotate_transitions(koord k);
@@ -1628,11 +1672,6 @@ public:
 	 * Loop recalculating transitions - suitable for multithreading
 	 */
 	void recalc_transitions_loop(sint16, sint16, sint16, sint16);
-
-	/**
-	 * Loop creating grounds on all plans from height and water height - suitable for multithreading
-	 */
-	void create_grounds_loop(sint16, sint16, sint16, sint16);
 
 	/**
 	 * Loop cleans grounds so that they have correct boden and slope - suitable for multithreading

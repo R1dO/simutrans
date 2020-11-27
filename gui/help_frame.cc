@@ -8,7 +8,7 @@
 #include "../simmem.h"
 #include "simwin.h"
 #include "../simmenu.h"
-#include "../simsys.h"
+#include "../sys/simsys.h"
 #include "../simworld.h"
 #include "../simticker.h" // TICKER_HEIGHT
 
@@ -141,7 +141,7 @@ help_frame_t::help_frame_t(char const* const filename) :
 	add_helpfile( how_to_play, "Spielerliste", "players.txt", false, 0 );
 	add_helpfile( how_to_play, "Finanzen", "finances.txt", false, 1 );
 	add_helpfile( how_to_play, "Farbe", "color.txt", false, 1 );
-//		add_helpfile( how_to_play, "Scenario", "scenario.txt", false, 1 );
+//	add_helpfile( how_to_play, "Scenario", "scenario.txt", false, 1 );
 	add_helpfile( how_to_play, "Enter Password", "password.txt", false, 1 );
 
 	add_helpfile( others, "Einstellungen aendern", "options.txt", false, 0 );
@@ -180,7 +180,7 @@ static char *load_text(char const* const filename )
 {
 	std::string file_prefix= std::string("text") + PATH_SEPARATOR;
 	std::string fullname = file_prefix + translator::get_lang()->iso + PATH_SEPARATOR + filename;
-	dr_chdir(env_t::program_dir);
+	dr_chdir(env_t::data_dir);
 
 	FILE* file = dr_fopen(fullname.c_str(), "rb");
 	if (!file) {
@@ -207,9 +207,9 @@ static char *load_text(char const* const filename )
 		}
 		// now we may need to translate the text ...
 		if(  len>0  ) {
-			bool is_latin = strchr( buf, 0xF6 )!=NULL;	// "o-umlaut, is forbidden for unicode
+			bool is_latin = strchr( buf, 0xF6 )!=NULL; // "o-umlaut, is forbidden for unicode
 			if(  !is_latin  &&  translator::get_lang()->is_latin2_based  ) {
-				is_latin |= strchr( buf, 0xF8 )!=NULL;	// "o-umlaut, is forbidden for unicode
+				is_latin |= strchr( buf, 0xF8 )!=NULL; // "o-umlaut, is forbidden for unicode
 			}
 			if(  is_latin  ) {
 				// we need to translate charwise ...
@@ -316,8 +316,8 @@ void help_frame_t::set_helpfile(const char *filename, bool resize_frame )
 				case '<': c = "&lt;"; break;
 				case '>': c = "&gt;"; break;
 				case 27:  c = "ESC"; break;
-				case SIM_KEY_HOME:	c=translator::translate( "[HOME]" ); break;
-				case SIM_KEY_END:	c=translator::translate( "[END]" ); break;
+				case SIM_KEY_HOME: c = translator::translate( "[HOME]" ); break;
+				case SIM_KEY_END:  c = translator::translate( "[END]" ); break;
 				default:
 					if (key < 32) {
 						sprintf(str, "%s + %c", translator::translate("[CTRL]"), '@' + key);
@@ -345,9 +345,11 @@ void help_frame_t::set_helpfile(const char *filename, bool resize_frame )
 			set_text( buf, resize_frame );
 			free(buf);
 		}
-		else {
-			set_text( "<title>Error</title>Help text not found", resize_frame );
-		}
+		else {{
+			cbuffer_t buf;
+			buf.printf("<title>%s</title>%s", translator::translate("Error"), translator::translate("Help text not found"));
+			set_text(buf, resize_frame );
+		}}
 	}
 	else {
 		// default text when opening general help
@@ -371,7 +373,7 @@ FILE *help_frame_t::has_helpfile( char const* const filename, int &mode )
 	mode = native;
 	std::string file_prefix = std::string("text") + PATH_SEPARATOR;
 	std::string fullname = file_prefix + translator::get_lang()->iso + PATH_SEPARATOR + filename;
-	dr_chdir(env_t::program_dir);
+	dr_chdir(env_t::data_dir);
 
 	FILE* file = dr_fopen(fullname.c_str(), "rb");
 	if(  !file  &&  strcmp(translator::get_lang()->iso,translator::get_lang()->iso_base)  ) {
@@ -437,7 +439,8 @@ void help_frame_t::add_helpfile( cbuffer_t &section, const char *titlename, cons
 	if(  (  only_native  &&  mode!=native  )  ||  mode==missing  ) {
 		return;
 	}
-	std::string filetitle;	// just in case as temporary storage ...
+
+	std::string filetitle; // just in case as temporary storage ...
 	if(  titlename == NULL  &&  file  ) {
 		// get the title from the helpfile
 		char htmlline[1024];

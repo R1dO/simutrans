@@ -3,12 +3,17 @@
  * (see LICENSE.txt)
  */
 
-#ifndef SIMTESTDRIVER_H
-#define SIMTESTDRIVER_H
+#ifndef IFC_SIMTESTDRIVER_H
+#define IFC_SIMTESTDRIVER_H
+
+
+#include "../simtypes.h"
+#include "../dataobj/ribi.h"
 
 
 class grund_t;
 class weg_t;
+
 
 /**
  * Interface to connect the vehicle with its route

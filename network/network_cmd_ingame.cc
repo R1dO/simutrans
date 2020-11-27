@@ -18,7 +18,7 @@
 #include "../simversion.h"
 #include "../gui/simwin.h"
 #include "../simmesg.h"
-#include "../simsys.h"
+#include "../sys/simsys.h"
 #include "../dataobj/environment.h"
 #include "../player/simplay.h"
 #include "../gui/player_frame_t.h"
@@ -40,9 +40,9 @@ network_command_t* network_command_t::read_from_packet(packet_t *p)
 	network_command_t* nwc = NULL;
 	switch (p->get_id()) {
 		case NWC_GAMEINFO:    nwc = new nwc_gameinfo_t(); break;
-		case NWC_NICK:	      nwc = new nwc_nick_t(); break;
-		case NWC_CHAT:	      nwc = new nwc_chat_t(); break;
-		case NWC_JOIN:	      nwc = new nwc_join_t(); break;
+		case NWC_NICK:        nwc = new nwc_nick_t(); break;
+		case NWC_CHAT:        nwc = new nwc_chat_t(); break;
+		case NWC_JOIN:        nwc = new nwc_join_t(); break;
 		case NWC_SYNC:        nwc = new nwc_sync_t(); break;
 		case NWC_GAME:        nwc = new nwc_game_t(); break;
 		case NWC_READY:       nwc = new nwc_ready_t(); break;
@@ -88,7 +88,7 @@ bool nwc_gameinfo_t::execute(karte_t *welt)
 		// init the rest of the packet
 		SOCKET s = packet->get_sender();
 		loadsave_t fd;
-		if(  fd.wr_open( "serverinfo.sve", loadsave_t::xml_bzip2, 0, "info", SERVER_SAVEGAME_VER_NR )  ) {
+		if(  fd.wr_open( "serverinfo.sve", loadsave_t::xml_bzip2, 0, "info", SERVER_SAVEGAME_VER_NR ) == loadsave_t::FILE_STATUS_OK  ) {
 			gameinfo_t gi(welt);
 			gi.rdwr( &fd );
 			fd.close();
@@ -184,7 +184,7 @@ void nwc_nick_t::server_tools(karte_t *welt, uint32 client_id, uint8 what, const
 	socket_info_t &info = socket_list_t::get_client(client_id);
 
 	cbuffer_t buf;
-	buf.printf("%d,", message_t::general | message_t::local_flag);
+	buf.printf("%d,", message_t::general | message_t::playermsg_flag);
 
 	switch(what) {
 		case WELCOME: {
@@ -284,7 +284,7 @@ void nwc_chat_t::add_message (karte_t* welt) const
 	dbg->warning("nwc_chat_t::add_message", "");
 	cbuffer_t buf;  // Output which will be printed to chat window
 
-	FLAGGED_PIXVAL color = player_nr < PLAYER_UNOWNED  ?  color_idx_to_rgb(welt->get_player( player_nr )->get_player_color1())  :  color_idx_to_rgb(COL_WHITE);
+	FLAGGED_PIXVAL color = player_nr < PLAYER_UNOWNED  ?  color_idx_to_rgb(welt->get_player( player_nr )->get_player_color1()+env_t::gui_player_color_dark)  :  color_idx_to_rgb(COL_WHITE);
 	uint16 flag = message_t::chat;
 
 	if (  destination == NULL  ) {
@@ -297,7 +297,7 @@ void nwc_chat_t::add_message (karte_t* welt) const
 	}
 	else {
 		// Whisper, do not store message in savegame
-		flag |= message_t::local_flag;
+		flag |= message_t::playermsg_flag;
 		if (  player_nr < PLAYER_UNOWNED  ) {
 			buf.printf( "%s <%s> --> %s: %s", clientname.c_str(), welt->get_player( player_nr )->get_name(), destination.c_str(), message.c_str() );
 		}
@@ -716,7 +716,7 @@ void nwc_sync_t::do_command(karte_t *welt)
 		// first save password hashes
 		sprintf( fn, "server%d-pwdhash.sve", env_t::server );
 		loadsave_t file;
-		if(file.wr_open(fn, loadsave_t::zipped, 1, "hashes", SAVEGAME_VER_NR )) {
+		if(  file.wr_open(fn, loadsave_t::zipped, 1, "hashes", SAVEGAME_VER_NR ) == loadsave_t::FILE_STATUS_OK  ) {
 			welt->rdwr_player_password_hashes( &file );
 			file.close();
 		}
@@ -1051,7 +1051,7 @@ network_broadcast_world_command_t* nwc_tool_t::clone(karte_t *welt)
 	}
 
 	// do not open dialog windows across network
-	if (  init  ?  tool->is_init_network_save() :  tool->is_work_network_save() ){
+	if (  init  ?  tool->is_init_network_safe() :  tool->is_work_network_safe() ){
 		// no reason to send request over network
 		return NULL;
 	}

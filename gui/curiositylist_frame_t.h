@@ -3,12 +3,15 @@
  * (see LICENSE.txt)
  */
 
-#ifndef curiositylist_frame_t_h
-#define curiositylist_frame_t_h
+#ifndef GUI_CURIOSITYLIST_FRAME_T_H
+#define GUI_CURIOSITYLIST_FRAME_T_H
+
 
 #include "gui_frame.h"
 #include "components/action_listener.h"
 #include "components/gui_scrolled_list.h"
+#include "components/gui_button.h"
+#include "components/gui_combobox.h"
 
 
 /**
@@ -17,10 +20,12 @@
 class curiositylist_frame_t : public gui_frame_t, private action_listener_t
 {
 private:
-	button_t	sortedby;
-	button_t	sorteddir;
+	button_t sortedby;
+	button_t sorteddir;
 	gui_scrolled_list_t scrolly;
 	gui_aligned_container_t list;
+	button_t filter_by_owner;
+	gui_combobox_t filterowner;
 
 	uint32 attraction_count;
 

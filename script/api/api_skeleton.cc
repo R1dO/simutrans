@@ -22,7 +22,7 @@ register_function("start");
  * as you cannot initialize global variables with non-built-in squirrel types.
  *
  * @param pl_num the number of the AI player. Call <code>player_x(pl_num)</code> to obtain
- * 		 a corresponding player_x instance. Definitely store this value!
+ *               a corresponding player_x instance. Definitely store this value!
  *
  * @typemask void(int)
  * @ingroup ai_skel
@@ -43,7 +43,7 @@ register_function("resume_game");
  * Do all the initializations and post-processing here.
  *
  * @param pl_num the number of the AI player. Call <code>player_x(pl_num)</code> to obtain
- * 		 a corresponding player_x instance. Definitely store this value!
+ *               a corresponding player_x instance. Definitely store this value!
  * @typemask void(int)
  * @ingroup ai_skel
  */
@@ -228,9 +228,9 @@ register_function("is_tool_allowed");
  * The error message can contain a coordinate, which is used to show a location on the map.
  * In order to show the right place, use @ref coord_to_string. The must be enclosed in parentheses
  * or prefixed with @ .
- *	@code
+ * @code
 		return "You cannot do this. The guy living at (" + coord_to_string({x=47, y=11}) + ") does not like you!"
-	@endcode
+   @endcode
  *
  * @attention Does not work with waybuilding and all tools that need path-finding, use the functions provided in #rules in this case.
  *
@@ -275,5 +275,88 @@ register_function("is_schedule_allowed");
  * @ingroup quick_return_func
  */
 register_function("is_convoy_allowed");
+
+/**
+ * Initializes the tool.
+ * @returns true upon success.
+ *
+ * @param pl player instance to use this tool.
+ * @ingroup tool_skel
+ * @typemask bool(player_x)
+ */
+register_function("init");
+
+/**
+ * Exits the tool. Do cleanup here.
+ * @returns true upon success.
+ *
+ * @param pl player instance to use this tool.
+ * @ingroup tool_skel
+ * @typemask bool(player_x)
+ */
+register_function("exit");
+
+/**
+ * Does the work (for tools of one-click type).
+ * @returns null upon success, an error message otherwise.
+ *
+ * @param pl player instance to use this tool.
+ * @param pos tile clicked by user, here the work should be done.
+ * @ingroup tool_skel
+ * @typemask string(player_x, coord3d)
+ */
+register_function("work");
+
+/**
+ * Does the work (for tools of two-click type).
+ * @returns null upon success, an error message otherwise.
+ *
+ * @param pl player instance to use this tool.
+ * @param start first tile clicked by user.
+ * @param end second tile clicked by user.
+ * @ingroup tool_skel
+ * @typemask string(player_x, coord3d, coord3d)
+ */
+register_function("do_work");
+
+/**
+ * Mark tiles for working (for tools of two-click type).
+ * Call @ref mark_tile from here.
+ *
+ * @param pl player instance to use this tool.
+ * @param start first tile clicked by user.
+ * @param end second tile clicked by user.
+ * @ingroup tool_skel
+ * @typemask void(player_x, coord3d, coord3d)
+ */
+register_function("mark_tiles");
+
+/**
+ * Place marker image of scripted tool at @p pos.
+ * Marker images will be deleted automatically.
+ * @returns true if succesfull
+ *
+ * @param pos position to be marked
+ * @ingroup tool_only
+ * @typemask bool(coord3d)
+ */
+// see simtool.scripted.cc
+register_function("mark_tile");
+
+/**
+ * Can the tool start/end on @p pos? If it is the second click, @p start is the position of the first click.
+ * Possible return values:
+ * 0 = no
+ * 1 = This tool can work on this tile (with single click)
+ * 2 = On this tile can dragging start/end
+ * 3 = Both (1 and 2)
+ *
+ * @param pl player instance to use this tool.
+ * @param pos position to test
+ * @param start first tile clicked by user
+ * @ingroup tool_skel
+ * @typemask void(player_x, coord3d, coord3d)
+ */
+register_function("is_valid_pos");
 
 #endif

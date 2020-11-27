@@ -3,12 +3,14 @@
  * (see LICENSE.txt)
  */
 
+#ifndef SIMCONST_H
+#define SIMCONST_H
+
+
 /*
  * all defines that can change the compiling
  */
 
-#ifndef simconst_h
-#define simconst_h
 
 // color depth (default assumes RGB565), undefine only for rgb555 builds!
 //#define RGB555
@@ -47,9 +49,6 @@
 /* Use low level C/C++ implementations of routines
  * Some routines, eg for drawing, can have low level C++ implementations that might perform better on certain platforms */
 #define LOW_LEVEL
-
-// The wind (i.e. approach direction) is random all over the map (not recommended, since it confuses players)
-//#define USE_DIFFERENT_WIND
 
 // define this for automatically joining stations next to a public stop with it
 //#define AUTOJOIN_PUBLIC

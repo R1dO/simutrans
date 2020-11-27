@@ -3,8 +3,9 @@
  * (see LICENSE.txt)
  */
 
-#ifndef __TREE_DESC_H
-#define __TREE_DESC_H
+#ifndef DESCRIPTOR_TREE_DESC_H
+#define DESCRIPTOR_TREE_DESC_H
+
 
 #include "../simtypes.h"
 #include "obj_base_desc.h"
@@ -15,16 +16,15 @@
 /**
  * Tree type description in Simutrans
  *
- *  Child nodes:
- *	0   Name
- *	1   Copyright
- *	2   Image-array
+ * Child nodes:
+ *  0   Name
+ *  1   Copyright
+ *  2   Image-array
+ *
+ * season 0 is always summer
+ * season 1 is winter for two seasons
+ * otherwise 0 summer, next seasons (autumn, winter, spring) ....
  */
-
- // season 0 is always summer
- // season 1 is winter for two seasons
- // otherwise 0 summer, next seasons (autumn, winter, spring) ....
-
 class tree_desc_t : public obj_named_desc_t {
 	friend class tree_reader_t;
 

@@ -3,8 +3,9 @@
  * (see LICENSE.txt)
  */
 
-#ifndef gui_theme_h
-#define gui_theme_h
+#ifndef GUI_GUI_THEME_H
+#define GUI_GUI_THEME_H
+
 
 #include "../dataobj/koord.h"
 #include "../simcolor.h"
@@ -126,6 +127,8 @@ class image_t;
 #define D_GET_CENTER_ALIGN_OFFSET(N1,N2) ((N2-N1)>>1)
 #define D_GET_FAR_ALIGN_OFFSET(N1,N2) (N2-N1)
 
+#define D_FILELIST_V_SPACE (gui_theme_t::gui_filelist_vspace)
+
 #define TOOLTIP_MOUSE_OFFSET_X (16)
 #define TOOLTIP_MOUSE_OFFSET_Y (12)
 
@@ -144,7 +147,7 @@ enum {
 	SKIN_WINDOW_RESIZE,
 	SKIN_GADGET_GOTOPOS,
 //	SKIN_GADGET_BUTTON,
-	SKIN_GADGET_COUNT,	// maximum number, NOT AN IMAGE
+	SKIN_GADGET_COUNT, // maximum number, NOT AN IMAGE
 
 	// scrollbars horizontal
 	SKIN_BUTTON_ARROW_LEFT = 0,
@@ -238,7 +241,11 @@ public:
 	static PIXVAL gui_color_statusbar_divider;            //@< Color to draw statusbar divider
 	static PIXVAL gui_highlight_color;                    //@< Color to draw highlight dividers (tabs)
 	static PIXVAL gui_shadow_color;                       //@< Color to draw shadowed dividers (tabs)
-	/// @}
+	static PIXVAL gui_color_loadingbar_inner;
+	static PIXVAL gui_color_loadingbar_progress;
+	static PIXVAL gui_color_obsolete;                     //@< Color for obsolete convois/server entries
+	static PIXVAL gui_color_empty;                        //@< Color for empty entries
+														  /// @}
 
 	/// @name GUI element sizes used by gui components
 	/// @{
@@ -254,7 +261,7 @@ public:
 	static scr_size gui_arrow_up_size;
 	static scr_size gui_arrow_down_size;
 	static scr_size gui_scrollbar_size;
-	static scr_size gui_min_scrollbar_size;	// minimum width and height of a scrollbar slider
+	static scr_size gui_min_scrollbar_size; // minimum width and height of a scrollbar slider
 	static scr_size gui_label_size;
 	static scr_size gui_edit_size;
 	static scr_size gui_indicator_size;
@@ -271,6 +278,9 @@ public:
 	static KOORD_VAL gui_hspace;
 	static KOORD_VAL gui_vspace;
 	static KOORD_VAL gui_waitingbar_width;
+
+	// one special entries, since there are lot of lists with files/fonts/paks/... where zero spacing could fit more entires on the screen
+	static KOORD_VAL gui_filelist_vspace;
 	/// @}
 
 	// those are the 3x3 images which are used for stretching
@@ -296,6 +306,7 @@ public:
 
 	static bool gui_drop_shadows;
 
+
 public:
 	// default dimensions and colors
 	static void init_gui_defaults();
@@ -310,6 +321,6 @@ public:
 	 * Reads theme configuration data, still not final
 	 * searches a theme.tab inside the specified folder
 	 */
-	static bool themes_init(const char *dir_name,bool init_font);
+	static bool themes_init(const char *dir_name,bool init_font,bool init_tools);
 };
 #endif

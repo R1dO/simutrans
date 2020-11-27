@@ -3,8 +3,8 @@
  * (see LICENSE.txt)
  */
 
-#ifndef AI_PASSENGER_H
-#define AI_PASSENGER_H
+#ifndef PLAYER_AI_PASSENGER_H
+#define PLAYER_AI_PASSENGER_H
 
 
 #include "ai.h"
@@ -44,7 +44,7 @@ private:
 	koord platz1, platz2;
 
 	const stadt_t *start_stadt;
-	const stadt_t *end_stadt;	// target is town
+	const stadt_t *end_stadt; // target is town
 	const gebaeude_t *end_attraction;
 	fabrik_t *ziel;
 

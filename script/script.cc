@@ -25,6 +25,10 @@
 #include "../utils/plainstring.h"
 
 
+namespace script_api {
+	bool pause_game();  // api_control.cc
+}
+
 // debug: store stack pointer
 #define BEGIN_STACK_WATCH(v) int stack_top = sq_gettop(v);
 // debug: compare stack pointer with expected stack pointer, raise warning if failure
@@ -71,7 +75,7 @@ void script_vm_t::errorfunc(HSQUIRRELVM vm, const SQChar *s_, ...)
 	}
 	else if (strcmp(s, "</error>")==0) {
 		// end of error message
-		help_frame_t *win = dynamic_cast<help_frame_t*>(win_get_magic((ptrdiff_t)script));
+		help_frame_t *win = dynamic_cast<help_frame_t*>(win_get_magic(magic_script_error));
 		if (win == NULL) {
 			win = new help_frame_t();
 			create_win( win, w_info, magic_script_error);
@@ -81,6 +85,10 @@ void script_vm_t::errorfunc(HSQUIRRELVM vm, const SQChar *s_, ...)
 
 		if (script) {
 			script->set_error(buf);
+			// pause game
+			if (script->pause_on_error) {
+				script_api::pause_game();
+			}
 		}
 	}
 	else {
@@ -98,6 +106,8 @@ void export_include(HSQUIRRELVM vm, const char* include_path); // api_include.cc
 // virtual machine
 script_vm_t::script_vm_t(const char* include_path_, const char* log_name)
 {
+	pause_on_error = false;
+
 	vm = sq_open(1024);
 	sqstd_seterrorhandlers(vm);
 	sq_setprintfunc(vm, printfunc, errorfunc);
@@ -178,16 +188,19 @@ const char* script_vm_t::call_script(const char* filename)
 
 const char* script_vm_t::eval_string(const char* squirrel_string)
 {
+	if (squirrel_string == NULL) {
+		return NULL;
+	}
+	HSQUIRRELVM &job = thread;
 	// compile string
-	if (!SQ_SUCCEEDED(sq_compilebuffer(vm, squirrel_string, strlen(squirrel_string), "userdefinedstringmethod", true))) {
+	if (!SQ_SUCCEEDED(sq_compilebuffer(job, squirrel_string, strlen(squirrel_string), "userdefinedstringmethod", true))) {
 		set_error("Error compiling string buffer");
 		return get_error();
 	}
 	// execute
-	sq_pushroottable(vm);
-	sq_call_restricted(vm, 1, SQFalse, SQTrue, 100000);
-	sq_pop(vm, 1);
-	return get_error();
+	sq_pushroottable(job);
+	// stack: closure, root table (1st param)
+	return intern_finish_call(job, QUEUE, 1, true);
 }
 
 
@@ -240,7 +253,8 @@ const char* script_vm_t::intern_finish_call(HSQUIRRELVM job, call_type_t ct, int
 	BEGIN_STACK_WATCH(job);
 	// stack: closure, nparams*objects
 	const char* err = NULL;
-	bool suspended = sq_getvmstate(job) == SQ_VMSTATE_SUSPENDED;
+	// only call the closure if vm is idle (maybe in RUN state)
+	bool suspended = sq_getvmstate(job) != SQ_VMSTATE_IDLE;
 	// check queue, if not empty resume first job in queue
 	if (!suspended  &&  ct != FORCE  &&  ct != FORCEX) {
 		sq_pushregistrytable(job);
@@ -258,7 +272,7 @@ const char* script_vm_t::intern_finish_call(HSQUIRRELVM job, call_type_t ct, int
 		err = "suspended";
 		// stack: clean
 	}
-	if (suspended) {
+	if (suspended  &&  ct != FORCE  &&  ct != FORCEX) {
 		intern_resume_call(job);
 	}
 	if (!suspended  ||  ct == FORCE  ||  ct == FORCEX) {
@@ -295,7 +309,7 @@ const char* script_vm_t::intern_call_function(HSQUIRRELVM job, call_type_t ct, i
 	if (ct == FORCE  ||  ct == FORCEX) {
 		sq_block_suspend(job, NULL);
 	}
-	if (sq_getvmstate(job) != SQ_VMSTATE_SUSPENDED) {
+	if (sq_getvmstate(job) != SQ_VMSTATE_SUSPENDED  ||  ct == FORCE  ||  ct == FORCEX) {
 		// remove closure
 		sq_remove(job, retvalue ? -2 : -1);
 		if (ct == QUEUE  &&  retvalue) {
@@ -313,7 +327,6 @@ const char* script_vm_t::intern_call_function(HSQUIRRELVM job, call_type_t ct, i
 		END_STACK_WATCH(job, -nparams-1 + retvalue);
 	}
 	else {
-		assert(ct != FORCE  &&  ct != FORCEX);
 		// call suspended: pop dummy return value
 		if (retvalue) {
 			sq_poptop(job);
@@ -440,6 +453,7 @@ void script_vm_t::intern_queue_call(HSQUIRRELVM job, int nparams, bool retvalue)
 		// stack: [...], queue[i]
 		sint32 n = sq_getsize(job, -1);
 		if (n != nparams+2) {
+			sq_poptop(job);
 			continue; // different number of arguments
 		}
 		equal = true;

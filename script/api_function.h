@@ -3,8 +3,9 @@
  * (see LICENSE.txt)
  */
 
-#ifndef _API_FUNCTION_H_
-#define _API_FUNCTION_H_
+#ifndef SCRIPT_API_FUNCTION_H
+#define SCRIPT_API_FUNCTION_H
+
 
 #include "api_param.h"
 #include "../squirrel/squirrel.h"
@@ -17,6 +18,23 @@
 /** @file api_function.h templates to export c++ function to and call from squirrel */
 
 namespace script_api {
+
+	// forward declarations
+	template<typename F> SQInteger generic_squirrel_callback(HSQUIRRELVM vm);
+	template<typename F> struct embed_call_t;
+	template<typename F> struct func_signature_t;
+
+	/// @{
+	/// @name Function to log squirrel-side type of exported functions
+	void start_squirrel_type_logging(const char* suffix);
+
+	void end_squirrel_type_logging();
+
+	// sets current class name, does not work with nested classes
+	void set_squirrel_type_class(const char* classname);
+
+	void log_squirrel_type(std::string classname, const char* name, std::string squirrel_type);
+	/// @}
 
 	/**
 	 * Registers custom SQFUNCTION @p funcptr.
@@ -31,6 +49,28 @@ namespace script_api {
 	 * @param staticmethod if true then register as static method
 	 */
 	void register_function(HSQUIRRELVM vm, SQFUNCTION funcptr, const char *name, int nparamcheck, const char* typemask, bool staticmethod = false);
+
+	/**
+	 * Registers custom SQFUNCTION @p funcptr.
+	 *
+	 * Same as non-templated register_function. Typemask und paramcheck will be deduced from the template parameter.
+	 *
+	 * @tparam F function pointer signature of c++ method
+	 * @param funcptr function pointer to custom implementation
+	 * @param name name of the method as visible from squirrel
+	 * @param staticmethod if true then register as static method
+	 */
+	template<class F>
+	void register_function(HSQUIRRELVM vm, SQFUNCTION funcptr, const char *name, bool staticmethod = false)
+	{
+		std::string typemask = func_signature_t<F>::get_typemask(false);
+		int nparamcheck = func_signature_t<F>::get_nparams();
+
+		register_function(vm, funcptr, name, nparamcheck, typemask.c_str(), staticmethod);
+
+		log_squirrel_type(func_signature_t<F>::get_squirrel_class(false), name, func_signature_t<F>::get_squirrel_type(false, 0));
+	}
+
 
 	/**
 	 * Registers custom SQFUNCTION @p funcptr with templated free variables (default parameters).
@@ -56,12 +96,6 @@ namespace script_api {
 		sq_setparamscheck(vm, nparamcheck, typemask);
 		sq_newslot(vm, -3, staticmethod);
 	}
-
-	// forward declarations
-	template<typename F> SQInteger generic_squirrel_callback(HSQUIRRELVM vm);
-	template<typename F> struct embed_call_t;
-	template<typename F> struct func_signature_t;
-
 	// auxiliary struct
 	template <typename F>
 	struct function_info_t {
@@ -69,15 +103,6 @@ namespace script_api {
 		bool discard_first;
 		function_info_t(F f, bool d) : funcptr(f), discard_first(d) {}
 	};
-
-	void start_squirrel_type_logging(const char* suffix);
-
-	void end_squirrel_type_logging();
-
-	// sets current class name, does not work with nested classes
-	void set_squirrel_type_class(const char* classname);
-
-	void log_squirrel_type(std::string classname, const char* name, std::string squirrel_type);
 
 	/**
 	 * Registers native c++ method to be called from squirrel.
@@ -112,8 +137,6 @@ namespace script_api {
 		sq_newslot(vm, -3, staticmethod);
 
 		log_squirrel_type(func_signature_t<F>::get_squirrel_class(discard_first), name, func_signature_t<F>::get_squirrel_type(discard_first, 0));
-		//printf("CHECKTPM %d %s::%s: %s vs %s = %s\n", discard_first, func_signature_t<F>::get_squirrel_class(discard_first).c_str(), name, func_signature_t<F>::get_typemask(discard_first).c_str(), embed_call_t<F>::get_typemask(discard_first).c_str(),
-		 //      func_signature_t<F>::get_squirrel_type(discard_first, 0).c_str());
 	}
 
 
@@ -129,7 +152,7 @@ namespace script_api {
 	 * @tparam V class to push default parameters as free variables
 	 * @param funcptr pointer to the c++ method
 	 * @param name name of the method as visible from squirrel
-	 * @param freevariables values of default parameters
+	 * @param freevariables values of default parameters to the c++ function (not the squirrel function)
 	 * @param discard_first if true then a global (non-member) function can be called
 	 *                      as if it would be a member function of the class instance
 	 *                      provided as first argument
@@ -154,9 +177,6 @@ namespace script_api {
 		sq_newslot(vm, -3, staticmethod);
 
 		log_squirrel_type(func_signature_t<F>::get_squirrel_class(discard_first), name, func_signature_t<F>::get_squirrel_type(discard_first, count));
-
-		//printf("CHECKTPM %d %ld %s::%s: %s vs %s = %s\n", discard_first, count, func_signature_t<F>::get_squirrel_class(discard_first).c_str(), name, func_signature_t<F>::get_typemask(discard_first).c_str(), embed_call_t<F>::get_typemask(discard_first).c_str(),
-		//       func_signature_t<F>::get_squirrel_type(discard_first, count).c_str());
 	}
 
 
@@ -730,6 +750,29 @@ namespace script_api {
 	};
 
 	// 6 parameters
+	template<typename R, typename A1, typename A2, typename A3, typename A4, typename A5, typename A6>
+	struct embed_call_t<R (*)(A1, A2, A3, A4, A5, A6)> {
+		static SQInteger call_function(HSQUIRRELVM vm, R (*func)(A1, A2, A3, A4, A5, A6), bool discard_first)
+		{
+			A1 a1 = param<A1>::get(vm, 2-discard_first);
+			if (discard_first  &&  param_chk_t<A1>::is_null(a1)) {
+				return -1;
+			}
+			return param<R>::push(vm, (*func)(a1,
+											  param<A2>::get(vm, 3-discard_first),
+											  param<A3>::get(vm, 4-discard_first),
+											  param<A4>::get(vm, 5-discard_first),
+											  param<A5>::get(vm, 6-discard_first),
+											  param<A6>::get(vm, 7-discard_first)
+			));
+			return 0;
+		}
+
+		typedef R              sig_return;  // return type
+		typedef void_t         sig_class;   // type of class
+		typedef A1             sig_first;   // type of first parameter
+		typedef void(*sig_reduced)(A2,A3,A4,A5,A6);  // signature of function with without return type, class, and first parameter
+	};
 	template<class C, typename A1, typename A2, typename A3, typename A4, typename A5, typename A6>
 	struct embed_call_t<void (C::*)(A1, A2, A3, A4, A5, A6)> {
 		static SQInteger call_function(HSQUIRRELVM vm, void (C::*func)(A1, A2, A3, A4, A5, A6), bool)
@@ -760,7 +803,7 @@ namespace script_api {
 	/**
 	 * Exports function to check whether pointer to in-game object is not null
 	 */
-	template<class P>	SQInteger is_ptr_valid(HSQUIRRELVM vm)
+	template<class P> SQInteger is_ptr_valid(HSQUIRRELVM vm)
 	{
 		P ptr = param<P>::get(vm, 1);
 		sq_pushbool(vm, ptr != NULL);

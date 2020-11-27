@@ -3,8 +3,9 @@
  * (see LICENSE.txt)
  */
 
-#ifndef __ROADSIGN_DESC_H
-#define __ROADSIGN_DESC_H
+#ifndef DESCRIPTOR_ROADSIGN_DESC_H
+#define DESCRIPTOR_ROADSIGN_DESC_H
+
 
 #include "obj_base_desc.h"
 #include "image_list.h"
@@ -15,12 +16,12 @@
 
 
 /**
- *	Road signs
+ * Road signs
  *
- *  Child nodes:
- *	0   Name
- *	1   Copyright
- *	2   Image list
+ * Child nodes:
+ *  0   Name
+ *  1   Copyright
+ *  2   Image list
  */
 class roadsign_desc_t : public obj_desc_transport_infrastructure_t {
 	friend class roadsign_reader_t;
@@ -30,7 +31,7 @@ private:
 
 	sint8 offset_left; // default 14
 
-	uint16 min_speed;	// 0 = no min speed
+	uint16 min_speed; // 0 = no min speed
 
 public:
 	enum types {
@@ -78,7 +79,7 @@ public:
 	//  return true for presignal
 	bool is_pre_signal() const { return (flags & SIGN_PRE_SIGNAL) != 0; }
 
-    //  return true for priority signal
+	//  return true for priority signal
 	bool is_priority_signal() const { return (flags & SIGN_PRIORITY_SIGNAL) != 0; }
 
 	//  return true for single track section signal
@@ -89,11 +90,11 @@ public:
 	bool is_signal_type() const
 	{
 		return (flags&(
-                    SIGN_SIGNAL |
-                    SIGN_PRE_SIGNAL |
-                    SIGN_PRIORITY_SIGNAL |
-                    SIGN_LONGBLOCK_SIGNAL)
-                ) != 0;
+				SIGN_SIGNAL |
+				SIGN_PRE_SIGNAL |
+				SIGN_PRIORITY_SIGNAL |
+				SIGN_LONGBLOCK_SIGNAL)
+			) != 0;
 	}
 
 	uint16 get_flags() const { return flags; }

@@ -3,8 +3,9 @@
  * (see LICENSE.txt)
  */
 
-#ifndef gui_components_gui_combobox_h
-#define gui_components_gui_combobox_h
+#ifndef GUI_COMPONENTS_GUI_COMBOBOX_H
+#define GUI_COMPONENTS_GUI_COMBOBOX_H
+
 
 #include "../../simcolor.h"
 #include "gui_action_creator.h"
@@ -151,6 +152,14 @@ public:
 
 	void enable();
 	void disable();
+	void enable( bool yesno ) {
+		if( yesno && !is_focusable() ) {
+			enable();
+		}
+		else if( !yesno  &&  is_focusable() ) {
+			disable();
+		}
+	}
 
 	// save selection
 	void rdwr( loadsave_t *file );

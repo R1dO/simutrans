@@ -3,8 +3,8 @@
  * (see LICENSE.txt)
  */
 
-#ifndef boden_grund_h
-#define boden_grund_h
+#ifndef BODEN_GRUND_H
+#define BODEN_GRUND_H
 
 
 #include "../halthandle_t.h"
@@ -93,18 +93,18 @@ class grund_t
 {
 public:
 	/**
-	 * Flag-Werte für das neuzeichnen geänderter Untergründe
+	 * Flag values for different ground properties
 	 */
 	enum flag_values {
-		keine_flags=0,
-		dirty=1, // was changed => redraw full
-		is_kartenboden=2,
-		has_text=4,
-		marked = 8,  // will have a frame
-		draw_as_obj = 16, // is a slope etc => draw as one
-		is_halt_flag = 32,	// is a part of a halt
-		has_way1 = 64,
-		has_way2 = 128
+		keine_flags    = 0,
+		dirty          = 1 << 0, ///< was changed => redraw full
+		is_kartenboden = 1 << 1,
+		has_text       = 1 << 2,
+		marked         = 1 << 3, ///< will have a frame
+		draw_as_obj    = 1 << 4, ///< is a slope etc => draw as one
+		is_halt_flag   = 1 << 5, ///< is a part of a halt
+		has_way1       = 1 << 6,
+		has_way2       = 1 << 7
 	};
 
 	/**
@@ -165,10 +165,10 @@ public:
 
 	/** underground modes */
 	enum _underground_modes {
-		ugm_none = 0,	// normal view
-		ugm_all  = 1,   // everything underground visible, grid for grounds
-		ugm_level= 2	// overground things visible if their height  <= underground_level
-						// underground things visible if their height == underground_level
+		ugm_none = 0, // normal view
+		ugm_all  = 1, // everything underground visible, grid for grounds
+		ugm_level= 2  // overground things visible if their height  <= underground_level
+		              // underground things visible if their height == underground_level
 	};
 	static uint8 underground_mode;
 	static sint8 underground_level;
@@ -181,7 +181,7 @@ protected:
 	objlist_t objlist;
 
 	/**
- 	 * Handle to halt built on this ground
+	 * Handle to halt built on this ground
 	 */
 	halthandle_t this_halt;
 
@@ -198,7 +198,7 @@ protected:
 	/**
 	 * Slope (now saved locally), because different grounds need different slopes
 	 */
-	uint8 slope;
+	slope_t::type slope;
 
 	/**
 	 * Image of the walls
@@ -229,13 +229,20 @@ protected:
 	static karte_ptr_t welt;
 
 	// calculates the slope image and sets the draw_as_obj flag correctly
-	void calc_back_image(const sint8 hgt,const sint8 slope_this);
+	void calc_back_image(const sint8 hgt,const slope_t::type slope_this);
 
 	// this is the real image calculation, called for the actual ground image
 	virtual void calc_image_internal(const bool calc_only_snowline_change) = 0;
 
 public:
-	enum typ { boden = 1, wasser, fundament, tunnelboden, brueckenboden, monorailboden };
+	enum typ {
+		boden = 1,
+		wasser,
+		fundament,
+		tunnelboden,
+		brueckenboden,
+		monorailboden
+	};
 
 	grund_t(koord3d pos);
 
@@ -410,18 +417,13 @@ public:
 	inline void set_pos(koord3d newpos) { pos = newpos;}
 
 	// slope are now maintained locally
-	slope_t::type get_grund_hang() const { return (slope_t::type)slope; }
+	slope_t::type get_grund_hang() const { return slope; }
 	void set_grund_hang(slope_t::type sl) { slope = sl; }
 
 	/**
-	 * Manche Böden können zu Haltestellen gehören.
+	 * some ground tiles may be part of halts.
 	 */
 	void set_halt(halthandle_t halt);
-
-	/**
-	 * Ermittelt, ob dieser Boden zu einer Haltestelle gehört.
-	 * @return NULL wenn keine Haltestelle, sonst Zeiger auf Haltestelle
-	 */
 	halthandle_t get_halt() const;
 	bool is_halt() const { return flags & is_halt_flag; }
 
@@ -642,10 +644,12 @@ public:
 				// ways are ordered wrt to waytype
 				return NULL;
 			}
-			// try second way (if exists)
-			if (weg_t* const w = get_weg_nr(1)) {
-				if(w->get_waytype()==typ) {
-					return w;
+			if (flags & has_way2) {
+				// try second way (if exists)
+				if (weg_t* const w = get_weg_nr(1)) {
+					if (w->get_waytype() == typ) {
+						return w;
+					}
 				}
 			}
 		}
@@ -677,11 +681,9 @@ public:
 	virtual ribi_t::ribi get_weg_ribi(waytype_t typ) const;
 
 	/**
-	* Ermittelt die Richtungsbits furr den weg vom Typ 'typ' unmaskiert.
-	* Dies wird beim Bauen ben÷tigt. Furr die Routenfindung werden die
-	* maskierten ribis benutzt.
-	*
-	*/
+	 * @returns the ribis (unmasked) for waytype @p typ.
+	 * These are required e.g. for building. For pathfinding masked ribis are used.
+	 */
 	virtual ribi_t::ribi get_weg_ribi_unmasked(waytype_t typ) const;
 
 	/**
@@ -695,9 +697,8 @@ public:
 	*/
 	virtual sint8 get_weg_yoff() const { return 0; }
 
-	/**
-	* Hat der Boden mindestens ein weg_t-Objekt? Liefert false für Water!
-	*/
+
+	/// @returns true if there is at least one way on this ground.
 	inline bool hat_wege() const { return (flags&(has_way1|has_way2))!=0;}
 
 	/**
@@ -732,26 +733,26 @@ public:
 
 	/**
 	 * A new way is built with the given ribis. Registered and assigned to the builder.
-	 * @param weg	    der neue Weg
-	 * @param ribi	    die neuen ribis
-	 * @param player    Player building the way
+	 * @param weg     der neue Weg
+	 * @param ribi    die neuen ribis
+	 * @param player  Player building the way
 	 */
 	sint64 neuen_weg_bauen(weg_t *weg, ribi_t::ribi ribi, player_t *player);
 
 	/**
 	 * Bauhilfsfunktion - die ribis eines vorhandenen weges werden erweitert
 	 *
-	 * @return bool	    true, falls weg vorhanden
-	 * @param wegtyp	    um welchen wegtyp geht es
-	 * @param ribi	    die neuen ribis
+	 * @return bool  true, falls weg vorhanden
+	 * @param wegtyp um welchen wegtyp geht es
+	 * @param ribi   die neuen ribis
 	 */
 	bool weg_erweitern(waytype_t wegtyp, ribi_t::ribi ribi);
 
 	/**
 	 * Bauhilfsfunktion - einen Weg entfernen
 	 *
-	 * @param wegtyp	    um welchen wegtyp geht es
-	 * @param ribi_rem  sollen die ribis der nachbar zururckgesetzt werden?
+	 * @param wegtyp   um welchen wegtyp geht es
+	 * @param ribi_rem sollen die ribis der nachbar zururckgesetzt werden?
 	 */
 	sint32 weg_entfernen(waytype_t wegtyp, bool ribi_rem);
 
@@ -817,8 +818,7 @@ public:
 		if(  way_slope != slope  ) {
 			if(  ist_bruecke()  &&  slope  ) {
 				// calculate height quicker because we know that slope exists and is north, south, east or west
-				// single heights are not integer multiples of 8, double heights are
-				h += (slope & 7) ? 1 : 2;
+				h += is_one_high(slope) ? 1 : 2;
 			}
 		}
 

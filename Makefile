@@ -15,24 +15,26 @@ AV_FOUNDATION ?= 0
 
 ALLEGRO_CONFIG  ?= allegro-config
 SDL_CONFIG      ?= sdl-config
-SDL2_CONFIG     ?= sdl2-config
+SDL2_CONFIG     ?= pkg-config sdl2
+#SDL2_CONFIG     ?= sdl2-config
 FREETYPE_CONFIG ?= freetype-config
 #FREETYPE_CONFIG ?= pkg-config freetype2
 
 BACKENDS      = allegro gdi sdl sdl2 mixer_sdl mixer_sdl2 posix
-COLOUR_DEPTHS = 0 16
 OSTYPES       = amiga beos freebsd haiku linux mingw mac openbsd
 
 ifeq ($(findstring $(BACKEND), $(BACKENDS)),)
   $(error Unkown BACKEND "$(BACKEND)", must be one of "$(BACKENDS)")
 endif
 
-ifeq ($(findstring $(COLOUR_DEPTH), $(COLOUR_DEPTHS)),)
-  $(error Unkown COLOUR_DEPTH "$(COLOUR_DEPTH)", must be one of "$(COLOUR_DEPTHS)")
-endif
-
 ifeq ($(findstring $(OSTYPE), $(OSTYPES)),)
   $(error Unkown OSTYPE "$(OSTYPE)", must be one of "$(OSTYPES)")
+endif
+
+ifeq ($(BACKEND),posix)
+  COLOUR_DEPTH = 0
+else
+  COLOUR_DEPTH = 16
 endif
 
 ifeq ($(OSTYPE),amiga)
@@ -53,8 +55,8 @@ else ifeq ($(OSTYPE),mingw)
     CFLAGS  += -static
     LDFLAGS += -static-libgcc -static-libstdc++ -static
   endif
-  LDFLAGS   += -pthread -Wl,--large-address-aware
-  SOURCES   += simsys_w32_png.cc
+  LDFLAGS   += -pthread
+  SOURCES   += sys/simsys_w32_png.cc
   CFLAGS    += -Wno-deprecated-copy -Wno-c++11-narrowing -DNOMINMAX -DWIN32_LEAN_AND_MEAN -DWINVER=0x0501 -D_WIN32_IE=0x0500
   LIBS      += -lmingw32 -lgdi32 -lwinmm -lws2_32 -limm32
 
@@ -71,11 +73,11 @@ else ifeq ($(OSTYPE),mingw)
 endif
 
 ifeq ($(BACKEND),sdl2)
-  SOURCES += clipboard_s2.cc
+  SOURCES += sys/clipboard_s2.cc
 else ifeq ($(OSTYPE),mingw)
-  SOURCES += clipboard_w32.cc
+  SOURCES += sys/clipboard_w32.cc
 else
-  SOURCES += clipboard_internal.cc
+  SOURCES += sys/clipboard_internal.cc
 endif
 
 LIBS += -lbz2 -lz
@@ -83,14 +85,14 @@ LIBS += -lbz2 -lz
 ifdef OPTIMISE
   ifeq ($(shell expr $(OPTIMISE) \>= 1), 1)
     CFLAGS += -O3
-    ifeq ($(findstring $(OSTYPE), amiga),)
-      ifneq ($(findstring $(CXX), clang),)
+    ifeq ($(findstring amiga, $(OSTYPE)),)
+      ifneq ($(findstring clang, $(CXX)),)
         CFLAGS += -minline-all-stringops
       endif
     endif
   endif
 else
-  CFLAGS += -O
+  CFLAGS += -O1
 endif
 
 ifdef DEBUG
@@ -166,8 +168,9 @@ endif
 
 ifdef USE_ZSTD
   ifeq ($(shell expr $(USE_ZSTD) \>= 1), 1)
-    FLAGS      += -DUSE_ZSTD
-    LDFLAGS     += -lzstd
+    FLAGS   += -DUSE_ZSTD
+    LDFLAGS += -lzstd
+    SOURCES += io/rdwr/zstd_file_rdwr_stream.cc
   endif
 endif
 
@@ -175,7 +178,11 @@ ifdef PROFILE
   ifeq ($(shell expr $(PROFILE) \>= 1), 1)
     CFLAGS   += -pg -DPROFILE
     ifeq ($(shell expr $(PROFILE) \>= 2), 1)
-      CFLAGS += -fno-inline -fno-schedule-insns
+      CFLAGS += -fno-inline
+
+      ifeq ($(findstring clang, $(CXX)),)
+        CFLAGS += -fno-schedule-insns
+      endif
     endif
     LDFLAGS  += -pg
   endif
@@ -198,14 +205,21 @@ ifdef WITH_REVISION
     ifeq ($(shell expr $(WITH_REVISION) \>= 2), 1)
       REV = $(WITH_REVISION)
     else
+      $(info Query SVN revision ...)
       REV = $(shell svnversion)
+      $(info Revision is $(REV))
     endif
-    ifeq ($(shell expr $(WITH_REVISION) \<= 1), 1)
-      REV = $(shell svn info --show-item revision svn://servers.simutrans.org/simutrans | sed "s/[0-9]*://" | sed "s/M.*//")
+    # we can query the svn directly, should the folder is not an svn (like on github)
+    ifeq ($(REV),)
+      ifeq ($(shell expr $(WITH_REVISION) \<= 1), 1)
+        $(info Query SVN revision with SVN directly...)
+        REV = $(shell svn info --show-item revision svn://servers.simutrans.org/simutrans | sed "s/[0-9]*://" | sed "s/M.*//")
+         $(info Revision is $(REV))
+      endif
     endif
 
     ifneq ($(REV),)
-      CFLAGS  += -DREVISION="$(REV)"
+      CFLAGS  += -DREVISION=$(REV)
     endif
   endif
 endif
@@ -328,6 +342,7 @@ SOURCES += gui/components/gui_label.cc
 SOURCES += gui/components/gui_map_preview.cc
 SOURCES += gui/components/gui_numberinput.cc
 SOURCES += gui/components/gui_obj_view_t.cc
+SOURCES += gui/components/gui_schedule.cc
 SOURCES += gui/components/gui_scrollbar.cc
 SOURCES += gui/components/gui_scrolled_list.cc
 SOURCES += gui/components/gui_scrollpane.cc
@@ -335,6 +350,7 @@ SOURCES += gui/components/gui_speedbar.cc
 SOURCES += gui/components/gui_tab_panel.cc
 SOURCES += gui/components/gui_textarea.cc
 SOURCES += gui/components/gui_textinput.cc
+SOURCES += gui/components/gui_waytype_tab_panel.cc
 SOURCES += gui/components/gui_world_view_t.cc
 SOURCES += gui/convoi_detail_t.cc
 SOURCES += gui/convoi_filter_frame.cc
@@ -385,6 +401,7 @@ SOURCES += gui/money_frame.cc
 SOURCES += gui/obj_info.cc
 SOURCES += gui/optionen.cc
 SOURCES += gui/pakselector.cc
+SOURCES += gui/pakinstaller.cc
 SOURCES += gui/password_frame.cc
 SOURCES += gui/player_frame_t.cc
 SOURCES += gui/privatesign_info.cc
@@ -393,6 +410,7 @@ SOURCES += gui/scenario_frame.cc
 SOURCES += gui/scenario_info.cc
 SOURCES += gui/schedule_gui.cc
 SOURCES += gui/schedule_list.cc
+SOURCES += gui/script_tool_frame.cc
 SOURCES += gui/server_frame.cc
 SOURCES += gui/settings_frame.cc
 SOURCES += gui/settings_stats.cc
@@ -406,6 +424,11 @@ SOURCES += gui/tool_selector.cc
 SOURCES += gui/trafficlight_info.cc
 SOURCES += gui/vehiclelist_frame.cc
 SOURCES += gui/welt.cc
+SOURCES += io/classify_file.cc
+SOURCES += io/rdwr/bzip2_file_rdwr_stream.cc
+SOURCES += io/rdwr/raw_file_rdwr_stream.cc
+SOURCES += io/rdwr/rdwr_stream.cc
+SOURCES += io/rdwr/zlib_file_rdwr_stream.cc
 SOURCES += network/checksum.cc
 SOURCES += network/memory_rw.cc
 SOURCES += network/network.cc
@@ -418,7 +441,6 @@ SOURCES += network/network_file_transfer.cc
 SOURCES += network/network_packet.cc
 SOURCES += network/network_socket_list.cc
 SOURCES += network/pakset_info.cc
-SOURCES += network/pwd_hash.cc
 SOURCES += obj/baum.cc
 SOURCES += obj/bruecke.cc
 SOURCES += obj/crossing.cc
@@ -430,6 +452,7 @@ SOURCES += obj/leitung2.cc
 SOURCES += obj/pillar.cc
 SOURCES += obj/roadsign.cc
 SOURCES += obj/signal.cc
+SOURCES += obj/simobj.cc
 SOURCES += obj/tunnel.cc
 SOURCES += obj/wayobj.cc
 SOURCES += obj/wolke.cc
@@ -470,6 +493,8 @@ SOURCES += script/api_param.cc
 SOURCES += script/dynamic_string.cc
 SOURCES += script/export_objs.cc
 SOURCES += script/script.cc
+SOURCES += script/script_loader.cc
+SOURCES += script/script_tool_manager.cc
 SOURCES += simcity.cc
 SOURCES += simconvoi.cc
 SOURCES += simdebug.cc
@@ -487,13 +512,12 @@ SOURCES += simmain.cc
 SOURCES += simmem.cc
 SOURCES += simmenu.cc
 SOURCES += simmesg.cc
-SOURCES += simobj.cc
 SOURCES += simplan.cc
 SOURCES += simskin.cc
 SOURCES += simsound.cc
-SOURCES += simsys.cc
 SOURCES += simticker.cc
 SOURCES += simtool.cc
+SOURCES += simtool-scripted.cc
 SOURCES += simware.cc
 SOURCES += simworld.cc
 SOURCES += squirrel/sq_extensions.cc
@@ -517,22 +541,31 @@ SOURCES += squirrel/squirrel/sqobject.cc
 SOURCES += squirrel/squirrel/sqstate.cc
 SOURCES += squirrel/squirrel/sqtable.cc
 SOURCES += squirrel/squirrel/sqvm.cc
+SOURCES += sys/simsys.cc
 SOURCES += unicode.cc
 SOURCES += utils/cbuffer_t.cc
+SOURCES += utils/checklist.cc
 SOURCES += utils/csv.cc
 SOURCES += utils/log.cc
 SOURCES += utils/searchfolder.cc
 SOURCES += utils/sha1.cc
+SOURCES += utils/sha1_hash.cc
 SOURCES += utils/simrandom.cc
 SOURCES += utils/simstring.cc
 SOURCES += utils/simthread.cc
+SOURCES += vehicle/air_vehicle.cc
 SOURCES += vehicle/movingobj.cc
-SOURCES += vehicle/simpeople.cc
+SOURCES += vehicle/pedestrian.cc
+SOURCES += vehicle/rail_vehicle.cc
+SOURCES += vehicle/road_vehicle.cc
 SOURCES += vehicle/simroadtraffic.cc
-SOURCES += vehicle/simvehicle.cc
+SOURCES += vehicle/vehicle.cc
+SOURCES += vehicle/vehicle_base.cc
+SOURCES += vehicle/water_vehicle.cc
+
 
 ifeq ($(BACKEND),allegro)
-  SOURCES += simsys_d.cc
+  SOURCES += sys/simsys_d.cc
   SOURCES += sound/allegro_sound.cc
   SOURCES += music/allegro_midi.cc
   ifeq ($(ALLEGRO_CONFIG),)
@@ -547,13 +580,14 @@ ifeq ($(BACKEND),allegro)
 endif
 
 ifeq ($(BACKEND),gdi)
-  SOURCES += simsys_w.cc
+  SOURCES += sys/simsys_w.cc
   SOURCES += music/w32_midi.cc
-  SOURCES += sound/win32_sound.cc
+  SOURCES += sound/win32_sound_xa.cc
+	LDFLAGS += -lxaudio2_8
 endif
 
 ifeq ($(BACKEND),sdl)
-  SOURCES += simsys_s.cc
+  SOURCES += sys/simsys_s.cc
   ifeq ($(OSTYPE),mac)
     ifeq ($(shell expr $(AV_FOUNDATION) \>= 1), 1)
       # Core Audio (AVFoundation) base sound system routines
@@ -596,7 +630,7 @@ ifeq ($(BACKEND),sdl)
 endif
 
 ifeq ($(BACKEND),sdl2)
-  SOURCES += simsys_s2.cc
+  SOURCES += sys/simsys_s2.cc
   ifeq ($(OSTYPE),mac)
     ifeq ($(shell expr $(AV_FOUNDATION) \>= 1), 1)
       # Core Audio (AVFoundation) base sound system routines
@@ -629,7 +663,7 @@ ifeq ($(BACKEND),sdl2)
   else
     SDL_CFLAGS    := $(shell $(SDL2_CONFIG) --cflags)
     ifeq ($(shell expr $(STATIC) \>= 1), 1)
-      SDL_LDFLAGS := $(shell $(SDL2_CONFIG) --static-libs)
+      SDL_LDFLAGS := $(shell $(SDL2_CONFIG) --static --libs)
     else
       SDL_LDFLAGS := $(shell $(SDL2_CONFIG) --libs)
     endif
@@ -639,7 +673,7 @@ ifeq ($(BACKEND),sdl2)
 endif
 
 ifeq ($(BACKEND),mixer_sdl2)
-  SOURCES += simsys_s2.cc
+  SOURCES += sys/simsys_s2.cc
   ifeq ($(SDL2_CONFIG),)
     ifeq ($(OSTYPE),mac)
       SDL_CFLAGS  := -F /Library/Frameworks -I/Library/Frameworks/SDL2.framework/Headers
@@ -663,7 +697,7 @@ ifeq ($(BACKEND),mixer_sdl2)
 endif
 
 ifeq ($(BACKEND),mixer_sdl)
-  SOURCES += simsys_s.cc
+  SOURCES += sys/simsys_s.cc
   SOURCES += sound/sdl_mixer_sound.cc
   SOURCES += music/sdl_midi.cc
   ifeq ($(SDL_CONFIG),)
@@ -678,7 +712,7 @@ ifeq ($(BACKEND),mixer_sdl)
 endif
 
 ifeq ($(BACKEND),posix)
-  SOURCES += simsys_posix.cc
+  SOURCES += sys/simsys_posix.cc
   SOURCES += music/no_midi.cc
   SOURCES += sound/no_sound.cc
 endif
@@ -698,14 +732,30 @@ PROGDIR  ?= $(BUILDDIR)
 PROG     ?= sim
 
 
+.DEFAULT_GOAL := simutrans
+.PHONY: simutrans makeobj nettool
+
 include common.mk
 
 ifeq ($(OSTYPE),mac)
   include OSX/osx.mk
 endif
 
-
-.PHONY: makeobj
+all: simutrans makeobj nettool
 
 makeobj:
+	@echo "Building makeobj"
 	$(Q)$(MAKE) -e -C makeobj FLAGS="$(FLAGS)"
+
+nettool:
+	@echo "Building nettool"
+	$(Q)$(MAKE) -e -C nettools FLAGS="$(FLAGS)"
+
+clean:
+	@echo "===> Cleaning up"
+	$(Q)rm -f $(OBJS)
+	$(Q)rm -f $(DEPS)
+	$(Q)rm -f $(PROGDIR)/$(PROG)
+	$(Q)rm -fr $(PROGDIR)/$(PROG).app
+	$(Q)$(MAKE) -e -C makeobj clean
+	$(Q)$(MAKE) -e -C nettools clean

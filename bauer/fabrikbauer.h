@@ -3,8 +3,9 @@
  * (see LICENSE.txt)
  */
 
-#ifndef factory_builder_t_h
-#define factory_builder_t_h
+#ifndef BAUER_FABRIKBAUER_H
+#define BAUER_FABRIKBAUER_H
+
 
 #include "../tpl/stringhashtable_tpl.h"
 #include "../tpl/weighted_vector_tpl.h"
@@ -34,8 +35,8 @@ private:
 	 */
 	class factories_to_crossconnect_t {
 	public:
-		fabrik_t *fab;		///< The factory
-		sint32 demand;		///< To how many factories this factory needs to connect to
+		fabrik_t *fab; ///< The factory
+		sint32 demand; ///< To how many factories this factory needs to connect to
 
 		factories_to_crossconnect_t() { fab = NULL; demand = 0; }
 		factories_to_crossconnect_t(fabrik_t *f, sint32 d) { fab = f; demand = d; }

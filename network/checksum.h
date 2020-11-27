@@ -3,15 +3,16 @@
  * (see LICENSE.txt)
  */
 
-#ifndef _CHECKSUM_H_
-#define _CHECKSUM_H_
+#ifndef NETWORK_CHECKSUM_H
+#define NETWORK_CHECKSUM_H
+
 
 #include "../utils/sha1.h"
 
 class checksum_t
 {
 private:
-	uint8 message_digest[20];
+	sha1_hash_t message_digest;
 	bool valid:1;
 	SHA1 *sha;
 public:

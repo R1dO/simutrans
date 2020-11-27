@@ -3,8 +3,9 @@
  * (see LICENSE.txt)
  */
 
-#ifndef _SCRIPT_H_
-#define _SCRIPT_H_
+#ifndef SCRIPT_SCRIPT_H
+#define SCRIPT_SCRIPT_H
+
 
 /** @file script.h handles the virtual machine, interface to squirrel */
 
@@ -59,7 +60,7 @@ public:
 		FORCE,   ///< function has to return, raise error if not
 		FORCEX,  ///< function has to return, raise error if not, give more opcodes
 		QUEUE,   ///< function call can be queued, return value can be propagated by call back
-		TRY,     ///< function call will not be queued, if virtual machine is suspended just return
+		TRY      ///< function call will not be queued, if virtual machine is suspended just return
 	};
 
 	/**
@@ -196,6 +197,13 @@ private:
 
 	plainstring error_msg;
 
+	/// path to files to #include
+	plainstring include_path;
+
+public:
+	bool pause_on_error;
+
+private:
 	/// @{
 	/// @name Helper functions to call, suspend, queue calls to scripted functions
 
@@ -243,9 +251,6 @@ private:
 
 	/// custom print handler
 	static void printfunc(HSQUIRRELVM, const SQChar *s, ...);
-
-	/// path to files to #include
-	plainstring include_path;
 };
 
 /**

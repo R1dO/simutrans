@@ -3,12 +3,13 @@
  * (see LICENSE.txt)
  */
 
-#ifndef wayobj_t_h
-#define wayobj_t_h
+#ifndef OBJ_WAYOBJ_H
+#define OBJ_WAYOBJ_H
+
 
 #include "../simtypes.h"
 #include "../display/simimg.h"
-#include "../simobj.h"
+#include "simobj.h"
 #include "../dataobj/ribi.h"
 #include "../descriptor/way_obj_desc.h"
 #include "../tpl/stringhashtable_tpl.h"

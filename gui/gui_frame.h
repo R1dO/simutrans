@@ -3,8 +3,9 @@
  * (see LICENSE.txt)
  */
 
-#ifndef gui_gui_frame_h
-#define gui_gui_frame_h
+#ifndef GUI_GUI_FRAME_H
+#define GUI_GUI_FRAME_H
+
 
 #include "../display/scr_coord.h"
 #include "../display/simgraph.h"
@@ -32,7 +33,10 @@ public:
 	 * Resize modes
 	 */
 	enum resize_modes {
-		no_resize = 0, vertical_resize = 1, horizontal_resize = 2, diagonal_resize = 3
+		no_resize         = 0,
+		vertical_resize   = 1,
+		horizontal_resize = 2,
+		diagonal_resize   = 3
 	};
 
 private:

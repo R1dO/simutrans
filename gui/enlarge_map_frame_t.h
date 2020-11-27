@@ -3,8 +3,9 @@
  * (see LICENSE.txt)
  */
 
-#ifndef bigger_map_gui_h
-#define bigger_map_gui_h
+#ifndef GUI_ENLARGE_MAP_FRAME_T_H
+#define GUI_ENLARGE_MAP_FRAME_T_H
+
 
 #include "gui_frame.h"
 #include "components/gui_label.h"
@@ -38,10 +39,10 @@ private:
 		inp_number_of_towns,
 		inp_town_size;
 
-	/* 
+	/*
 	 * Label to display current map seed number.
 	 */
-	gui_label_buf_t	map_number_label;
+	gui_label_buf_t map_number_label;
 
 	button_t
 		start_button;

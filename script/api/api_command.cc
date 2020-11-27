@@ -14,6 +14,7 @@
 #include "../api_class.h"
 #include "../api_function.h"
 #include "../../simmenu.h"
+#include "../../simtool.h"
 #include "../../simworld.h"
 #include "../../dataobj/environment.h"
 #include "../../script/script.h"
@@ -34,10 +35,16 @@ SQInteger command_constructor(HSQUIRRELVM vm)
 	if (id & GENERAL_TOOL) {
 		// we do not want scripts to open dialogues or quitting the game etc
 
-		if (tool_t *tool = create_tool(id)) {
-			my_tool_t* mtool = new my_tool_t(tool);
-			attach_instance(vm, 1, mtool);
+		if (id == (TOOL_EXEC_TWO_CLICK_SCRIPT | GENERAL_TOOL)) {
+			// do not create & attach instance, will be done separately
 			return 0;
+		}
+		else {
+			if (tool_t *tool = create_tool(id)) {
+				my_tool_t* mtool = new my_tool_t(tool);
+				attach_instance(vm, 1, mtool);
+				return 0;
+			}
 		}
 	}
 	return sq_raise_error(vm, "Invalid tool called (%d / 0x%x)", id & 0xfff, id);
@@ -144,7 +151,7 @@ SQInteger command_work(HSQUIRRELVM vm)
 	bool twoclick = top>4;
 
 	// save & set default_param
-	my_tool_t *mtool = get_attached_instance<my_tool_t>(vm, 1, (void*)param<tool_t*>::get);
+	my_tool_t *mtool = get_attached_instance<my_tool_t>(vm, 1, param<tool_t*>::tag());
 	if (mtool == NULL) {
 		return sq_raise_error(vm, "Called from an instance different to tool_x");
 	}
@@ -203,7 +210,7 @@ SQInteger param<call_tool_work>::push(HSQUIRRELVM vm, call_tool_work v)
 	uint8 flags = tool->flags; // might be reset by init()
 
 	// call init before work (but check network safety)
-	if (!tool->is_init_network_save()) {
+	if (!tool->is_init_network_safe()) {
 		return sq_raise_error(vm, "Initializing tool has side effects");
 	}
 	if (!tool->init(player)) {
@@ -212,7 +219,7 @@ SQInteger param<call_tool_work>::push(HSQUIRRELVM vm, call_tool_work v)
 	// set flags
 	tool->flags = flags;
 	// test work
-	if (tool->is_work_network_save()  ||  (!v.twoclick  &&  tool->is_work_here_network_save(player, v.start))) {
+	if (tool->is_work_network_safe()  ||  (!v.twoclick  &&  tool->is_work_here_network_safe(player, v.start))) {
 		return sq_raise_error(vm, "Tool has no effects");
 	}
 	// two-click tool
@@ -220,7 +227,7 @@ SQInteger param<call_tool_work>::push(HSQUIRRELVM vm, call_tool_work v)
 		if (dynamic_cast<two_click_tool_t*>(tool)==NULL) {
 			return sq_raise_error(vm, "Cannot call this tool with two coordinates");
 		}
-		if (!tool->is_work_here_network_save(player, v.start)) {
+		if (!tool->is_work_here_network_safe(player, v.start)) {
 			return sq_raise_error(vm, "First click has side effects");
 		}
 	}
@@ -228,7 +235,6 @@ SQInteger param<call_tool_work>::push(HSQUIRRELVM vm, call_tool_work v)
 	if (const char* blocker = env_t::networkmode ? sq_get_suspend_blocker(vm) : NULL) {
 		return sq_raise_error(vm, "Cannot call this tool from within `%s'.", blocker);
 	}
-
 
 	bool suspended = false;
 	const char* err = NULL;
@@ -276,21 +282,51 @@ void* script_api::param<tool_t*>::tag()
 }
 
 
-call_tool_work build_way(player_t* pl, koord3d start, koord3d end, const way_desc_t* way, bool straight)
+call_tool_work build_way(player_t* pl, koord3d start, koord3d end, const way_desc_t* way, bool straight, bool keep_city_roads)
 {
 	if (way == NULL) {
 		return call_tool_work("No way provided");
 	}
-	return call_tool_work(TOOL_BUILD_WAY | GENERAL_TOOL, way->get_name(), straight ? 2 : 0, pl, start, end);
+	return call_tool_work(TOOL_BUILD_WAY | GENERAL_TOOL, way->get_name(), (straight ? 2 : 0) + (keep_city_roads ? 1 : 0), pl, start, end);
 }
 
-call_tool_work build_station(player_t* pl, koord3d pos, const building_desc_t* building)
+typedef call_tool_work(*bsr_type)(player_t*, koord3d, const building_desc_t*, my_ribi_t);
+
+call_tool_work build_station_rotation(player_t* pl, koord3d pos, const building_desc_t* building, my_ribi_t rotation)
 {
+	// rotation: SENW -> 0123, see station_building_select_t
+	int rot = -1;
+	switch( (ribi_t::ribi)rotation )
+	{
+		case ribi_t::south: rot = 0; break;
+		case ribi_t::east:  rot = 1; break;
+		case ribi_t::north: rot = 2; break;
+		case ribi_t::west:  rot = 3; break;
+		default: ;
+	}
 	if (building == NULL  ||  !building->is_transport_building()) {
 		return call_tool_work("No building provided");
 	}
-	return call_tool_work(TOOL_BUILD_STATION | GENERAL_TOOL, building->get_name(), 0, pl, pos);
+	static cbuffer_t buf;
+	buf.clear();
+	buf.printf("%s,%i", building->get_name(), rot);
+	return call_tool_work(TOOL_BUILD_STATION | GENERAL_TOOL, buf, 0, pl, pos);
 }
+
+SQInteger command_build_station(HSQUIRRELVM vm)
+{
+	/* possible calling conventions:
+	 *
+	 * build_station(player, pos, desc)           - top == 4
+	 * build_station(player, pos, desc, rotation) - top == 5
+	 */
+	if (sq_gettop(vm) == 4) {
+		// rotation parameter missing, push default value
+		sq_pushinteger(vm, ribi_t::all);
+	}
+	return embed_call_t<bsr_type>::call_function(vm, build_station_rotation, false);
+}
+
 
 call_tool_work build_depot(player_t* pl, koord3d pos, const building_desc_t* building)
 {
@@ -318,14 +354,24 @@ call_tool_work build_bridge_at(player_t* pl, koord3d start, const bridge_desc_t*
 
 call_tool_work set_slope(player_t* pl, koord3d start, my_slope_t slope)
 {
+	// communicate per default_param
 	static char buf[8];
 	sprintf(buf, "%2d", (uint8)slope);
-	return call_tool_work(TOOL_SETSLOPE | GENERAL_TOOL, buf, 0, pl, start);
+	static tool_setslope_t tool;
+	// we do not want our slopes translated to double-height (even for single-height paksets), they are already in the double-height system
+	tool.old_slope_compatibility_mode = false;
+	tool.set_default_param(buf);
+	return call_tool_work(&tool, pl, start);
 }
 
 call_tool_work restore_slope(player_t* pl, koord3d start)
 {
 	return call_tool_work(TOOL_RESTORESLOPE | GENERAL_TOOL, "", 0, pl, start);
+}
+
+const char* can_set_slope(player_t* pl, koord3d pos, my_slope_t slope)
+{
+	return tool_setslope_t::tool_set_slope_work(pl, pos, slope, false /* compatibility */, true /* check */);
 }
 
 call_tool_work build_sign_at(player_t* pl, koord3d start, const roadsign_desc_t* sign)
@@ -412,7 +458,17 @@ void export_commands(HSQUIRRELVM vm)
 	 * @param way type of way to be built
 	 * @param straight force building of straight ways, similar as building way with control key pressed
 	 */
-	STATIC register_method(vm, build_way, "build_way", false, true);
+	STATIC register_method_fv(vm, build_way, "build_way", freevariable<bool>(false), false, true);
+	/**
+	 * Build a road.
+	 * @param pl player to pay for the work
+	 * @param start coordinate, where work begins
+	 * @param end   coordinate, where work ends
+	 * @param way type of way to be built
+	 * @param straight force building of straight ways, similar as building way with control key pressed
+	 * @param keep_city_roads if true city roads will not be replaced
+	 */
+	STATIC register_method(vm, build_way, "build_road", false, true);
 	/**
 	 * Build a depot.
 	 * @param pl player to pay for the work
@@ -425,8 +481,12 @@ void export_commands(HSQUIRRELVM vm)
 	 * @param pl player to pay for the work
 	 * @param pos position to place the depot
 	 * @param station type of station to be built
+	 * @param rotaton (optional parameter) rotation of building (only used for flat docks, put direction from land to water here)
 	 */
-	STATIC register_method(vm, build_station, "build_station", false, true);
+	STATIC register_function(vm, command_build_station, "build_station", -4 /* at least 4 parameters */,
+							 func_signature_t<bsr_type>::get_typemask(false).c_str(), false /* static */);
+
+	log_squirrel_type(func_signature_t<bsr_type>::get_squirrel_class(false), "build_station", func_signature_t<bsr_type>::get_squirrel_type(false, 0));
 	/**
 	 * Build a bridge.
 	 * Similar to drag-and-build of bridges in-game.
@@ -457,7 +517,14 @@ void export_commands(HSQUIRRELVM vm)
 	 * @param pos position of tile
 	 */
 	STATIC register_method(vm, restore_slope, "restore_slope", false, true);
-
+	/**
+	 * Checks whether player @p pl can do this terraforming.
+	 * @param pl player
+	 * @param pos position
+	 * @param slope new slope, can also be one of @ref slope::all_up_slope or @ref slope::all_down_slope
+	 * @returns null (if allowed) or an error message otherwise
+	 */
+	STATIC register_method(vm, can_set_slope, "can_set_slope", false, true);
 	/**
 	 * Build signal / road-sign. If such a sign already exists then change its direction.
 	 * @param pl player to pay for the work

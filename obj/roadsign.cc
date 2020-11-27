@@ -7,7 +7,7 @@
 
 #include "../simunits.h"
 #include "../simdebug.h"
-#include "../simobj.h"
+#include "simobj.h"
 #include "../display/simimg.h"
 #include "../player/simplay.h"
 #include "../simtool.h"
@@ -172,10 +172,6 @@ void roadsign_t::show_info()
 }
 
 
-/**
- * @return Einen Beschreibungsstring für das Objekt, der z.B. in einem
- * Beobachtungsfenster angezeigt wird.
- */
 void roadsign_t::info(cbuffer_t & buf) const
 {
 	obj_t::info( buf );
@@ -190,14 +186,18 @@ void roadsign_t::info(cbuffer_t & buf) const
 			buf.printf("%s%d", translator::translate("\nminimum speed:"), speed_to_kmh(desc->get_min_speed()));
 		}
 		buf.printf("%s%u\n", translator::translate("\ndirection:"), dir);
+
 		if(  automatic  ) {
 			buf.append(translator::translate("\nSet phases:"));
 		}
-	}
 
-	if (char const* const maker = desc->get_copyright()) {
-		buf.append("\n");
-		buf.printf(translator::translate("Constructed by %s"), maker);
+		if (!automatic) {
+			if (char const* const maker = desc->get_copyright()) {
+				buf.append("\n");
+				buf.printf(translator::translate("Constructed by %s"), maker);
+			}
+			// extra treatment of trafficlights & private signs, author will be shown by those windows themselves
+		}
 	}
 }
 
@@ -596,10 +596,6 @@ void roadsign_t::cleanup(player_t *player)
 }
 
 
-/**
- * Wird nach dem Laden der Welt aufgerufen - üblicherweise benutzt
- * um das Aussehen des Dings an Boden und Umgebung anzupassen
- */
 void roadsign_t::finish_rd()
 {
 	grund_t *gr=welt->lookup(get_pos());

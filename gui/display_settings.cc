@@ -26,6 +26,7 @@
 
 enum {
 	IDBTN_SCROLL_INVERSE,
+	IDBTN_IGNORE_NUMLOCK,
 	IDBTN_PEDESTRIANS_AT_STOPS,
 	IDBTN_PEDESTRIANS_IN_TOWNS,
 	IDBTN_DAY_NIGHT_CHANGE,
@@ -43,7 +44,7 @@ enum {
 	IDBTN_SHOW_THEMEMANAGER,
 	IDBTN_SIMPLE_DRAWING,
 	IDBTN_CHANGE_FONT,
-	COLORS_MAX_BUTTONS,
+	COLORS_MAX_BUTTONS
 };
 
 static button_t buttons[COLORS_MAX_BUTTONS];
@@ -61,12 +62,13 @@ public:
 	{
 		scr_coord p = pos + offset;
 
-		FLAGGED_PIXVAL pc = welt->get_active_player() ? color_idx_to_rgb(welt->get_active_player()->get_player_color1()+4) : color_idx_to_rgb(COL_ORANGE);
+		FLAGGED_PIXVAL pc = welt->get_active_player() ? color_idx_to_rgb(welt->get_active_player()->get_player_color1()+3) : color_idx_to_rgb(COL_ORANGE);
 		const char *text = get_text_pointer();
-
-		switch( env_t::show_names >> 2 ) {
+		switch( env_t::show_names>>2 ) {
 		case 0:
-			display_ddd_proportional_clip( p.x, p.y + get_size().h/2, proportional_string_width(text)+7, 0, pc, color_idx_to_rgb(COL_BLACK), text, 1 );
+			if(  env_t::show_names & 1  ) {
+				display_ddd_proportional_clip( p.x, p.y + get_size().h/2, proportional_string_width(text)+7, 0, pc, color_idx_to_rgb(COL_BLACK), text, 1 );
+			}
 			break;
 		case 1:
 			display_outline_proportional_rgb( p.x, p.y, pc+1, color_idx_to_rgb(COL_BLACK), text, 1 );
@@ -75,8 +77,6 @@ public:
 			display_outline_proportional_rgb( p.x + LINESPACE + D_H_SPACE, p.y, color_idx_to_rgb(COL_YELLOW), color_idx_to_rgb(COL_BLACK), text, 1 );
 			display_ddd_box_clip_rgb(         p.x,                     p.y,   LINESPACE,   LINESPACE,   pc-2, pc+2 );
 			display_fillbox_wh_clip_rgb(      p.x+1,                   p.y+1, LINESPACE-2, LINESPACE-2, pc,   true);
-			break;
-		case 3: // show nothing
 			break;
 		}
 	}
@@ -101,7 +101,7 @@ gui_settings_t::gui_settings_t()
 	add_component( buttons + IDBTN_CHANGE_FONT );
 
 	// add controls to info container
-	add_table(2,3);
+	add_table(2,4);
 	set_alignment(ALIGN_LEFT);
 	// Frame time label
 	new_component<gui_label_t>("Frame time:");
@@ -135,7 +135,7 @@ void gui_settings_t::draw(scr_coord offset)
 	idle_time_value_label.update();
 
 	// fps_label
-	uint32 target_fps = world()->is_fast_forward() ? 10 : env_t::fps;
+	uint32 target_fps = world()->is_fast_forward() ? env_t::ff_fps : env_t::fps;
 	uint32 loops = world()->get_realFPS();
 	PIXVAL color = SYSCOL_TEXT_HIGHLIGHT;
 	if(  loops < (target_fps*16*3)/4  ) {
@@ -203,6 +203,11 @@ map_settings_t::map_settings_t()
 	// Scroll inverse checkbox
 	buttons[ IDBTN_SCROLL_INVERSE ].init( button_t::square_state, "4LIGHT_CHOOSE" );
 	add_component( buttons + IDBTN_SCROLL_INVERSE, 2 );
+
+	// Numpad key
+	buttons[ IDBTN_IGNORE_NUMLOCK ].init( button_t::square_state, "Num pad keys always move map" );
+	buttons[ IDBTN_IGNORE_NUMLOCK ].pressed = env_t::numpad_always_moves_map;
+	add_component( buttons + IDBTN_IGNORE_NUMLOCK, 2 );
 
 	// Scroll speed label
 	new_component<gui_label_t>( "3LIGHT_CHOOSE" );
@@ -294,6 +299,14 @@ bool transparency_settings_t::action_triggered( gui_action_creator_t *comp, valu
 }
 
 
+void transparency_settings_t::draw( scr_coord offset )
+{
+	hide_buildings.set_selection( env_t::hide_buildings );
+
+	gui_aligned_container_t::draw(offset);
+}
+
+
 station_settings_t::station_settings_t()
 {
 	set_table_layout( 1, 0 );
@@ -355,6 +368,7 @@ traffic_settings_t::traffic_settings_t()
 	convoy_tooltip.set_focusable(false);
 	convoy_tooltip.new_component<gui_scrolled_list_t::const_text_scrollitem_t>(translator::translate("convoi error tooltips"), SYSCOL_TEXT);
 	convoy_tooltip.new_component<gui_scrolled_list_t::const_text_scrollitem_t>(translator::translate("convoi mouseover tooltips"), SYSCOL_TEXT);
+	convoy_tooltip.new_component<gui_scrolled_list_t::const_text_scrollitem_t>(translator::translate("line name mouseover tooltips"), SYSCOL_TEXT);
 	convoy_tooltip.new_component<gui_scrolled_list_t::const_text_scrollitem_t>(translator::translate("all convoi tooltips"), SYSCOL_TEXT);
 	convoy_tooltip.set_selection(env_t::show_vehicle_states);
 	add_component(&convoy_tooltip, 2);
@@ -409,7 +423,7 @@ bool traffic_settings_t::action_triggered( gui_action_creator_t *comp, value_t v
 	if( &follow_mode == comp ) {
 		env_t::follow_convoi_underground = v.i;
 	}
-		
+
 	if( &money_booking == comp ) {
 		env_t::show_money_message = v.i;
 	}
@@ -458,6 +472,10 @@ bool color_gui_t::action_triggered( gui_action_creator_t *comp, value_t)
 
 	switch( i )
 	{
+	case IDBTN_IGNORE_NUMLOCK:
+		env_t::numpad_always_moves_map = !env_t::numpad_always_moves_map;
+		buttons[IDBTN_IGNORE_NUMLOCK].pressed = env_t::numpad_always_moves_map;
+		break;
 	case IDBTN_SCROLL_INVERSE:
 		env_t::scroll_multi = -env_t::scroll_multi;
 		break;
@@ -578,6 +596,7 @@ void color_gui_t::draw(scr_coord pos, scr_size size)
 	buttons[IDBTN_UNDERGROUND_VIEW].pressed = grund_t::underground_mode == grund_t::ugm_all;
 	buttons[IDBTN_TRANSPARENT_STATION_COVERAGE].pressed = env_t::use_transparency_station_coverage;
 	buttons[IDBTN_TRANSPARENT_INSTEAD_OF_HIDDEN].pressed = env_t::hide_with_transparency;
+
 
 	// All components are updated, now draw them...
 	gui_frame_t::draw(pos, size);

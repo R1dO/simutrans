@@ -13,7 +13,7 @@
 #include "../display/viewport.h"
 #include "../simmenu.h"
 #include "../simskin.h"
-#include "../simsys.h"
+#include "../sys/simsys.h"
 #include "../simticker.h"
 #include "simwin.h"
 #include "../simintr.h"
@@ -47,6 +47,7 @@
 #include "money_frame.h"
 #include "halt_info.h"
 #include "convoi_detail_t.h"
+#include "convoi_frame.h"
 #include "convoi_info_t.h"
 #include "schedule_gui.h"
 #include "line_management_gui.h"
@@ -60,6 +61,8 @@
 #include "loadfont_frame.h"
 #include "scenario_info.h"
 #include "depot_frame.h"
+#include "depotlist_frame.h"
+#include "vehiclelist_frame.h"
 
 #include "../simversion.h"
 
@@ -95,7 +98,7 @@ public:
 	uint8 wt;               // the flags for the window type
 	ptrdiff_t magic_number; // either magic number or this pointer (which is unique too)
 	gui_frame_t *gui;
-	uint16	gadget_state;	// which buttons to hilite
+	uint16 gadget_state;    // which buttons to hilite
 	bool sticky;            // true if window is sticky
 	bool rollup;
 	bool dirty;
@@ -124,13 +127,13 @@ static void display_win(int win);
 static int tooltip_xpos = 0;
 static int tooltip_ypos = 0;
 static const char * tooltip_text = 0;
-static const char * static_tooltip_text = 0;
+static std::string static_tooltip_text;
 
 // For timed tooltip with initial delay and finite visible duration.
 // Valid owners are required for timing. Invalid (NULL) owners disable timing.
-static const void * tooltip_owner = 0;	// owner of the registered tooltip
-static const void * tooltip_group = 0;	// group to which the owner belongs
-static uint32 tooltip_register_time = 0;	// time at which a tooltip is initially registered
+static const void * tooltip_owner = 0;   // owner of the registered tooltip
+static const void * tooltip_group = 0;   // group to which the owner belongs
+static uint32 tooltip_register_time = 0; // time at which a tooltip is initially registered
 
 static bool show_ticker=0;
 
@@ -162,7 +165,7 @@ static int display_gadget_box(sint8 code,
 	// If we have a skin, get gadget image data
 	const image_t *img = NULL;
 	if(  skinverwaltung_t::gadget  ) {
-		// "x", "?", "=", "«", "»"
+		// "x", "?", "=", "<<", ">>"
 		img = skinverwaltung_t::gadget->get_image(code);
 	}
 
@@ -175,7 +178,7 @@ static int display_gadget_box(sint8 code,
 	if(  img != NULL  ) {
 
 		// Max Kielland: This center the gadget image and compensates for any left/top margins within the image to be backward compatible with older PAK sets.
-		display_color_img(img->imageid, x-img->x + D_GET_CENTER_ALIGN_OFFSET(img->w,D_GADGET_WIDTH), y, 0, false, false);
+		display_img_aligned(img->imageid, scr_rect(x, y, D_GADGET_WIDTH, D_TITLEBAR_HEIGHT), ALIGN_CENTER_H | ALIGN_CENTER_V, true);
 
 	}
 	else {
@@ -186,13 +189,13 @@ static int display_gadget_box(sint8 code,
 			gadget_text = gadget_texts[code];
 		}
 		else if(  code == SKIN_GADGET_GOTOPOS  ) {
-			gadget_text	= "*";
+			gadget_text = "*";
 		}
 		else if(  code == SKIN_GADGET_NOTPINNED  ) {
-			gadget_text	= "s";
+			gadget_text = "s";
 		}
 		else if(  code == SKIN_GADGET_PINNED  ) {
-			gadget_text	= "S";
+			gadget_text = "S";
 		}
 		display_proportional_rgb( x+4, y+4, gadget_text, ALIGN_LEFT, color_idx_to_rgb(COL_BLACK), false );
 	}
@@ -245,11 +248,8 @@ static int display_gadget_boxes(
 }
 
 
-static sint8 decode_gadget_boxes(
-               simwin_gadget_flags_t const * const flags,
-               int const x,
-               int const px
-) {
+static sint8 decode_gadget_boxes(simwin_gadget_flags_t const * const flags, int const x,int const px)
+{
 	int offset = px-x;
 	const int w=(REVERSE_GADGETS?-D_GADGET_WIDTH:D_GADGET_WIDTH);
 
@@ -577,6 +577,9 @@ void rdwr_all_win(loadsave_t *file)
 					case magic_font:           w = new loadfont_frame_t(); break;
 					case magic_scenario_info:  w = new scenario_info_t(); break;
 					case magic_depot:          w = new depot_frame_t(); break;
+					case magic_convoi_list:    w = new convoi_frame_t(); break;
+					case magic_depotlist:      w = new depotlist_frame_t(); break;
+					case magic_vehiclelist:    w = new vehiclelist_frame_t(); break;
 
 					default:
 						if(  id>=magic_finances_t  &&  id<magic_finances_t+MAX_PLAYER_COUNT  ) {
@@ -933,6 +936,37 @@ void destroy_all_win(bool destroy_sticky)
 	}
 }
 
+void rollup_all_win()
+{
+	bool all_rolldown_flag = true; // If any dialog is open, all rolldown will not be performed
+	for (  sint32 curWin = 0; curWin < (sint32)wins.get_count(); curWin++  ) {
+		if (  !wins[curWin].rollup  ) {
+			wins[curWin].rollup = true;
+			gui_frame_t *gui = wins[curWin].gui;
+			scr_size size = gui->get_windowsize();
+			mark_rect_dirty_wc( wins[curWin].pos.x, wins[curWin].pos.y, wins[curWin].pos.x+size.w, wins[curWin].pos.y+size.h );
+			all_rolldown_flag = false;
+		}
+	}
+
+	if (  !all_rolldown_flag  ) {
+		wl->set_background_dirty();
+	}
+	else if (  wins.get_count()  ) {
+		rolldown_all_win();
+	}
+}
+
+void rolldown_all_win()
+{
+	for (  sint32 curWin = 0; curWin < (sint32)wins.get_count(); curWin++  ) {
+		wins[curWin].rollup = false;
+		gui_frame_t *gui = wins[curWin].gui;
+		scr_size size = gui->get_windowsize();
+		mark_rect_dirty_wc( wins[curWin].pos.x, wins[curWin].pos.y, wins[curWin].pos.x+size.w, wins[curWin].pos.y+size.h );
+	}
+}
+
 
 int top_win(int win, bool keep_state )
 {
@@ -948,7 +982,7 @@ int top_win(int win, bool keep_state )
 	simwin_t tmp = wins[win];
 	wins.remove_at(win);
 	if(  !keep_state  ) {
-		tmp.rollup = false;	// make visible when topping
+		tmp.rollup = false; // make visible when topping
 	}
 	wins.append(tmp);
 
@@ -1218,8 +1252,8 @@ void move_win(int win, event_t *ev)
 	}
 
 	// CLIP(wert,min,max)
-	to_pos.x = CLIP( to_pos.x, 8-to_size.x, display_get_width()-16 );
-	to_pos.y = CLIP( to_pos.y, env_t::iconsize.h, display_get_height() - D_TITLEBAR_HEIGHT - win_get_statusbar_height() - TICKER_HEIGHT);
+	to_pos.x = clamp( to_pos.x, 8-to_size.x, display_get_width()-16 );
+	to_pos.y = clamp( to_pos.y, env_t::iconsize.h, display_get_height() - D_TITLEBAR_HEIGHT - win_get_statusbar_height() - TICKER_HEIGHT);
 
 	// delta is actual window movement.
 	const scr_coord delta = to_pos - from_pos;
@@ -1463,7 +1497,8 @@ bool check_pos_win(event_t *ev)
 									wins[i].gui->infowin_event( ev );
 									break;
 								case SKIN_GADGET_GOTOPOS:
-									{	// change position on map (or follow)
+									{
+										// change position on map (or follow)
 										koord3d k = wins[i].gui->get_weltpos(true);
 										if(  k!=koord3d::invalid  ) {
 											wl->get_viewport()->change_world_position( k );
@@ -1544,7 +1579,7 @@ void win_poll_event(event_t* const ev)
 	// main window resized
 	if(  ev->ev_class==EVENT_SYSTEM  &&  ev->ev_code==SYSTEM_RESIZE  ) {
 		// main window resized
-		simgraph_resize( ev->size_x, ev->size_y );
+		simgraph_resize( ev->new_window_size );
 		ticker::redraw();
 		wl->set_dirty();
 		wl->get_viewport()->metrics_updated();
@@ -1554,12 +1589,13 @@ void win_poll_event(event_t* const ev)
 	if(  ev->ev_class==EVENT_SYSTEM  &&  ev->ev_code==SYSTEM_RELOAD_WINDOWS  ) {
 		dr_chdir( env_t::user_dir );
 		loadsave_t dlg;
-		if(  dlg.wr_open( "dlgpos.xml", loadsave_t::xml_zipped, 1, "temp", SERVER_SAVEGAME_VER_NR )  ) {
+
+		if(  dlg.wr_open( "dlgpos.xml", loadsave_t::xml_zipped, 1, "temp", SERVER_SAVEGAME_VER_NR ) == loadsave_t::FILE_STATUS_OK  ) {
 			// save all
 			rdwr_all_win( &dlg );
 			dlg.close();
 			destroy_all_win( true );
-			if(  dlg.rd_open( "dlgpos.xml" )  ) {
+			if(  dlg.rd_open( "dlgpos.xml" ) == loadsave_t::FILE_STATUS_OK  ) {
 				// and reload them ...
 				rdwr_all_win( &dlg );
 			}
@@ -1641,7 +1677,7 @@ void win_display_flush(double konto)
 	}
 
 	if(  skinverwaltung_t::compass_iso  &&  env_t::compass_screen_position  ) {
-		display_img_aligned( skinverwaltung_t::compass_iso->get_image_id( wl->get_settings().get_rotation() ), scr_rect(4,menu_height+4,disp_width-2*4,disp_height-menu_height-15-2*4-(TICKER_HEIGHT)*show_ticker), env_t::compass_screen_position, false );
+		display_img_aligned( skinverwaltung_t::compass_iso->get_image_id( wl->get_settings().get_rotation() ), scr_rect(D_MARGIN_LEFT,menu_height+D_MARGIN_TOP,disp_width-2*4,disp_height-menu_height-D_MARGIN_TOP-D_MARGIN_BOTTOM-win_get_statusbar_height()-(TICKER_HEIGHT)*show_ticker), env_t::compass_screen_position, false );
 	}
 
 	{
@@ -1658,15 +1694,15 @@ void win_display_flush(double konto)
 				uint32 elapsed_time;
 				if(  !tooltip_owner  ||  ((elapsed_time=dr_time()-tooltip_register_time)>env_t::tooltip_delay  &&  elapsed_time<=env_t::tooltip_delay+env_t::tooltip_duration)  ) {
 					const sint16 width = proportional_string_width(tooltip_text)+7;
-					display_ddd_proportional_clip(min(tooltip_xpos,disp_width-width), max(menu_height+7,tooltip_ypos), width, 0, env_t::tooltip_color, env_t::tooltip_textcolor, tooltip_text, true);
+					display_ddd_proportional_clip(min(tooltip_xpos,disp_width-width), max(menu_height+1+LINESPACE/2,tooltip_ypos), width, 0, env_t::tooltip_color, env_t::tooltip_textcolor, tooltip_text, true);
 					if(wl) {
 						wl->set_background_dirty();
 					}
 				}
 			}
-			else if(static_tooltip_text!=NULL  &&  *static_tooltip_text) {
-				const sint16 width = proportional_string_width(static_tooltip_text)+7;
-				display_ddd_proportional_clip(min(get_mouse_x()+16,disp_width-width), max(menu_height+7,get_mouse_y()-16), width, 0, env_t::tooltip_color, env_t::tooltip_textcolor, static_tooltip_text, true);
+			else if(!static_tooltip_text.empty()) {
+				const sint16 width = proportional_string_width(static_tooltip_text.c_str())+7;
+				display_ddd_proportional_clip(min(get_mouse_x()+16,disp_width-width), max(menu_height+1+LINESPACE/2,get_mouse_y()-16), width, 0, env_t::tooltip_color, env_t::tooltip_textcolor, static_tooltip_text.c_str(), true);
 				if(wl) {
 					wl->set_background_dirty();
 				}
@@ -1795,13 +1831,16 @@ void win_display_flush(double konto)
 		}
 	}
 #endif
-	scr_coord_val w_left = 20+display_proportional_rgb(20, status_bar_text_y, time, ALIGN_LEFT, SYSCOL_STATUSBAR_TEXT, true);
-	scr_coord_val w_right  = display_proportional_rgb(right_border-4, status_bar_text_y, info, ALIGN_RIGHT, SYSCOL_STATUSBAR_TEXT, true);
-	scr_coord_val middle = (disp_width+((w_left+8)&0xFFF0)-((w_right+8)&0xFFF0))/2;
+	/*scr_coord_val w_left  = 20 + */ display_proportional_rgb(20, status_bar_text_y, time, ALIGN_LEFT, SYSCOL_STATUSBAR_TEXT, true);
+	/*scr_coord_val w_right =      */ display_proportional_rgb(right_border-4, status_bar_text_y, info, ALIGN_RIGHT, SYSCOL_STATUSBAR_TEXT, true);
+	/* Since the visual center (disp_width + ((w_left + 8) & 0xFFF0) - ((w_right + 8) & 0xFFF0)) / 2;
+	 * jump left and right with proportional fonts, we just take the actual cetner
+	 */
+	scr_coord_val middle = disp_width / 2;
 
 	if(wl->get_active_player()) {
 		char buffer[256];
-		display_proportional_rgb( middle-5, status_bar_text_y, wl->get_active_player()->get_name(), ALIGN_RIGHT, PLAYER_FLAG|color_idx_to_rgb(wl->get_active_player()->get_player_color1()+0), true);
+		display_proportional_rgb( middle-5, status_bar_text_y, wl->get_active_player()->get_name(), ALIGN_RIGHT, PLAYER_FLAG|color_idx_to_rgb(wl->get_active_player()->get_player_color1()+env_t::gui_player_color_dark), true);
 		money_to_string(buffer, konto );
 		display_proportional_rgb( middle+5, status_bar_text_y, buffer, ALIGN_LEFT, konto >= 0.0?MONEY_PLUS:MONEY_MINUS, true);
 	}
@@ -1841,7 +1880,7 @@ void win_load_font(const char *fname, uint16 fontsize)
 
 	if (display_load_font(fname, force_reload) ) {
 		// successfull
-		gui_theme_t::themes_init( env_t::default_theme, false );
+		gui_theme_t::themes_init( env_t::default_theme, false, false );
 
 		event_t *ev = new event_t();
 		ev->ev_class = EVENT_SYSTEM;
@@ -1879,7 +1918,7 @@ void win_set_tooltip(int xpos, int ypos, const char *text, const void *const own
 			if(  group  &&  group==tooltip_group  ) {
 				// case : same group
 				const uint32 elapsed_time = current_time - tooltip_register_time;
-				const uint32 threshold = env_t::tooltip_delay - (env_t::tooltip_delay>>2);	// 3/4 of delay
+				const uint32 threshold = env_t::tooltip_delay - (env_t::tooltip_delay>>2); // 3/4 of delay
 				if(  elapsed_time>threshold  &&  elapsed_time<=env_t::tooltip_delay+env_t::tooltip_duration  ) {
 					// case : threshold was reached and duration not expired -> delay time is reduced to 1/4
 					tooltip_register_time = current_time - threshold;
@@ -1911,5 +1950,5 @@ void win_set_tooltip(int xpos, int ypos, const char *text, const void *const own
  */
 void win_set_static_tooltip(const char *text)
 {
-	static_tooltip_text = text;
+	static_tooltip_text = text ? text : "";
 }

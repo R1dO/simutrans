@@ -18,8 +18,6 @@
 #include "api/api_simple.h"  // my_ribi_t
 
 
-template<typename T> T clamp(T v, T l, T u) { return v < l ? l : (v > u ? u :v); }
-
 namespace script_api {
 
 	karte_ptr_t welt;
@@ -88,7 +86,7 @@ namespace script_api {
 
 	void coordinate_transform_t::slope_w2sq(slope_t::type &s)
 	{
-		if (s < slope_t::raised) {
+		if (s < slope_t::max_number) {
 			for(uint8 i=1; i <= 4-rotation; i++) {
 				s = slope_t::rotate90(s);
 			}
@@ -97,7 +95,7 @@ namespace script_api {
 
 	void coordinate_transform_t::slope_sq2w(slope_t::type &s)
 	{
-		if (s < slope_t::raised) {
+		if (s < slope_t::max_number) {
 			for(uint8 i=1; i <= rotation; i++) {
 				s = slope_t::rotate90(s);
 			}
@@ -388,7 +386,12 @@ namespace script_api {
 		return fab;
 	}
 
-	SQInteger param<fabrik_t*>::push(HSQUIRRELVM vm, fabrik_t* const& fab)
+	const fabrik_t* param<const fabrik_t*>::get(HSQUIRRELVM vm, SQInteger index)
+	{
+		return param<fabrik_t*>::get(vm, index);
+	}
+
+	SQInteger param<const fabrik_t*>::push(HSQUIRRELVM vm, const fabrik_t* const& fab)
 	{
 		if (fab == NULL) {
 			sq_pushnull(vm); return 1;
@@ -396,6 +399,11 @@ namespace script_api {
 		koord pos(fab->get_pos().get_2d());
 		coordinate_transform_t::koord_w2sq(pos);
 		return push_instance(vm, "factory_x", pos.x, pos.y);
+	}
+
+	SQInteger param<fabrik_t*>::push(HSQUIRRELVM vm, fabrik_t* const& fab)
+	{
+		return param<const fabrik_t*>::push(vm,  fab);
 	}
 
 	const ware_production_t* param<const ware_production_t*>::get(HSQUIRRELVM vm, SQInteger index)

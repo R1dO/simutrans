@@ -3,8 +3,9 @@
  * (see LICENSE.txt)
  */
 
-#ifndef simfab_h
-#define simfab_h
+#ifndef SIMFAB_H
+#define SIMFAB_H
+
 
 #include "dataobj/koord3d.h"
 #include "dataobj/translator.h"
@@ -150,7 +151,7 @@ public:
 	}
 	void book_weighted_sum_storage(uint32 factor, sint64 delta_time);
 
-	sint32 menge;	// in internal units shifted by precision_bits (see step)
+	sint32 menge; // in internal units shifted by precision_bits (see step)
 	sint32 max;
 	/// Cargo currently in transit from/to this slot. Equivalent to statistics[0][FAB_GOODS_TRANSIT].
 	sint32 get_in_transit() const { return (sint32)statistics[0][FAB_GOODS_TRANSIT]; }
@@ -171,7 +172,7 @@ public:
 	bool placing_orders;
 
 #ifdef TRANSIT_DISTANCE
-	sint32 count_suppliers;	// only needed for averaging
+	sint32 count_suppliers; // only needed for averaging
 #endif
 	uint32 index_offset; // used for haltlist and lieferziele searches in verteile_waren to produce round robin results
 
@@ -184,9 +185,7 @@ public:
 
 
 /**
- * Eine Klasse für Fabriken in Simutrans. Fabriken produzieren und
- * verbrauchen Waren und beliefern nahe Haltestellen.
- *
+ * Factories produce and consume goods (ware_t) and supply nearby halts.
  * @see haltestelle_t
  */
 class fabrik_t
@@ -195,7 +194,11 @@ public:
 	/**
 	 * Constants
 	 */
-	enum { precision_bits = 10, old_precision_bits = 10, precision_mask = 1023 };
+	enum {
+		old_precision_bits = 10,
+		precision_bits     = 10,
+		precision_mask     = (1 << precision_bits) - 1
+	};
 
 private:
 	/**
@@ -223,7 +226,7 @@ private:
 		CL_CONS_MANY,    // Consumer that consumes multiple inputs, possibly produces power.
 		// Electricity producers provide power.
 		CL_ELEC_PROD,    // Simple electricity source. (green energy)
-		CL_ELEC_CLASSIC, // Classic electricity producer behaviour with no inputs.
+		CL_ELEC_CLASSIC  // Classic electricity producer behaviour with no inputs.
 	} control_type;
 
 	// Demand buffer order logic;
@@ -239,7 +242,7 @@ private:
 		BL_NONE,    // Production cannot be boosted.
 		BL_PAXM,    // Production boosted only using passengers/mail.
 		BL_POWER,   // Production boosted with power as well. Needs aditional logic for correct ordering.
-		BL_CLASSIC, // Production boosted in classic way.
+		BL_CLASSIC  // Production boosted in classic way.
 	} boost_type;
 
 	// Functions for manipulating factory statistics
@@ -249,9 +252,7 @@ private:
 	// For accumulating weighted sums for average statistics
 	void book_weighted_sums(sint64 delta_time);
 
-	/**
-	 * Die möglichen Lieferziele
-	 */
+	/// Possible destinations for produced goods
 	vector_tpl <koord> lieferziele;
 	uint32 lieferziele_active_last_month;
 
@@ -309,9 +310,7 @@ private:
 	array_tpl<ware_production_t> input;  ///< array for input/consumed goods
 	array_tpl<ware_production_t> output; ///< array for output/produced goods
 
-	/**
-	 * Zeitakkumulator für Produktion
-	 */
+	/// Accumulated time since last production
 	sint32 delta_sum;
 	uint32 delta_menge;
 
@@ -392,15 +391,16 @@ private:
 	/**
 	 * Class for collecting arrival data and calculating pax/mail boost with fixed period length
 	 */
-	#define PERIOD_BITS   (18)				// determines period length on which boost calculation is based
-	#define SLOT_BITS     (6)				// determines the number of time slots available
-	#define SLOT_COUNT    (1<<SLOT_BITS)	// number of time slots for accumulating arrived pax/mail
+	#define PERIOD_BITS   (18)              // determines period length on which boost calculation is based
+	#define SLOT_BITS     (6)               // determines the number of time slots available
+	#define SLOT_COUNT    (1<<SLOT_BITS)    // number of time slots for accumulating arrived pax/mail
+
 	class arrival_statistics_t
 	{
 	private:
 		uint16 slots[SLOT_COUNT];
 		uint16 current_slot;
-		uint16 active_slots;		// number of slots covered since aggregate arrival last increased from 0 to +ve
+		uint16 active_slots;      // number of slots covered since aggregate arrival last increased from 0 to +ve
 		uint32 aggregate_arrival;
 		uint32 scaled_demand;
 	public:
@@ -434,7 +434,7 @@ private:
 	void recalc_factory_status();
 
 	// create some smoke on the map
-	void smoke() const;
+	void smoke();
 
 	// scales the amount of production based on the amount already in storage
 	uint32 scale_output_production(const uint32 product, uint32 menge) const;
@@ -529,6 +529,8 @@ public:
 	void link_halt(halthandle_t halt);
 	void unlink_halt(halthandle_t halt);
 
+	bool is_within_players_network( const player_t* player ) const;
+
 	const vector_tpl<koord>& get_lieferziele() const { return lieferziele; }
 	bool is_active_lieferziel( koord k ) const;
 
@@ -542,9 +544,6 @@ public:
 	void clear_target_cities();
 	const vector_tpl<stadt_t *>& get_target_cities() const { return target_cities; }
 
-	/**
-	 * Fügt ein neues Lieferziel hinzu
-	 */
 	void  add_lieferziel(koord ziel);
 	void  rem_lieferziel(koord pos);
 
@@ -569,6 +568,8 @@ public:
 	 * True if a transformer is connected to this factory.
 	 */
 	bool is_transformer_connected() const { return transformer != NULL; }
+
+	leitung_t* get_transformer() { return transformer; }
 
 	/**
 	 * Connect transformer to this factory.
@@ -618,16 +619,12 @@ public:
 	 */
 	void get_tile_list( vector_tpl<koord> &tile_list ) const;
 
-	/**
-	 * gibt eine NULL-Terminierte Liste von Fabrikpointern zurück
-	 */
+	/// @returns a vector of factories within a rectangle
 	static vector_tpl<fabrik_t *> & sind_da_welche(koord min, koord max);
 
 	// hier die methoden zum parametrisieren der Fabrik
 
-	/**
-	 * Baut die Gebäude für die Fabrik
-	 */
+	/// Builds buildings (gebaeude_t) for the factory.
 	void build(sint32 rotate, bool build_fields, bool force_initial_prodbase);
 
 	sint16 get_rotate() const { return rotate; }
@@ -640,6 +637,12 @@ public:
 	void remove_field_at(koord pos);
 
 	uint32 get_field_count() const { return fields.get_count(); }
+
+	uint32 get_min_field_count() const
+	{
+		const field_group_desc_t *fg = get_desc()->get_field_group();
+		return fg ?  fg->get_min_fields() : 0;
+	}
 
 	/**
 	 * total and current procduction/storage values
@@ -662,7 +665,13 @@ public:
 	sint32 get_current_production() const { return (sint32)welt->scale_with_month_length( ((sint64)prodbase * (sint64)get_prodfactor())>>8 ); }
 
 	/* returns the status of the current factory, as well as output */
-	enum { bad, medium, good, inactive, nothing };
+	enum {
+		bad,
+		medium,
+		good,
+		inactive,
+		nothing
+	};
 	static uint8 status_to_color[5];
 
 	uint8  get_status() const { return status; }

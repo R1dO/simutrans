@@ -14,7 +14,7 @@
 #include "font.h"
 #include "../pathes.h"
 #include "../simconst.h"
-#include "../simsys.h"
+#include "../sys/simsys.h"
 #include "../simmem.h"
 #include "../simdebug.h"
 #include "../descriptor/image.h"
@@ -237,11 +237,12 @@ clipping_info_t clips;
 
 #define CR clips CLIP_NUM_INDEX
 
-static font_t large_font;
+static font_t default_font;
 
 // needed for resizing gui
-int large_font_ascent = 9;
-int large_font_total_height = 11;
+int default_font_ascent = 0;
+int default_font_linespace = 0;
+
 
 #define MAX_PLAYER_COUNT (16)
 
@@ -410,21 +411,21 @@ static int night_shift = -1;
  * special colors during daytime
  */
 uint8 display_day_lights[LIGHT_COUNT*3] = {
-	0x57,	0x65,	0x6F, // Dark windows, lit yellowish at night
-	0x7F,	0x9B,	0xF1, // Lighter windows, lit blueish at night
-	0xFF,	0xFF,	0x53, // Yellow light
-	0xFF,	0x21,	0x1D, // Red light
-	0x01,	0xDD,	0x01, // Green light
-	0x6B,	0x6B,	0x6B, // Non-darkening grey 1 (menus)
-	0x9B,	0x9B,	0x9B, // Non-darkening grey 2 (menus)
-	0xB3,	0xB3,	0xB3, // non-darkening grey 3 (menus)
-	0xC9,	0xC9,	0xC9, // Non-darkening grey 4 (menus)
-	0xDF,	0xDF,	0xDF, // Non-darkening grey 5 (menus)
-	0xE3,	0xE3,	0xFF, // Nearly white light at day, yellowish light at night
-	0xC1,	0xB1,	0xD1, // Windows, lit yellow
-	0x4D,	0x4D,	0x4D, // Windows, lit yellow
-	0xE1,	0x00,	0xE1, // purple light for signals
-	0x01,	0x01,	0xFF, // blue light
+	0x57, 0x65, 0x6F, // Dark windows, lit yellowish at night
+	0x7F, 0x9B, 0xF1, // Lighter windows, lit blueish at night
+	0xFF, 0xFF, 0x53, // Yellow light
+	0xFF, 0x21, 0x1D, // Red light
+	0x01, 0xDD, 0x01, // Green light
+	0x6B, 0x6B, 0x6B, // Non-darkening grey 1 (menus)
+	0x9B, 0x9B, 0x9B, // Non-darkening grey 2 (menus)
+	0xB3, 0xB3, 0xB3, // non-darkening grey 3 (menus)
+	0xC9, 0xC9, 0xC9, // Non-darkening grey 4 (menus)
+	0xDF, 0xDF, 0xDF, // Non-darkening grey 5 (menus)
+	0xE3, 0xE3, 0xFF, // Nearly white light at day, yellowish light at night
+	0xC1, 0xB1, 0xD1, // Windows, lit yellow
+	0x4D, 0x4D, 0x4D, // Windows, lit yellow
+	0xE1, 0x00, 0xE1, // purple light for signals
+	0x01, 0x01, 0xFF, // blue light
 };
 
 
@@ -432,21 +433,21 @@ uint8 display_day_lights[LIGHT_COUNT*3] = {
  * special colors during nighttime
  */
 uint8 display_night_lights[LIGHT_COUNT*3] = {
-	0xD3,	0xC3,	0x80, // Dark windows, lit yellowish at night
-	0x80,	0xC3,	0xD3, // Lighter windows, lit blueish at night
-	0xFF,	0xFF,	0x53, // Yellow light
-	0xFF,	0x21,	0x1D, // Red light
-	0x01,	0xDD,	0x01, // Green light
-	0x6B,	0x6B,	0x6B, // Non-darkening grey 1 (menus)
-	0x9B,	0x9B,	0x9B, // Non-darkening grey 2 (menus)
-	0xB3,	0xB3,	0xB3, // non-darkening grey 3 (menus)
-	0xC9,	0xC9,	0xC9, // Non-darkening grey 4 (menus)
-	0xDF,	0xDF,	0xDF, // Non-darkening grey 5 (menus)
-	0xFF,	0xFF,	0xE3, // Nearly white light at day, yellowish light at night
-	0xD3,	0xC3,	0x80, // Windows, lit yellow
-	0xD3,	0xC3,	0x80, // Windows, lit yellow
-	0xE1,	0x00,	0xE1, // purple light for signals
-	0x01,	0x01,	0xFF, // blue light
+	0xD3, 0xC3, 0x80, // Dark windows, lit yellowish at night
+	0x80, 0xC3, 0xD3, // Lighter windows, lit blueish at night
+	0xFF, 0xFF, 0x53, // Yellow light
+	0xFF, 0x21, 0x1D, // Red light
+	0x01, 0xDD, 0x01, // Green light
+	0x6B, 0x6B, 0x6B, // Non-darkening grey 1 (menus)
+	0x9B, 0x9B, 0x9B, // Non-darkening grey 2 (menus)
+	0xB3, 0xB3, 0xB3, // non-darkening grey 3 (menus)
+	0xC9, 0xC9, 0xC9, // Non-darkening grey 4 (menus)
+	0xDF, 0xDF, 0xDF, // Non-darkening grey 5 (menus)
+	0xFF, 0xFF, 0xE3, // Nearly white light at day, yellowish light at night
+	0xD3, 0xC3, 0x80, // Windows, lit yellow
+	0xD3, 0xC3, 0x80, // Windows, lit yellow
+	0xE1, 0x00, 0xE1, // purple light for signals
+	0x01, 0x01, 0xFF, // blue light
 };
 
 
@@ -684,8 +685,8 @@ static const uint8 special_pal[SPECIAL_COLOR_COUNT*3] =
 /*
  * tile raster width
  */
-KOORD_VAL tile_raster_width = 16;	// zoomed
-KOORD_VAL base_tile_raster_width = 16;	// original
+KOORD_VAL tile_raster_width = 16;      // zoomed
+KOORD_VAL base_tile_raster_width = 16; // original
 
 // variables for storing currently used image procedure set and tile raster width
 display_image_proc display_normal = NULL;
@@ -1120,7 +1121,7 @@ void set_zoom_factor(int z)
 	if(  (base_tile_raster_width * zoom_num[z]) / zoom_den[z] > 4  ) {
 		zoom_factor = z;
 		tile_raster_width = (base_tile_raster_width * zoom_num[zoom_factor]) / zoom_den[zoom_factor];
-		fprintf(stderr, "set_zoom_factor() : set %d (%i/%i)\n", zoom_factor, zoom_num[zoom_factor], zoom_den[zoom_factor] );
+		dbg->message("set_zoom_factor()", "Zoom level now %d (%i/%i)", zoom_factor, zoom_num[zoom_factor], zoom_den[zoom_factor] );
 		rezoom();
 	}
 }
@@ -1826,16 +1827,16 @@ static void rezoom_img(const image_id n)
 					}
 
 					/*
-					 *		If it is not the first clear-colored-run pair and its colored run is empty
-					 *		--> it is superfluous and can be removed by rolling back the pointer
+					 * If it is not the first clear-colored-run pair and its colored run is empty
+					 * --> it is superfluous and can be removed by rolling back the pointer
 					 */
 					if(  clear_colored_run_pair_count > 0  &&  count == 0  ) {
 						dest--;
 						// this only happens at the end of a line, so no need to increment clear_colored_run_pair_count
 					}
 					else {
-						*dest++ = count+has_alpha;	// number of colored pixel
-						dest += count;	// skip them
+						*dest++ = count+has_alpha; // number of colored pixels
+						dest += count; // skip them
 						clear_colored_run_pair_count++;
 					}
 				} while(  x < newzoomwidth  );
@@ -1963,7 +1964,7 @@ static void calc_base_pal_from_night_shift(const int night)
 
 	// special light colors (actually, only non-darkening greys should be used)
 	for(i=0;  i<LIGHT_COUNT;  i++  ) {
-		specialcolormap_day_night[SPECIAL_COLOR_COUNT+i] = get_system_color( display_day_lights[i*3 + 0], display_day_lights[i*3 + 1], 	display_day_lights[i*3 + 2] );
+		specialcolormap_day_night[SPECIAL_COLOR_COUNT+i] = get_system_color( display_day_lights[i*3 + 0], display_day_lights[i*3 + 1], display_day_lights[i*3 + 2] );
 	}
 
 	// init with black for forbidden colors
@@ -2135,7 +2136,7 @@ void register_image(image_t *image_in)
 				}
 			}
 			runlen = *src++;
-		} while(  runlen!=0  );	// end of row: runlen == 0
+		} while(  runlen!=0  ); // end of row: runlen == 0
 	}
 
 	for(  uint8 i = 0;  i < MAX_PLAYER_COUNT;  i++  ) {
@@ -2306,8 +2307,8 @@ static inline void colorpixcopy(PIXVAL *dest, const PIXVAL *src, const PIXVAL* c
  * to be used in display_img_pc
  */
 enum pixcopy_routines {
-	plain = 0,	/// simply copies the pixels
-	colored = 1	/// replaces player colors
+	plain   = 0, /// simply copies the pixels
+	colored = 1  /// replaces player colors
 };
 
 
@@ -2362,7 +2363,7 @@ static void display_img_pc(KOORD_VAL h, const KOORD_VAL xp, const KOORD_VAL yp, 
 					if(  !has_alpha  ) {
 						templated_pixcopy<copyroutine>(tp + xpos + left, sp + left, sp + len);
 					}
-					else 					{
+					else {
 						colorpixcopy(tp + xpos + left, sp + left, sp + len);
 					}
 				}
@@ -2408,7 +2409,7 @@ static void display_img_wc(KOORD_VAL h, const KOORD_VAL xp, const KOORD_VAL yp, 
 					if(  !has_alpha  ) {
 						pixcopy(tp + xpos + left, sp + left, sp + len);
 					}
-					else 					{
+					else {
 						colorpixcopy(tp + xpos + left, sp + left, sp + len);
 					}
 				}
@@ -2718,10 +2719,10 @@ void display_img_stretch( const stretch_map_t &imag, scr_rect area )
 	}
 
 	// now stretch the middle
-	if(  imag[0][1]!=IMG_EMPTY  ) {
+	if(  imag[0][1]!=IMG_EMPTY  ||  imag[1][1]!=IMG_EMPTY  ) {
 		scr_rect row( area.x, area.y+h_top, area.w, area.h-h_top-h_bottom );
 		// tile it wide
-		scr_coord_val h = images[imag[0][1]].h;
+		scr_coord_val h = imag[0][1]!=IMG_EMPTY ? images[imag[0][1]].h : imag[1][1]!=IMG_EMPTY;
 		while(  h <= row.h  ) {
 			display_three_image_row( imag[0][1], imag[1][1], imag[2][1], row );
 			row.y += h;
@@ -2845,7 +2846,7 @@ static void display_color_img_wc(const PIXVAL *sp, KOORD_VAL x, KOORD_VAL y, KOO
 			xpos += (runlen & ~TRANSPARENT_RUN);
 
 			// now get colored pixels
-			runlen = (*sp++) & ~TRANSPARENT_RUN;	// we recode anyway, so no need to do it explicitely
+			runlen = (*sp++) & ~TRANSPARENT_RUN; // we recode anyway, so no need to do it explicitely
 
 			// something to display?
 			if(  xpos + runlen > CR.clip_rect.x  &&  xpos < CR.clip_rect.xx  ) {
@@ -3007,7 +3008,7 @@ PIXVAL display_blend_colors(PIXVAL background, PIXVAL foreground, int percent_bl
 	const PIXVAL alpha = (percent_blend*64)/100;
 
 	switch( alpha ) {
-		case 0:	// nothing to do ...
+		case 0: // nothing to do ...
 			return background;
 		case 16:
 		{
@@ -3273,7 +3274,7 @@ void display_blend_wh_rgb(KOORD_VAL xp, KOORD_VAL yp, KOORD_VAL w, KOORD_VAL h, 
 		const PIXVAL alpha = (percent_blend*64)/100;
 
 		switch( alpha ) {
-			case 0:	// nothing to do ...
+			case 0: // nothing to do ...
 				break;
 
 			case 16:
@@ -3925,9 +3926,13 @@ void display_base_img_alpha(const image_id n, const image_id alpha_n, const unsi
 
 
 // scrolls horizontally, will ignore clipping etc.
-void display_scroll_band(const KOORD_VAL start_y, const KOORD_VAL x_offset, const KOORD_VAL h)
+void display_scroll_band(KOORD_VAL start_y, KOORD_VAL x_offset, KOORD_VAL h)
 {
-	const PIXVAL*const src = textur + start_y * disp_width + x_offset;
+	start_y  = max(start_y,  0);
+	x_offset = min(x_offset, disp_width);
+	h        = min(h,        disp_height);
+
+	const PIXVAL *const src = textur + start_y * disp_width + x_offset;
 	PIXVAL *const dst = textur + start_y * disp_width;
 	const size_t amount = sizeof(PIXVAL) * (h * disp_width - x_offset);
 
@@ -4102,33 +4107,31 @@ void display_array_wh(KOORD_VAL xp, KOORD_VAL yp, KOORD_VAL w, KOORD_VAL h, cons
 // --------------------------------- text rendering stuff ------------------------------
 
 
-uint16 display_load_font(const char* fname, bool reload)
+bool display_load_font(const char *fname, bool reload)
 {
-	font_t fnt;
+	font_t loaded_fnt;
 
 	if(  fname == NULL  ) {
 		dbg->error( "display_load_font", "NULL filename" );
-		return 0;
+		return false;
 	}
+
 	// skip reloading if already in memory, if bdf font
-	if(  !reload  &&  large_font.num_chars>0  &&  strcmp( large_font.fname, fname ) == 0  ) {
-		return large_font.num_chars;
+	if(  !reload  &&  default_font.is_loaded()  &&  strcmp( default_font.get_fname(), fname ) == 0  ) {
+		return true;
 	}
 
-	tstrncpy( large_font.fname, fname, lengthof(large_font.fname) );
-	if(  load_font(&fnt, fname)  ) {
-
-		free(large_font.screen_width);
-		free(large_font.char_data);
-		large_font = fnt;
-		large_font_ascent = large_font.height + large_font.descent;
-		large_font_total_height = large_font.height;	// this is the actual LINESPACE
+	if(  loaded_fnt.load_from_file(fname)  ) {
+		default_font = loaded_fnt;
+		default_font_ascent    = default_font.get_ascent();
+		default_font_linespace = default_font.get_linespace();
 
 		env_t::fontname = fname;
 
-		return large_font.num_chars;
+		return default_font.is_loaded();
 	}
-	return 0;
+
+	return false;
 }
 
 
@@ -4150,12 +4153,7 @@ sint32 get_prev_char(const char* text, sint32 pos)
 
 KOORD_VAL display_get_char_width(utf32 c)
 {
-	KOORD_VAL pixel_width;
-	if(  c >= large_font.num_chars  ||  (pixel_width = large_font.screen_width[c]) == 0xFF  ) {
-		// default width for missing characters
-		return large_font.screen_width[0];
-	}
-	return pixel_width;
+	return default_font.get_glyph_advance(c);
 }
 
 
@@ -4192,13 +4190,7 @@ utf32 get_next_char_with_metrics(const char* &text, unsigned char &byte_length, 
 	else {
 		text += len;
 		byte_length = len;
-		if(  char_code >= large_font.num_chars  ||  (pixel_width=large_font.screen_width[char_code]) == 0xFF  ) {
-			// default width for missing characters
-			pixel_width = large_font.screen_width[0];
-		}
-		else {
-			pixel_width = large_font.screen_width[char_code];
-		}
+		pixel_width = default_font.get_glyph_advance(char_code);
 	}
 	return char_code;
 }
@@ -4207,11 +4199,7 @@ utf32 get_next_char_with_metrics(const char* &text, unsigned char &byte_length, 
 /* returns true, if this is a valid character */
 bool has_character( utf16 char_code )
 {
-	if(  char_code >= large_font.num_chars  ||  large_font.screen_width[char_code] == 0xFF  ) {
-		// missing characters
-		return false;
-	}
-	return true;
+	return default_font.is_valid_glyph(char_code);
 }
 
 
@@ -4277,11 +4265,8 @@ utf32 get_prev_char_with_metrics(const char* &text, const char *const text_start
 	size_t len = 0;
 	char_code = utf8_decoder_t::decode((utf8 const *)text, len);
 	byte_length = len;
+	pixel_width = default_font.get_glyph_advance(char_code);
 
-	if(  char_code >= large_font.num_chars  ||  (pixel_width=large_font.screen_width[char_code]) == 0xFF  ) {
-		// default width for missing characters
-		pixel_width = large_font.screen_width[0];
-	}
 	return char_code;
 }
 
@@ -4291,22 +4276,17 @@ utf32 get_prev_char_with_metrics(const char* &text, const char *const text_start
 */
 int display_calc_proportional_string_len_width(const char *text, size_t len)
 {
-	const font_t* const fnt = &large_font;
+	const font_t* const fnt = &default_font;
 	unsigned int width = 0;
-	int w;
 
 	// decode char
 	const char *const end = text + len;
 	while(  text < end  ) {
-		utf32 iUnicode = utf8_decoder_t::decode((utf8 const *&)text);
+		const utf32 iUnicode = utf8_decoder_t::decode((utf8 const *&)text);
 		if(  iUnicode == UNICODE_NUL ||  iUnicode == '\n') {
 			return width;
 		}
-		else if(  iUnicode >= fnt->num_chars  ||  (w = fnt->screen_width[iUnicode]) == 0xFF  ) {
-			// default width for missing characters
-			w = fnt->screen_width[0];
-		}
-		width += w;
+		width += fnt->get_glyph_advance(iUnicode);
 	}
 
 	return width;
@@ -4319,9 +4299,8 @@ int display_calc_proportional_string_len_width(const char *text, size_t len)
 */
 void display_calc_proportional_multiline_string_len_width(int &xw, int &yh, const char *text, size_t len)
 {
-	const font_t* const fnt = &large_font;
+	const font_t* const fnt = &default_font;
 	int width = 0;
-	int w;
 
 	xw = yh = 0;
 
@@ -4338,12 +4317,10 @@ void display_calc_proportional_multiline_string_len_width(int &xw, int &yh, cons
 		if(  iUnicode == UNICODE_NUL ) {
 			return;
 		}
-		else if(  iUnicode >= fnt->num_chars  ||  (w = fnt->screen_width[iUnicode]) == 0xFF  ) {
-			// default width for missing characters
-			w = fnt->screen_width[0];
-		}
-		width += w;
+
+		width += fnt->get_glyph_advance(iUnicode);
 	}
+
 	xw = max( xw, width );
 	yh += LINESPACE;
 }
@@ -4377,25 +4354,16 @@ static unsigned char get_h_mask(const int xL, const int xR, const int cL, const 
 	return mask;
 }
 
+
 /**
  * len parameter added - use -1 for previous behaviour.
  * completely renovated for unicode and 10 bit width and variable height
  */
 int display_text_proportional_len_clip_rgb(KOORD_VAL x, KOORD_VAL y, const char* txt, control_alignment_t flags, const PIXVAL color, bool dirty, sint32 len  CLIP_NUM_DEF)
 {
-	const font_t* const fnt = &large_font;
 	KOORD_VAL cL, cR, cT, cB;
-	utf32 c;
-	size_t iTextPos = 0; // pointer on text position
-	int char_width_1, char_width_2; // 1 is char only, 2 includes room
-	int screen_pos;
-	const uint8 *char_data;
-	const uint8 *p;
-	KOORD_VAL yy = y + fnt->height;
-	KOORD_VAL x0;	// store the initial x (for dirty marking)
-	KOORD_VAL y_offset, char_height;	// real y for display with clipping
 
-	// TAKE CARE: Clipping area may be larger than actual screen size ...
+	// TAKE CARE: Clipping area may be larger than actual screen size
 	if(  (flags & DT_CLIP)  ) {
 		cL = CR.clip_rect.x;
 		cR = CR.clip_rect.xx;
@@ -4408,8 +4376,9 @@ int display_text_proportional_len_clip_rgb(KOORD_VAL x, KOORD_VAL y, const char*
 		cT = 0;
 		cB = disp_height;
 	}
-	// don't know len yet ...
+
 	if (len < 0) {
+		// don't know len yet
 		len = 0x7FFF;
 	}
 
@@ -4429,64 +4398,61 @@ int display_text_proportional_len_clip_rgb(KOORD_VAL x, KOORD_VAL y, const char*
 	}
 
 	// still something to display?
-	if (x >= cR || y >= cB || y + fnt->height <= cT) {
+	const font_t *const fnt = &default_font;
+
+	if (x >= cR || y >= cB || y + fnt->get_linespace() <= cT) {
 		// nothing to display
 		return 0;
 	}
 
-	// x0 contains the starting x
-	x0 = x;
-	y_offset = 0;
-	char_height = fnt->height;
+	// store the initial x (for dirty marking)
+	const KOORD_VAL x0 = x;
+
+	KOORD_VAL y_offset = 0; // real y for display with clipping
+	KOORD_VAL glyph_height = fnt->get_linespace();
+	const KOORD_VAL yy = y + fnt->get_linespace();
+
 	// calculate vertical y clipping parameters
 	if (y < cT) {
 		y_offset = cT - y;
 	}
 	if (yy > cB) {
-		char_height -= yy - cB;
+		glyph_height -= yy - cB;
 	}
 
-	// big loop, char by char
+	// big loop, draw char by char
 	utf8_decoder_t decoder((utf8 const*)txt);
-	while (iTextPos < (size_t)len  &&  decoder.has_next()) {
-		int h;
-		uint8 char_yoffset;
+	size_t iTextPos = 0; // pointer on text position
 
+	while (iTextPos < (size_t)len  &&  decoder.has_next()) {
 		// decode char
-		c = decoder.next();
+		utf32 c = decoder.next();
 		iTextPos = decoder.get_position() - (utf8 const*)txt;
 
-		if(  c == '\n') {
+		if(  c == '\n'  ) {
 			// stop at linebreak
 			break;
 		}
 		// print unknown character?
-		if(  c >= fnt->num_chars  ||  fnt->screen_width[c] == 0xFF  ) {
+		else if(  !fnt->is_valid_glyph(c)  ) {
 			c = 0;
 		}
 
 		// get the data from the font
-		char_data = fnt->char_data + CHARACTER_LEN * c;
-		char_width_1 = char_data[CHARACTER_LEN-1];
-		char_yoffset = (sint8)char_data[CHARACTER_LEN-2];
-		char_width_2 = fnt->screen_width[c];
-
-		// do the display
-		if(  y_offset>char_yoffset  ) {
-			char_yoffset = (uint8)y_offset;
-		}
+		int glyph_width = fnt->get_glyph_width(c);
+		const uint8 glyph_yoffset = std::max(fnt->get_glyph_yoffset(c), (uint8)y_offset);
 
 		// currently max character width 16 bit supported by font.h/font.cc
 		for(  int i=0;  i<2;  i++  ) {
+			const uint8 bits = std::min(8, glyph_width);
+			uint8 mask = get_h_mask(x + i*8, x + i*8 + bits, cL, cR);
+			glyph_width -= bits;
 
-			uint8 bits = min(8, char_width_1);
-			unsigned char mask = get_h_mask(x + i*8, x + i*8 + bits, cL, cR);
-			char_width_1 -= bits;
+			const uint8 *p = fnt->get_glyph_bitmap(c) + glyph_yoffset + i*GLYPH_BITMAP_HEIGHT;
+			if(  mask!=0  ) {
+				int screen_pos = (y+glyph_yoffset) * disp_width + x + i*8;
 
-			p = char_data + char_yoffset + i*CHARACTER_HEIGHT;
-			if(  mask  ) {
-				screen_pos = (y+char_yoffset) * disp_width + x + i*8;
-				for (h = char_yoffset; h < char_height; h++) {
+				for (int h = glyph_yoffset; h < glyph_height; h++) {
 					unsigned int dat = *p++ & mask;
 					PIXVAL* dst = textur + screen_pos;
 
@@ -4501,14 +4467,15 @@ int display_text_proportional_len_clip_rgb(KOORD_VAL x, KOORD_VAL y, const char*
 				}
 			}
 		}
-		// next char: screen width
-		x += char_width_2;
+
+		x += fnt->get_glyph_advance(c);
 	}
 
 	if(  dirty  ) {
 		// here, because only now we know the length also for ALIGN_LEFT text
-		mark_rect_dirty_clip( x0, y, x - 1, y + large_font_total_height - 1  CLIP_NUM_PAR);
+		mark_rect_dirty_clip( x0, y, x - 1, y + LINESPACE - 1  CLIP_NUM_PAR);
 	}
+
 	// warning: actual len might be longer, due to clipping!
 	return x - x0;
 }
@@ -4609,17 +4576,17 @@ void display_ddd_box_rgb(KOORD_VAL x1, KOORD_VAL y1, KOORD_VAL w, KOORD_VAL h, P
 void display_outline_proportional_rgb(KOORD_VAL xpos, KOORD_VAL ypos, PIXVAL text_color, PIXVAL shadow_color, const char *text, int dirty, sint32 len)
 {
 	const int flags = ALIGN_LEFT | DT_CLIP;
-	display_text_proportional_len_clip_rgb(xpos - 1, ypos - 1 + (12 - large_font_total_height) / 2, text, flags, shadow_color, dirty, len  CLIP_NUM_DEFAULT);
-	display_text_proportional_len_clip_rgb(xpos + 1, ypos + 1 + (12 - large_font_total_height) / 2, text, flags, shadow_color, dirty, len  CLIP_NUM_DEFAULT);
-	display_text_proportional_len_clip_rgb(xpos, ypos + (12 - large_font_total_height) / 2, text, flags, text_color, dirty, len  CLIP_NUM_DEFAULT);
+	display_text_proportional_len_clip_rgb(xpos - 1, ypos - 1 + (12 - LINESPACE) / 2, text, flags, shadow_color, dirty, len  CLIP_NUM_DEFAULT);
+	display_text_proportional_len_clip_rgb(xpos + 1, ypos + 1 + (12 - LINESPACE) / 2, text, flags, shadow_color, dirty, len  CLIP_NUM_DEFAULT);
+	display_text_proportional_len_clip_rgb(xpos, ypos + (12 - LINESPACE) / 2, text, flags, text_color, dirty, len  CLIP_NUM_DEFAULT);
 }
 
 
 void display_shadow_proportional_rgb(KOORD_VAL xpos, KOORD_VAL ypos, PIXVAL text_color, PIXVAL shadow_color, const char *text, int dirty, sint32 len)
 {
 	const int flags = ALIGN_LEFT | DT_CLIP;
-	display_text_proportional_len_clip_rgb(xpos + 1, ypos + 1 + (12 - large_font_total_height) / 2, text, flags, shadow_color, dirty, len  CLIP_NUM_DEFAULT);
-	display_text_proportional_len_clip_rgb(xpos, ypos + (12 - large_font_total_height) / 2, text, flags, text_color, dirty, len  CLIP_NUM_DEFAULT);
+	display_text_proportional_len_clip_rgb(xpos + 1, ypos + 1 + (12 - LINESPACE) / 2, text, flags, shadow_color, dirty, len  CLIP_NUM_DEFAULT);
+	display_text_proportional_len_clip_rgb(xpos, ypos + (12 - LINESPACE) / 2, text, flags, text_color, dirty, len  CLIP_NUM_DEFAULT);
 }
 
 
@@ -4643,7 +4610,7 @@ void display_ddd_box_clip_rgb(KOORD_VAL x1, KOORD_VAL y1, KOORD_VAL w, KOORD_VAL
  */
 void display_ddd_proportional_clip(KOORD_VAL xpos, KOORD_VAL ypos, KOORD_VAL width, KOORD_VAL hgt, FLAGGED_PIXVAL ddd_color, FLAGGED_PIXVAL text_color, const char *text, int dirty  CLIP_NUM_DEF)
 {
-	int halfheight = large_font_total_height / 2 + 1;
+	const int halfheight = LINESPACE / 2 + 1;
 
 	PIXVAL lighter = display_blend_colors(ddd_color, color_idx_to_rgb(COL_WHITE), 25);
 	PIXVAL darker  = display_blend_colors(ddd_color, color_idx_to_rgb(COL_BLACK), 25);
@@ -4656,7 +4623,7 @@ void display_ddd_proportional_clip(KOORD_VAL xpos, KOORD_VAL ypos, KOORD_VAL wid
 	display_vline_wh_clip_rgb( xpos - 2,         ypos - halfheight - 1 - hgt, halfheight * 2 + 2, lighter, dirty );
 	display_vline_wh_clip_rgb( xpos + width - 3, ypos - halfheight - 1 - hgt, halfheight * 2 + 2, darker,  dirty );
 
-	display_text_proportional_len_clip_rgb( xpos + 2, ypos - 5 + (12 - large_font_total_height) / 2, text, ALIGN_LEFT | DT_CLIP, text_color, dirty, -1);
+	display_text_proportional_len_clip_rgb( xpos + 2, ypos - 5 + (12 - LINESPACE) / 2, text, ALIGN_LEFT | DT_CLIP, text_color, dirty, -1);
 }
 
 
@@ -4865,7 +4832,7 @@ void draw_bezier_rgb(KOORD_VAL Ax, KOORD_VAL Ay, KOORD_VAL Bx, KOORD_VAL By, KOO
 	Dx = Bx + BDx;
 	Dy = By + BDy;
 
-	/*	float a,b,rx,ry,oldx,oldy;
+	/* float a,b,rx,ry,oldx,oldy;
 	for (float t=0.0;t<=1;t+=0.05)
 	{
 		a = t;
@@ -4903,6 +4870,20 @@ void draw_bezier_rgb(KOORD_VAL Ax, KOORD_VAL Ay, KOORD_VAL Bx, KOORD_VAL By, KOO
 		}
 	}
 }
+
+
+
+// Only right facing at the moment
+void display_right_triangle_rgb(KOORD_VAL x, KOORD_VAL y, KOORD_VAL height, const PIXVAL colval, const bool dirty)
+{
+	y += (height / 2);
+	while(  height > 0  ) {
+		display_vline_wh_rgb( x, y-(height/2), height, colval, dirty );
+		x++;
+		height -= 2;
+	}
+}
+
 
 
 // ------------------- other support routines that actually interface with the OS -----------------
@@ -5082,10 +5063,10 @@ void display_show_load_pointer(int loading)
 /**
  * Initialises the graphics module
  */
-void simgraph_init(KOORD_VAL width, KOORD_VAL height, int full_screen)
+void simgraph_init(scr_size window_size, bool full_screen)
 {
-	disp_actual_width = width;
-	disp_height = height;
+	disp_actual_width = window_size.w;
+	disp_height = window_size.h;
 
 #ifdef MULTI_THREAD
 	pthread_mutex_init( &recode_img_mutex, NULL );
@@ -5102,14 +5083,11 @@ void simgraph_init(KOORD_VAL width, KOORD_VAL height, int full_screen)
 	}
 
 	// get real width from os-dependent routines
-	disp_width = dr_os_open(width, height, full_screen);
+	disp_width = dr_os_open(window_size.w, window_size.h, full_screen);
 	if(  disp_width>0  ) {
 		textur = dr_textur_init();
 
 		// init, load, and check fonts
-		large_font.screen_width = NULL;
-		large_font.char_data = NULL;
-
 		if(  !display_load_font(env_t::fontname.c_str())  &&  !display_load_font(FONT_PATH_X "prop.fnt") ) {
 			dr_fatal_notify( "No fonts found!" );
 			fprintf(stderr, "Error: No fonts found!");
@@ -5201,9 +5179,9 @@ void simgraph_init(KOORD_VAL width, KOORD_VAL height, int full_screen)
 /**
  * Check if the graphic module already was initialized.
  */
-int is_display_init()
+bool is_display_init()
 {
-	return textur != NULL  &&  large_font.num_chars>0;
+	return textur != NULL  &&  default_font.is_loaded()  &&  images!=NULL;
 }
 
 
@@ -5232,18 +5210,18 @@ void simgraph_exit()
 
 /* changes display size
  */
-void simgraph_resize(KOORD_VAL w, KOORD_VAL h)
+void simgraph_resize(scr_size new_window_size)
 {
-	disp_actual_width = max( 16, w );
-	if(  h<=0  ) {
-		h = 64;
+	disp_actual_width = max( 16, new_window_size.w );
+	if(  new_window_size.h<=0  ) {
+		new_window_size.h = 64;
 	}
 	// only resize, if internal values are different
-	if (disp_width != w || disp_height != h) {
-		KOORD_VAL new_width = dr_textur_resize(&textur, w, h);
-		if(  new_width!=disp_width  ||  disp_height != h) {
-			disp_width = new_width;
-			disp_height = h;
+	if (disp_width != new_window_size.w || disp_height != new_window_size.h) {
+		KOORD_VAL new_pitch = dr_textur_resize(&textur, new_window_size.w, new_window_size.h);
+		if(  new_pitch!=disp_width  ||  disp_height != new_window_size.h) {
+			disp_width = new_pitch;
+			disp_height = new_window_size.h;
 
 			free( tile_dirty_old );
 			free( tile_dirty);

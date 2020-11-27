@@ -3,8 +3,9 @@
  * (see LICENSE.txt)
  */
 
-#ifndef __CROSSING_DESC_H
-#define __CROSSING_DESC_H
+#ifndef DESCRIPTOR_CROSSING_DESC_H
+#define DESCRIPTOR_CROSSING_DESC_H
+
 
 #include "obj_base_desc.h"
 #include "image.h"
@@ -16,13 +17,13 @@
 class checksum_t;
 
 /**
- *  Child nodes:
- *	0   Name
- *	1   Copyright
- *	2   Image-list
+ * Child nodes:
+ *  0   Name
+ *  1   Copyright
+ *  2   Image-list
  */
 class crossing_desc_t : public obj_desc_timelined_t {
-    friend class crossing_reader_t;
+	friend class crossing_reader_t;
 
 private:
 	waytype_t waytype1;
@@ -33,7 +34,7 @@ private:
 	uint32 closed_animation_time;
 	uint32 open_animation_time;
 
-	sint32 topspeed1;	// the topspeed depeds strongly on the crossing ...
+	sint32 topspeed1; // the topspeed depeds strongly on the crossing ...
 	sint32 topspeed2;
 
 public:

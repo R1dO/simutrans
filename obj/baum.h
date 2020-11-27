@@ -3,16 +3,21 @@
  * (see LICENSE.txt)
  */
 
-#ifndef obj_baum_h
-#define obj_baum_h
+#ifndef OBJ_BAUM_H
+#define OBJ_BAUM_H
 
-#include <string>
+
+#include "simobj.h"
+
 #include "../tpl/stringhashtable_tpl.h"
 #include "../tpl/vector_tpl.h"
 #include "../tpl/weighted_vector_tpl.h"
 #include "../descriptor/tree_desc.h"
 #include "../simcolor.h"
 #include "../dataobj/environment.h"
+
+#include <string>
+
 
 /**
  * Simulated trees for Simutrans.
@@ -48,8 +53,6 @@ private:
 	void calc_off(uint8 slope, sint8 x=-128, sint8 y=-128);
 
 	static uint16 random_tree_for_climate_intern(climate cl);
-
-	static uint8 plant_tree_on_coordinate(koord pos, const uint8 maximum_count, const uint8 count);
 
 public:
 	/**
@@ -114,15 +117,18 @@ public:
 	// static functions to handle trees
 
 	// distributes trees on a map
-	static void distribute_trees(int dichte);
+	static void distribute_trees(int dichte,  sint16 xtop, sint16 ytop, sint16 xbottom, sint16 ybottom );
+
+	static void fill_trees(int dichte, sint16 xtop, sint16 ytop, sint16 xbottom, sint16 ybottom );
+
+	static uint32 create_forest(koord center, koord size, sint16 xtop, sint16 ytop, sint16 xbottom, sint16 ybottom );
 
 	static bool plant_tree_on_coordinate(koord pos, const tree_desc_t *desc, const bool check_climate, const bool random_age );
 
+	static uint8 plant_tree_on_coordinate(koord pos, const uint8 maximum_count, const uint8 count);
+
 	static bool register_desc(tree_desc_t *desc);
 	static bool successfully_loaded();
-
-	static uint32 create_forest(koord center, koord size );
-	static void fill_trees(int dichte);
 
 	// return list to descriptors
 	static vector_tpl<tree_desc_t const*> const& get_all_desc() { return tree_list; }

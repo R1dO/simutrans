@@ -12,6 +12,7 @@
 #include "../simhalt.h"
 #include "../simware.h"
 #include "../simfab.h"
+#include "../unicode.h"
 #include "simwin.h"
 #include "../descriptor/skin_desc.h"
 
@@ -129,7 +130,7 @@ static bool passes_filter_name(haltestelle_t const& s)
 {
 	if (!halt_list_frame_t::get_filter(halt_list_frame_t::name_filter)) return true;
 
-	return strstr(s.get_name(), halt_list_frame_t::access_name_filter());
+	return utf8caseutf8(s.get_name(), halt_list_frame_t::access_name_filter());
 }
 
 
@@ -192,9 +193,9 @@ static bool passes_filter_out(haltestelle_t const& s)
 		} else if (ware == goods_manager_t::mail) {
 			if (s.get_mail_enabled()) return true;
 		} else if (ware != goods_manager_t::none) {
-			// Oh Mann - eine doppelte Schleife und das noch pro Haltestelle
-			// Zum Glück ist die Anzahl der Fabriken und die ihrer Ausgänge
-			// begrenzt (Normal 1-2 Fabriken mit je 0-1 Ausgang)
+			// Sigh - a doubly nested loop per halt
+			// Fortunately the number of factories and their number of outputs
+			// is limited (usually 1-2 factories and 0-1 outputs per factory)
 			FOR(slist_tpl<fabrik_t*>, const f, s.get_fab_list()) {
 				FOR(array_tpl<ware_production_t>, const& j, f->get_output()) {
 					if (j.get_typ() == ware) return true;
@@ -227,9 +228,9 @@ static bool passes_filter_in(haltestelle_t const& s)
 			if (s.get_mail_enabled()) return true;
 		}
 		else if (ware != goods_manager_t::none) {
-			// Oh Mann - eine doppelte Schleife und das noch pro Haltestelle
-			// Zum Glück ist die Anzahl der Fabriken und die ihrer Ausgänge
-			// begrenzt (Normal 1-2 Fabriken mit je 0-1 Ausgang)
+			// Sigh - a doubly nested loop per halt
+			// Fortunately the number of factories and their number of outputs
+			// is limited (usually 1-2 factories and 0-1 outputs per factory)
 			FOR(slist_tpl<fabrik_t*>, const f, s.get_fab_list()) {
 				FOR(array_tpl<ware_production_t>, const& j, f->get_input()) {
 					if (j.get_typ() == ware) return true;
@@ -316,7 +317,7 @@ halt_list_frame_t::~halt_list_frame_t()
 */
 void halt_list_frame_t::fill_list()
 {
-	last_world_stops = haltestelle_t::get_alle_haltestellen().get_count();				// count of stations
+	last_world_stops = haltestelle_t::get_alle_haltestellen().get_count(); // count of stations
 
 	scrolly->clear_elements();
 	FOR(vector_tpl<halthandle_t>, const halt, haltestelle_t::get_alle_haltestellen()) {

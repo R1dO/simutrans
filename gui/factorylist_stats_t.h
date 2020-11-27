@@ -3,8 +3,9 @@
  * (see LICENSE.txt)
  */
 
-#ifndef factorylist_stats_t_h
-#define factorylist_stats_t_h
+#ifndef GUI_FACTORYLIST_STATS_T_H
+#define GUI_FACTORYLIST_STATS_T_H
+
 
 #include "components/gui_colorbox.h"
 #include "components/gui_image.h"
@@ -16,7 +17,19 @@ class fabrik_t;
 
 
 namespace factorylist {
-    enum sort_mode_t { by_name=0, by_available, by_output, by_maxprod, by_status, by_power, SORT_MODES, by_input, by_transit,  };	// the last two not used
+	enum sort_mode_t {
+		by_name = 0,
+		by_available,
+		by_output,
+		by_maxprod,
+		by_status,
+		by_power,
+		SORT_MODES,
+
+		// the last two are unused
+		by_input,
+		by_transit
+	};
 };
 
 /**

@@ -86,6 +86,7 @@ static image_t* create_textured_tile(const image_t* image_lightmap, const image_
 	assert(dest - image_dest->get_data() == (ptrdiff_t)image_dest->get_pic()->len);
 #else
 	(void)image_texture;
+	(void)binary;
 #endif
 	image_dest->register_image();
 	return image_dest;
@@ -204,11 +205,11 @@ static image_t* create_alpha_tile(const image_t* image_lightmap, slope_t::type s
 				// now we have calulated the y_t of square tile that is rotated by 45 degree
 				// so we just have to do a 45 deg backtransform ...
 				// (and do not forget: tile_y_corrected middle = 0!
-				sint16 x_t = tile_x - tile_y_corrected;
-				sint16 y_t = tile_y_corrected + tile_x;
+				sint32 x_t = tile_x - tile_y_corrected;
+				sint32 y_t = tile_y_corrected + tile_x;
 				// due to some inexactness of integer arithmethics, we have to take care of overflow and underflow
-				x_t = max(0, min(x_t, x_y-1));
-				y_t = max(0, min(y_t, x_y-1));
+				x_t = clamp(x_t, 0, x_y-1);
+				y_t = clamp(y_t, 0, x_y-1);
 				sint32 alphamap_offset = ((y_t * mix_x_y) / x_y) * (mix_x_y + 3) + 2 + (x_t * mix_x_y) / x_y;
 
 				// see only the mixmap for mixing
@@ -308,14 +309,14 @@ karte_t *ground_desc_t::world = NULL;
  */
 const uint8 ground_desc_t::slopetable[80] =
 {
-	0,	1,	0xFF,	2,	3,	0xFF,	0xFF,	0xFF,	0xFF,	4,
-	5, 	0xFF,	6,	7,	0xFF,	0xFF,	0xFF,	0xFF,	0xFF,	0xFF,
-	0xFF,	0xFF,	0xFF,	0xFF,	0xFF,	0xFF,	0xFF,	8,	9,	0xFF,
-	10,	11,	0xFF,	0xFF,	0xFF,	0xFF,	12,	13,	0xFF,	14,
-	0xFF,	0xFF,	0xFF,	0xFF,	0xFF,	0xFF,	0xFF,	0xFF,	0xFF,	0xFF,
-	0xFF,	0xFF,	0xFF,	0xFF,	0xFF,	0xFF,	0xFF,	0xFF,	0xFF,	0xFF,
-	0xFF,	0xFF,	0xFF,	0xFF,	0xFF,	0xFF,	0xFF,	0xFF,	0xFF,	0xFF,
-	0xFF,	0xFF,	0xFF,	0xFF,	0xFF,	0xFF,	0xFF,	0xFF,	0xFF,	0xFF
+	0,    1,    0xFF, 2,    3,    0xFF, 0xFF, 0xFF, 0xFF, 4,
+	5,    0xFF, 6,    7,    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+	0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 8,    9,    0xFF,
+	10,   11,   0xFF, 0xFF, 0xFF, 0xFF, 12,   13,   0xFF, 14,
+	0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+	0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+	0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+	0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF
 };
 
 
@@ -352,25 +353,25 @@ const ground_desc_t *ground_desc_t::sea = NULL;
 const ground_desc_t *ground_desc_t::outside = NULL;
 
 static special_obj_tpl<ground_desc_t> const grounds[] = {
-    { &ground_desc_t::shore,    "Shore" },
-    { &boden_texture,	    "ClimateTexture" },
-    { &light_map,	    "LightTexture" },
-    { &transition_water_texture,    "ShoreTrans" },
-    { &transition_slope_texture,    "SlopeTrans" },
-    { &ground_desc_t::fundament,    "Basement" },
-    { &ground_desc_t::slopes,    "Slopes" },
-    { &ground_desc_t::fences,   "Fence" },
-    { &ground_desc_t::marker,   "Marker" },
-    { &ground_desc_t::borders,   "Borders" },
-    { &ground_desc_t::sea,   "Water" },
-    { &ground_desc_t::outside,   "Outside" },
-    { NULL, NULL }
+	{ &ground_desc_t::shore,     "Shore"          },
+	{ &boden_texture,            "ClimateTexture" },
+	{ &light_map,                "LightTexture"   },
+	{ &transition_water_texture, "ShoreTrans"     },
+	{ &transition_slope_texture, "SlopeTrans"     },
+	{ &ground_desc_t::fundament, "Basement"       },
+	{ &ground_desc_t::slopes,    "Slopes"         },
+	{ &ground_desc_t::fences,    "Fence"          },
+	{ &ground_desc_t::marker,    "Marker"         },
+	{ &ground_desc_t::borders,   "Borders"        },
+	{ &ground_desc_t::sea,       "Water"          },
+	{ &ground_desc_t::outside,   "Outside"        },
+	{ NULL, NULL }
 };
 
 // the water and seven climates
 static const char* const climate_names[MAX_CLIMATES] =
 {
-    "Water", "desert", "tropic", "mediterran", "temperate", "tundra", "rocky", "arctic"
+	"Water", "desert", "tropic", "mediterran", "temperate", "tundra", "rocky", "arctic"
 };
 
 // from this number on there will be all ground images

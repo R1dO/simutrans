@@ -3,8 +3,9 @@
  * (see LICENSE.txt)
  */
 
-#ifndef __IMAGE_DESC_H
-#define __IMAGE_DESC_H
+#ifndef DESCRIPTOR_IMAGE_H
+#define DESCRIPTOR_IMAGE_H
+
 
 #include "../display/simgraph.h"
 #include "../display/simimg.h"
@@ -21,8 +22,8 @@
 /**
  * Data of one image
  *
- *  Child nodes:
- *	(none)
+ * Child nodes:
+ *  (none)
  */
 class image_t : public obj_desc_t
 {

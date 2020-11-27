@@ -7,9 +7,10 @@
 
 
 #include "gui_theme.h"
+#include "../simworld.h"
 #include "../simskin.h"
 #include "../simmenu.h"
-#include "../simsys.h"
+#include "../sys/simsys.h"
 #include "../dataobj/environment.h"
 #include "../dataobj/tabfile.h"
 #include "components/gui_button.h"
@@ -55,6 +56,10 @@ PIXVAL gui_theme_t::gui_color_statusbar_background;
 PIXVAL gui_theme_t::gui_color_statusbar_divider;
 PIXVAL gui_theme_t::gui_highlight_color;
 PIXVAL gui_theme_t::gui_shadow_color;
+PIXVAL gui_theme_t::gui_color_loadingbar_inner;
+PIXVAL gui_theme_t::gui_color_loadingbar_progress;
+PIXVAL gui_theme_t::gui_color_obsolete;
+PIXVAL gui_theme_t::gui_color_empty;
 
 /**
  * Max Kielland
@@ -91,6 +96,7 @@ KOORD_VAL gui_theme_t::gui_frame_right;
 KOORD_VAL gui_theme_t::gui_frame_bottom;
 KOORD_VAL gui_theme_t::gui_hspace;
 KOORD_VAL gui_theme_t::gui_vspace;
+KOORD_VAL gui_theme_t::gui_filelist_vspace;
 
 /* those are the 3x3 images which are used for stretching
  * also 1x3 and 3x1 subsets are possible
@@ -168,6 +174,15 @@ void gui_theme_t::init_gui_defaults()
 	gui_highlight_color                    = color_idx_to_rgb(MN_GREY4);
 	gui_shadow_color                       = color_idx_to_rgb(MN_GREY0);
 
+	gui_color_loadingbar_inner             = color_idx_to_rgb(COL_GREY5);
+	gui_color_loadingbar_progress          = color_idx_to_rgb(COL_BLUE);
+
+	gui_color_obsolete                     = color_idx_to_rgb(COL_BLUE);
+	gui_color_empty                        = color_idx_to_rgb(COL_WHITE);
+
+	env_t::gui_player_color_bright = 4;
+	env_t::gui_player_color_dark   = 1;
+
 	gui_button_size              = scr_size(92,14);
 	gui_color_button_size        = scr_size(92,16);
 	gui_button_text_offset       = scr_size(0,0);
@@ -194,6 +209,7 @@ void gui_theme_t::init_gui_defaults()
 	gui_frame_bottom     = 10;
 	gui_hspace           = 4;
 	gui_vspace           = 4;
+	gui_filelist_vspace  = 0;
 	gui_waitingbar_width = 4;
 	gui_divider_size.h   = D_V_SPACE*2;
 
@@ -357,7 +373,7 @@ void gui_theme_t::init_gui_from_images()
  * manager. This will be done as the last step in
  * the chain when loading a theme.
  */
-bool gui_theme_t::themes_init(const char *file_name, bool init_fonts )
+bool gui_theme_t::themes_init(const char *file_name, bool init_fonts, bool init_tools )
 {
 	tabfile_t themesconf;
 
@@ -399,6 +415,7 @@ bool gui_theme_t::themes_init(const char *file_name, bool init_fonts )
 		obj_reader_t::read_file(buttonpak.c_str());
 		gui_theme_t::init_gui_from_images();
 		free(pathname);
+		dr_chdir(env_t::user_dir);
 	}
 
 	// first the stuff for the dialogues
@@ -409,6 +426,7 @@ bool gui_theme_t::themes_init(const char *file_name, bool init_fonts )
 	gui_theme_t::gui_frame_bottom =    (uint32)contents.get_int("gui_frame_bottom",    gui_theme_t::gui_frame_bottom );
 	gui_theme_t::gui_hspace =          (uint32)contents.get_int("gui_hspace",          gui_theme_t::gui_hspace );
 	gui_theme_t::gui_vspace =          (uint32)contents.get_int("gui_vspace",          gui_theme_t::gui_vspace );
+	gui_theme_t::gui_filelist_vspace = (uint32)contents.get_int("gui_filelist_vspace", gui_theme_t::gui_filelist_vspace );
 
 	// the divider needs the vspace added to it for know
 	gui_divider_size.h += gui_vspace*2;
@@ -420,6 +438,9 @@ bool gui_theme_t::themes_init(const char *file_name, bool init_fonts )
 
 	gui_theme_t::gui_checkbox_size.w = (uint32)contents.get_int("gui_checkbox_width",  gui_theme_t::gui_checkbox_size.w );
 	gui_theme_t::gui_checkbox_size.h = (uint32)contents.get_int("gui_checkbox_height", gui_theme_t::gui_checkbox_size.h );
+
+	gui_theme_t::gui_gadget_size.w = (uint32)contents.get_int("gui_gadget_width",  gui_theme_t::gui_gadget_size.w );
+	gui_theme_t::gui_gadget_size.h = (uint32)contents.get_int("gui_gadget_height", gui_theme_t::gui_gadget_size.h );
 
 	// make them fit at least the font height
 	gui_theme_t::gui_titlebar_height = max( LINESPACE+2, gui_theme_t::gui_titlebar_height );
@@ -497,6 +518,10 @@ bool gui_theme_t::themes_init(const char *file_name, bool init_fonts )
 	gui_theme_t::gui_color_statusbar_divider            = (PIXVAL)contents.get_color("gui_color_statusbar_divider", SYSCOL_STATUSBAR_DIVIDER);
 	gui_theme_t::gui_highlight_color                    = (PIXVAL)contents.get_color("gui_highlight_color", SYSCOL_HIGHLIGHT);
 	gui_theme_t::gui_shadow_color                       = (PIXVAL)contents.get_color("gui_shadow_color", SYSCOL_SHADOW);
+	gui_theme_t::gui_color_loadingbar_inner             = (PIXVAL)contents.get_color("gui_color_loadingbar_inner", SYSCOL_LOADINGBAR_INNER);
+	gui_theme_t::gui_color_loadingbar_progress          = (PIXVAL)contents.get_color("gui_color_loadingbar_progress", SYSCOL_LOADINGBAR_PROGRESS);
+	gui_theme_t::gui_color_obsolete                     = (PIXVAL)contents.get_color("gui_color_obsolete", SYSCOL_OBSOLETE);
+	gui_theme_t::gui_color_empty                        = (PIXVAL)contents.get_color("gui_color_empty", SYSCOL_EMPTY);
 
 	gui_theme_t::gui_waitingbar_width = (uint32)contents.get_int("gui_waitingbar_width", gui_theme_t::gui_waitingbar_width);
 
@@ -515,6 +540,9 @@ bool gui_theme_t::themes_init(const char *file_name, bool init_fonts )
 	gui_theme_t::gui_drop_shadows =    contents.get_int("gui_drop_shadows",          gui_theme_t::gui_drop_shadows );
 	env_t::bottom_window_darkness =    contents.get_int("bottom_window_darkness",    env_t::bottom_window_darkness );
 
+	env_t::gui_player_color_bright =   contents.get_int("gui_player_color_bright",   env_t::gui_player_color_bright );
+	env_t::gui_player_color_dark =     contents.get_int("gui_player_color_dark",     env_t::gui_player_color_dark );
+
 	env_t::default_window_title_color = contents.get_color("default_window_title_color", env_t::default_window_title_color,  &env_t::default_window_title_color_rgb );
 	env_t::front_window_text_color =    contents.get_color("front_window_text_color",    env_t::front_window_text_color,  &env_t::front_window_text_color_rgb );
 	env_t::bottom_window_text_color =   contents.get_color("bottom_window_text_color",   env_t::bottom_window_text_color, &env_t::bottom_window_text_color_rgb );
@@ -528,7 +556,7 @@ bool gui_theme_t::themes_init(const char *file_name, bool init_fonts )
 	env_t::toolbar_max_width =    contents.get_int("toolbar_max_width",          env_t::toolbar_max_width );
 	env_t::toolbar_max_height =   contents.get_int("toolbar_max_height",         env_t::toolbar_max_height );
 
-	if(  toolbar_last_used_t::last_used_tools  ) {
+	if(  toolbar_last_used_t::last_used_tools  &&  init_tools  ) {
 		// only re-init if already inited
 		tool_t::update_toolbars();
 	}

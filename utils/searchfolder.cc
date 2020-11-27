@@ -19,6 +19,7 @@
 
 #include "../simdebug.h"
 #include "../simmem.h"
+#include "../simtypes.h"
 #include "simstring.h"
 #include "searchfolder.h"
 
@@ -30,14 +31,10 @@
  *      If filepath does not end with a slash and it also doesn't contain
  *      a dot after the last slash, then append extension to filepath and
  *      search for it.
- *	Otherwise searches directly for filepath.
+ * Otherwise searches directly for filepath.
  *
- *	No wildcards please!
- *
- *  Return type:
- *      int			number of matching files.
-*/
-
+ * No wildcards please!
+ */
 void searchfolder_t::add_entry(const std::string &path, const char *entry, const bool prepend)
 {
 	const size_t entry_len = strlen(entry);

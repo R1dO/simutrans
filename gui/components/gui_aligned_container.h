@@ -3,8 +3,9 @@
  * (see LICENSE.txt)
  */
 
-#ifndef gui_aligned_container_h
-#define gui_aligned_container_h
+#ifndef GUI_COMPONENTS_GUI_ALIGNED_CONTAINER_H
+#define GUI_COMPONENTS_GUI_ALIGNED_CONTAINER_H
+
 
 #include "gui_container.h"
 #include "../../tpl/vector_tpl.h"
@@ -135,6 +136,8 @@ public:
 	C* new_component_span(const A1& a1, uint span) { C* comp = new C(a1); take_component(comp, span); return comp; }
 	template<class C, class A1, class A2, class A3>
 	C* new_component_span(const A1& a1, const A2& a2, const A3& a3, uint span) { C* comp = new C(a1, a2, a3); take_component(comp, span); return comp; }
+	template<class C, class A1, class A2, class A3, class A4>
+	C* new_component_span(const A1& a1, const A2& a2, const A3& a3, const A4& a4, uint span) { C* comp = new C(a1, a2, a3, a4); take_component(comp, span); return comp; }
 
 	/**
 	 * Removes all components in the Container.

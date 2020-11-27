@@ -20,6 +20,11 @@
 uint16 rescale_probability(const uint16 p)
 {
 	if(  p  ) {
+		// probability is p / 10000
+		if (p >= 10000) {
+			// too large, will lead to overflow here
+			return 10000;
+		}
 		sint64 pp = ( (sint64)p << 30 ) / 10000LL;
 		sint64 qq = ( 1LL << 30 ) - pp;
 		uint16 ss = 256u;
@@ -59,7 +64,7 @@ obj_desc_t *factory_field_class_reader_t::read_node(FILE *fp, obj_node_info_t &n
 			desc->spawn_weight);
 	}
 	else {
-		dbg->fatal("factory_field_class_reader_t::read_node()","unknown version %i", v&0x00ff );
+		dbg->fatal("factory_field_class_reader_t::read_node()","Cannot handle too new node version %i", v&0x00ff );
 	}
 
 	return desc;
@@ -126,7 +131,7 @@ obj_desc_t *factory_field_group_reader_t::read_node(FILE *fp, obj_node_info_t &n
 			field_class_desc->snow_image);
 	}
 	else {
-		dbg->fatal("factory_field_group_reader_t::read_node()","unknown version %i", v&0x00ff );
+		dbg->fatal("factory_field_group_reader_t::read_node()","Cannot handle too new node version %i", v );
 	}
 
 	if (  v>0x8001  ) {
@@ -247,6 +252,9 @@ obj_desc_t *factory_product_reader_t::read_node(FILE *fp, obj_node_info_t &node)
 		desc->factor = decode_uint16(p);
 	}
 	else {
+		if( version ) {
+			dbg->fatal( "factory_product_reader_t::read_node()", "Cannot handle too new node version %i", version );
+		}
 		// old node, version 0
 		decode_uint16(p);
 		desc->capacity = v;
@@ -286,7 +294,7 @@ obj_desc_t *factory_reader_t::read_node(FILE *fp, obj_node_info_t &node)
 
 	typedef factory_desc_t::site_t site_t;
 	if(version == 5) {
-		// Versioned node, version 4 with sound and animation
+		// Versioned node, version 5 with smoke offsets
 		desc->placement = (site_t)decode_uint16(p);
 		desc->productivity = decode_uint16(p);
 		desc->range = decode_uint16(p);
@@ -410,9 +418,12 @@ obj_desc_t *factory_reader_t::read_node(FILE *fp, obj_node_info_t &node)
 		desc->mail_demand = 65535;
 	}
 	else {
+		if( version ) {
+			dbg->fatal( "factory_reader_t::read_node()", "Cannot handle too new node version %i", version );
+		}
 		// old node, version 0, without pax_level
 		desc->placement = (site_t)v;
-		decode_uint16(p);	// alsways zero
+		decode_uint16(p); // alsways zero
 		desc->productivity = decode_uint16(p)|0x8000;
 		desc->range = decode_uint16(p);
 		desc->distribution_weight = decode_uint16(p);
@@ -485,7 +496,6 @@ DBG_MESSAGE("vehicle_reader_t::register_obj()","old sound %i to %i",old_id,desc-
 void factory_reader_t::register_obj(obj_desc_t *&data)
 {
 	factory_desc_t* desc = static_cast<factory_desc_t*>(data);
-	const char *name = desc->get_name();
 	size_t fab_name_len = strlen( desc->get_name() );
 	desc->electricity_producer = ( fab_name_len>11   &&  (strcmp(desc->get_name()+fab_name_len-9, "kraftwerk")==0  ||  strcmp(desc->get_name()+fab_name_len-11, "Power Plant")==0) );
 	desc->correct_smoke();

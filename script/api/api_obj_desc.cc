@@ -235,6 +235,11 @@ uint32 get_power(const vehicle_desc_t *desc)
 	return desc->get_power() * desc->get_gear();
 }
 
+bool vehicle_needs_electrification(const vehicle_desc_t *desc)
+{
+	return desc->get_power()  &&  (desc->get_engine_type()==vehicle_desc_t::electric);
+}
+
 // export of building_desc_t::btype only here
 namespace script_api {
 	declare_enum_param(building_desc_t::btype, uint16, "building_desc_x::building_type");
@@ -348,9 +353,15 @@ void export_goods_desc(HSQUIRRELVM vm)
 	 */
 	STATIC register_method(vm, &get_available_vehicles, "get_available_vehicles", false, true);
 	/**
-	 * @returns the power of the vehicle (takes power and gear from pak-files into account)
+	 * Power of the vehicle. This value can be used in convoy_x::calc_max_speed.
+	 * It returns (power of vehicle in kW) * (gear value) * 64, where power and gear are as shown in-game.
+	 * @returns the total power of the vehicle (takes power and gear from pak-files into account)
 	 */
 	register_method(vm, &get_power, "get_power", true);
+	/**
+	 * @returns true if this vehicle needs electrification (and is powered)
+	 */
+	register_method(vm, &vehicle_needs_electrification, "needs_electrification", true);
 	/**
 	 * @returns freight that can be transported (or null)
 	 */
@@ -621,6 +632,8 @@ void export_goods_desc(HSQUIRRELVM vm)
 	/**
 	 * Calculates transport revenue per tile and freight unit.
 	 * Takes speedbonus into account.
+	 * Value contains an additional factor of 3000. Don't ask.
+	 * Divide by 3000 *after* calculating revenue for a loaded convoy.
 	 * @param wt waytype of vehicle
 	 * @param speedkmh actual achieved speed in km/h
 	 * @returns revenue

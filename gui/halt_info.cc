@@ -3,6 +3,8 @@
  * (see LICENSE.txt)
  */
 
+#include <algorithm>
+
 #include "halt_info.h"
 #include "components/gui_button_to_chart.h"
 
@@ -27,7 +29,7 @@
 
 #include "../player/simplay.h"
 
-#include "../vehicle/simvehicle.h"
+#include "../vehicle/vehicle.h"
 
 #include "../utils/simstring.h"
 
@@ -140,6 +142,13 @@ private:
 		return strcmp(a.halt->get_name(), b.halt->get_name()) <=0;
 	}
 
+	static bool compare_line (linehandle_t a, linehandle_t b)
+	{
+		return a->get_linetype() == b->get_linetype() ?
+			strcmp(a->get_name(), b->get_name()) <= 0
+			: strcmp(a->get_linetype_name(a->get_linetype()), b->get_linetype_name(b->get_linetype())) <= 0;
+	}
+
 	uint32 cached_line_count;
 	uint32 cached_convoy_count;
 
@@ -154,7 +163,7 @@ private:
 	}
 
 public:
-	uint8 destination_counter;	// last destination counter of the halt; if mismatch to current, then redraw destinations
+	uint8 destination_counter; // last destination counter of the halt; if mismatch to current, then redraw destinations
 
 	gui_halt_detail_t(halthandle_t h) : gui_aligned_container_t()
 	{
@@ -329,7 +338,19 @@ void halt_info_t::init(halthandle_t halt)
 				}
 			}
 			end_table();
-			add_component(&lb_happy);
+			// happy / unhappy / no route
+			add_table(6,1);
+			{
+				add_component(&lb_happy[0]);
+				if (skinverwaltung_t::happy && skinverwaltung_t::unhappy && skinverwaltung_t::no_route) {
+					new_component<gui_image_t>(skinverwaltung_t::happy->get_image_id(0), 0, ALIGN_NONE, true);
+					add_component(&lb_happy[1]);
+					new_component<gui_image_t>(skinverwaltung_t::unhappy->get_image_id(0), 0, ALIGN_NONE, true);
+					add_component(&lb_happy[2]);
+					new_component<gui_image_t>(skinverwaltung_t::no_route->get_image_id(0), 0, ALIGN_NONE, true);
+				}
+			}
+			end_table();
 		}
 		end_table();
 
@@ -393,7 +414,7 @@ void halt_info_t::init(halthandle_t halt)
 	container_chart.end_table();
 
 	update_components();
-	set_resizemode(diagonal_resize);     // 31-May-02	markus weber	added
+	set_resizemode(diagonal_resize);
 	reset_min_windowsize();
 	set_windowsize(get_min_windowsize());
 }
@@ -439,16 +460,29 @@ void halt_info_t::update_components()
 	lb_capacity[2].buf().printf("  %u", halt->get_capacity(2));
 	lb_capacity[2].update();
 
-	if(  has_character( 0x263A )  ) {
-		utf8 happy[4], unhappy[4];
-		happy[ utf16_to_utf8( 0x263A, happy ) ] = 0;
-		unhappy[ utf16_to_utf8( 0x2639, unhappy ) ] = 0;
-		lb_happy.buf().printf(translator::translate("Passengers %d %s, %d %s, %d no route"), halt->get_pax_happy(), happy, halt->get_pax_unhappy(), unhappy, halt->get_pax_no_route());
+	if (skinverwaltung_t::happy && skinverwaltung_t::unhappy && skinverwaltung_t::no_route) {
+		lb_happy[0].buf().printf("%s: %u", translator::translate("Passagiere"), halt->get_pax_happy());
+		lb_happy[0].update();
+		lb_happy[1].buf().printf("  %u", halt->get_pax_unhappy());
+		lb_happy[1].update();
+		lb_happy[2].buf().printf("  %u", halt->get_pax_no_route());
+		lb_happy[2].update();
 	}
 	else {
-		lb_happy.buf().printf(translator::translate("Passengers %d %c, %d %c, %d no route"), halt->get_pax_happy(), 30, halt->get_pax_unhappy(), 31, halt->get_pax_no_route());
+		if(  has_character( 0x263A )  ) {
+			utf8 happy[4], unhappy[4];
+			happy[ utf16_to_utf8( 0x263A, happy ) ] = 0;
+			unhappy[ utf16_to_utf8( 0x2639, unhappy ) ] = 0;
+			lb_happy[0].buf().printf(translator::translate("Passengers %d %s, %d %s, %d no route"), halt->get_pax_happy(), happy, halt->get_pax_unhappy(), unhappy, halt->get_pax_no_route());
+		}
+		else if(  has_character( 0x30 )  ) {
+			lb_happy[0].buf().printf(translator::translate("Passengers %d %c, %d %c, %d no route"), halt->get_pax_happy(), 30, halt->get_pax_unhappy(), 31, halt->get_pax_no_route());
+		}
+		else {
+			lb_happy[0].buf().printf(translator::translate("Passengers %d %c, %d %c, %d no route"), halt->get_pax_happy(), '+', halt->get_pax_unhappy(), '-', halt->get_pax_no_route());
+		}
+		lb_happy[0].update();
 	}
-	lb_happy.update();
 
 	img_enable[0].set_visible(halt->get_pax_enabled());
 	img_enable[1].set_visible(halt->get_mail_enabled());
@@ -559,13 +593,27 @@ void gui_halt_detail_t::update_connections( halthandle_t halt )
 	new_component_span<gui_label_t>("Lines serving this stop", 2);
 
 	if(  !halt->registered_lines.empty()  ) {
-		for (unsigned int i = 0; i<halt->registered_lines.get_count(); i++) {
+		simline_t::linetype previous_linetype = simline_t::MAX_LINE_TYPE;
 
-			linehandle_t line = halt->registered_lines[i];
+		vector_tpl<linehandle_t> sorted_lines;
+		FOR(vector_tpl<linehandle_t>, l, halt->registered_lines) {
+			if(  l.is_bound()  ) {
+				sorted_lines.insert_unique_ordered( l, gui_halt_detail_t::compare_line );
+			}
+		}
+
+		FOR(vector_tpl<linehandle_t>, line, sorted_lines) {
+
+			// Linetype if it is the first
+			if(  line->get_linetype() != previous_linetype  ) {
+				previous_linetype = line->get_linetype();
+				new_component_span<gui_label_t>(simline_t::get_linetype_name(previous_linetype),2);
+			}
+
 			new_component<gui_line_button_t>(line);
 
 			// Line labels with color of player
-			gui_label_buf_t *lb = new_component<gui_label_buf_t>(PLAYER_FLAG | color_idx_to_rgb(line->get_owner()->get_player_color1()) );
+			gui_label_buf_t *lb = new_component<gui_label_buf_t>(PLAYER_FLAG | color_idx_to_rgb(line->get_owner()->get_player_color1()+env_t::gui_player_color_dark) );
 			lb->buf().append( line->get_name() );
 			lb->update();
 		}
@@ -585,7 +633,7 @@ void gui_halt_detail_t::update_connections( halthandle_t halt )
 			new_component<gui_convoi_button_t>(cnv);
 
 			// Line labels with color of player
-			gui_label_buf_t *lb = new_component<gui_label_buf_t>(PLAYER_FLAG | color_idx_to_rgb(cnv->get_owner()->get_player_color1()) );
+			gui_label_buf_t *lb = new_component<gui_label_buf_t>(PLAYER_FLAG | color_idx_to_rgb(cnv->get_owner()->get_player_color1()+env_t::gui_player_color_dark) );
 			lb->buf().append( cnv->get_name() );
 			lb->update();
 		}
@@ -604,7 +652,7 @@ void gui_halt_detail_t::update_connections( halthandle_t halt )
 		if(  !connections.empty()  ) {
 
 			gui_label_buf_t *lb = new_component_span<gui_label_buf_t>(2);
-			lb->buf().append(" ·");
+			lb->buf().append(" \xC2\xB7");
 			const goods_desc_t* info = goods_manager_t::get_info_catg_index(i);
 			// If it is a special freight, we display the name of the good, otherwise the name of the category.
 			lb->buf().append(translator::translate(info->get_catg()==0 ? info->get_name() : info->get_catg_name() ) );
@@ -712,6 +760,9 @@ void gui_departure_board_t::update_departures(halthandle_t halt)
 
 	// iterate over all convoys stopping here
 	FOR(  slist_tpl<convoihandle_t>, cnv, halt->get_loading_convois() ) {
+		if( !cnv.is_bound()) {
+			continue;
+		}
 		halthandle_t next_halt = cnv->get_schedule()->get_next_halt(cnv->get_owner(),halt);
 		if(  next_halt.is_bound()  ) {
 			dest_info_t next( next_halt, 0, cnv );
@@ -906,6 +957,7 @@ void halt_info_t::rdwr(loadsave_t *file)
 		halt = welt->lookup( halt_pos )->get_halt();
 		if (halt.is_bound()) {
 			init(halt);
+			win_set_magic(this, magic_halt_info+halt.get_id());
 			reset_min_windowsize();
 			set_windowsize(size);
 		}

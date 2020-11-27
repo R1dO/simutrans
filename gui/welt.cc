@@ -29,7 +29,7 @@
 #include "../boden/wege/schiene.h"
 #include "../obj/baum.h"
 #include "../simcity.h"
-#include "../vehicle/simvehicle.h"
+#include "../vehicle/vehicle.h"
 #include "../player/simplay.h"
 #include "../simconvoi.h"
 
@@ -37,7 +37,7 @@
 
 #include "../display/simgraph.h"
 
-#include "../simsys.h"
+#include "../sys/simsys.h"
 #include "../utils/simstring.h"
 #include "../utils/simrandom.h"
 
@@ -274,9 +274,13 @@ bool welt_gui_t::update_from_heightfield(const char *filename)
 {
 	DBG_MESSAGE("welt_gui_t::update_from_heightfield()", "%s", filename);
 
+	const sint8 min_h = env_t::default_settings.get_minimumheight();
+	const sint8 max_h = env_t::default_settings.get_maximumheight();
+
+	height_map_loader_t hml(min_h, max_h, env_t::height_conv_mode);
 	sint16 w, h;
 	sint8 *h_field=NULL;
-	height_map_loader_t hml(sets);
+
 	if(hml.get_height_data_from_file(filename, (sint8)sets->get_groundwater(), h_field, w, h, false )) {
 		sets->set_size_x(w);
 		sets->set_size_y(h);
@@ -295,8 +299,10 @@ bool welt_gui_t::update_from_heightfield(const char *filename)
 			}
 		}
 		map_preview.set_map_data(&map);
+		free(h_field);
 		return true;
 	}
+
 	return false;
 }
 
@@ -338,7 +344,7 @@ void welt_gui_t::update_memory(gui_label_buf_t *label, const settings_t* sets)
 		(
 			sizeof(grund_t) +
 			sizeof(planquadrat_t) +
-			sizeof(baum_t)*(1-sets->get_no_trees()) + /* only one since a lot will be water */
+			sizeof(baum_t)*(sets->get_tree()>0) + /* only one since a lot will be water */
 			sizeof(void*)*2
 		) * (uint64)sx * (uint64)sy
 	) / (1024ll * 1024ll);
@@ -460,7 +466,7 @@ bool welt_gui_t::action_triggered( gui_action_creator_t *comp,value_t v)
 		load_relief_frame_t* lrf = new load_relief_frame_t(sets);
 		create_win(lrf, w_info, magic_load_t );
 		win_set_pos(lrf, (display_get_width() - lrf->get_windowsize().w-10), env_t::iconsize.h);
-		knr = sets->get_map_number();	// otherwise using cancel would not show the normal generated map again
+		knr = sets->get_map_number(); // otherwise using cancel would not show the normal generated map again
 	}
 	else if(comp==&use_intro_dates) {
 		// 0,1 should force setting to new game as well. don't allow to change
@@ -523,7 +529,7 @@ bool welt_gui_t::action_triggered( gui_action_creator_t *comp,value_t v)
 		welt->set_pause(false);
 		// save setting ...
 		loadsave_t file;
-		if(file.wr_open("default.sve",loadsave_t::binary,0,"settings only",SAVEGAME_VER_NR)) {
+		if(  file.wr_open("default.sve",loadsave_t::binary,0,"settings only",SAVEGAME_VER_NR) == loadsave_t::FILE_STATUS_OK  ) {
 			// save default setting
 			env_t::default_settings.rdwr(&file);
 			file.close();

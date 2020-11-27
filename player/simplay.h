@@ -3,10 +3,11 @@
  * (see LICENSE.txt)
  */
 
-#ifndef simplay_h
-#define simplay_h
+#ifndef PLAYER_SIMPLAY_H
+#define PLAYER_SIMPLAY_H
 
-#include "../network/pwd_hash.h"
+
+#include "../utils/sha1_hash.h"
 #include "../simtypes.h"
 #include "../simlinemgmt.h"
 
@@ -32,7 +33,15 @@ class finance_t;
 class player_t
 {
 public:
-	enum { EMPTY=0, HUMAN=1, AI_GOODS=2, AI_PASSENGER=3, AI_SCRIPTED=4, MAX_AI, PASSWORD_PROTECTED=128 };
+	enum {
+		EMPTY        = 0,
+		HUMAN        = 1,
+		AI_GOODS     = 2,
+		AI_PASSENGER = 3,
+		AI_SCRIPTED  = 4,
+		MAX_AI,
+		PASSWORD_PROTECTED = 128
+	};
 
 protected:
 	char player_name_buf[256];
@@ -137,9 +146,9 @@ public:
 	 * @param amount earned money
 	 * @param wt transport type used in accounting statistics
 	 * @param cathegory parameter
-	 * 	0 ... passenger
-	 *	1 ... mail
-	 *	2 ... good (and powerlines revenue)
+	 *  0 ... passenger
+	 *  1 ... mail
+	 *  2 ... good (and powerlines revenue)
 	 */
 	void book_revenue(const sint64 amount, const koord k, const waytype_t wt=ignore_wt, sint32 cathegory=2);
 
@@ -333,7 +342,7 @@ public:
 	 * is going to be deleted (flag==0)
 	 */
 	enum notification_factory_t {
-		notify_delete	// notified immediately before object is deleted (and before nulled in the slist_tpl<>)!
+		notify_delete // notified immediately before object is deleted (and before nulled in the slist_tpl<>)!
 	};
 	virtual void notify_factory(notification_factory_t, const fabrik_t*) {}
 

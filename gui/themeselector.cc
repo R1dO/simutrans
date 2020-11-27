@@ -7,7 +7,7 @@
 
 #include "themeselector.h"
 #include "simwin.h"
-#include "../simsys.h"
+#include "../sys/simsys.h"
 #include "../simevent.h"
 #include "gui_theme.h"
 #include "../utils/simstring.h"
@@ -45,7 +45,7 @@ bool themeselector_t::check_file(const char *filename, const char *suffix)
 // A theme button was pressed
 bool themeselector_t::item_action(const char *fullpath)
 {
-	gui_theme_t::themes_init(fullpath,true);
+	gui_theme_t::themes_init(fullpath,true,true);
 
 	event_t *ev = new event_t();
 	ev->ev_class = EVENT_SYSTEM;
@@ -97,8 +97,8 @@ const char *themeselector_t::get_info(const char *fn )
 
 void themeselector_t::fill_list()
 {
-	add_path( ((std::string)env_t::program_dir+"themes/").c_str() );
-	if(  env_t::user_dir != env_t::program_dir  ) {
+	add_path( ((std::string)env_t::data_dir+"themes/").c_str() );
+	if(  env_t::user_dir != env_t::data_dir  ) {
 		// not signle user
 		add_path( ((std::string)env_t::user_dir+"themes/").c_str() );
 	}

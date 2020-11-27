@@ -3,8 +3,9 @@
  * (see LICENSE.txt)
  */
 
-#ifndef gui_scrolled_list_h
-#define gui_scrolled_list_h
+#ifndef GUI_COMPONENTS_GUI_SCROLLED_LIST_H
+#define GUI_COMPONENTS_GUI_SCROLLED_LIST_H
+
 
 #include "gui_aligned_container.h"
 #include "gui_scrollpane.h"
@@ -39,7 +40,10 @@ class gui_scrolled_list_t :
 	public gui_scrollpane_t
 {
 public:
-	enum type { windowskin, listskin };
+	enum type {
+		windowskin,
+		listskin
+	};
 
 	/**
 	 * Base class for elements in lists. Virtual inheritance.
@@ -53,7 +57,7 @@ public:
 
 		virtual char const* get_text() const = 0;
 		virtual void set_text(char const *) {}
-		virtual bool is_valid() const { return true; }	//  can be used to indicate invalid entries
+		virtual bool is_valid() const { return true; } //  can be used to indicate invalid entries
 		virtual bool is_editable()  const { return false; }
 
 		/// compares using get_text
@@ -93,10 +97,10 @@ public:
 private:
 	enum type type;
 
-	bool maximize;	// true if to expand to bottom right corner
+	bool maximize; // true if to expand to bottom right corner
 
 	item_compare_func compare;
-	
+
 	bool multiple_selection; // true when multiple selection is enabled.
 	void calc_selection(scrollitem_t*, scrollitem_t*, event_t);
 
@@ -121,10 +125,10 @@ public:
 	void set_selection(int s);
 	sint32 get_selection() const;
 	vector_tpl<sint32> get_selections() const;
-	
+
 	scrollitem_t* get_selected_item() const;
 	sint32 get_count() const { return item_list.get_count(); }
-	
+
 	void enable_multiple_selection() { multiple_selection = true; }
 
 	/*  when rebuilding a list, be sure to call recalculate the slider

@@ -10,7 +10,7 @@
 #include "../dataobj/environment.h"
 #include "../dataobj/translator.h"
 #include "../player/finance.h" // MAX_PLAYER_HISTORY_YEARS
-#include "../vehicle/simvehicle.h"
+#include "../vehicle/vehicle_base.h"
 #include "settings_stats.h"
 #include "components/gui_divider.h"
 
@@ -45,7 +45,6 @@ static char const* const version[] =
 	"0.120.5"
 };
 
-
 bool settings_general_stats_t::action_triggered(gui_action_creator_t *comp, value_t v)
 {
 	assert( comp==&savegame ); (void)comp;
@@ -64,6 +63,7 @@ void settings_general_stats_t::init(settings_t const* const sets)
 	INIT_INIT
 
 	// combobox for savegame version
+	savegame.clear_elements();
 	for(  uint32 i=0;  i<lengthof(version);  i++  ) {
 		savegame.new_component<gui_scrolled_list_t::const_text_scrollitem_t>( version[i]+2, SYSCOL_TEXT ) ;
 		if(  strcmp(version[i],env_t::savegame_version_str)==0  ) {
@@ -153,7 +153,8 @@ void settings_general_stats_t::read(settings_t* const sets)
 void settings_display_stats_t::init(settings_t const* const)
 {
 	INIT_INIT
-	INIT_NUM( "frames_per_second",env_t::fps, 10, 25, gui_numberinput_t::AUTOLINEAR, false );
+	INIT_NUM( "frames_per_second",env_t::fps, env_t::min_fps, env_t::max_fps, gui_numberinput_t::AUTOLINEAR, false );
+	INIT_NUM( "fast_forward_frames_per_second", env_t::ff_fps, env_t::min_fps, env_t::max_fps, gui_numberinput_t::AUTOLINEAR, false);
 	INIT_NUM( "simple_drawing_tile_size",env_t::simple_drawing_default, 2, 256, gui_numberinput_t::POWER2, false );
 	INIT_BOOL( "simple_drawing_fast_forward",env_t::simple_drawing_fast_forward );
 	INIT_NUM( "water_animation_ms", env_t::water_animation, 0, 1000, 25, false );
@@ -185,6 +186,7 @@ void settings_display_stats_t::read(settings_t* const)
 	READ_INIT
 	// all visual stuff
 	READ_NUM_VALUE( env_t::fps );
+	READ_NUM_VALUE( env_t::ff_fps );
 	READ_NUM_VALUE( env_t::simple_drawing_default );
 	READ_BOOL_VALUE( env_t::simple_drawing_fast_forward );
 	READ_NUM_VALUE( env_t::water_animation );
@@ -482,6 +484,18 @@ void settings_costs_stats_t::read(settings_t* const sets)
 
 #include "../descriptor/ground_desc.h"
 
+static char const * const climate_generate_string[] =
+{
+	"height based",
+	"temperature-humidity based"
+};
+
+static char const * const tree_generate_string[] =
+{
+	"none",
+	"random",
+	"rainfall"
+};
 
 void settings_climates_stats_t::init(settings_t* const sets)
 {
@@ -492,28 +506,39 @@ void settings_climates_stats_t::init(settings_t* const sets)
 	INIT_INIT
 	INIT_NUM_NEW( "height_map_conversion_version", env_t::pak_height_conversion_factor, 1, 2, 0, false );
 	SEPERATOR
-	INIT_NUM_NEW( "Water level", sets->get_groundwater(), sets->get_minimumheight()+10, 0, gui_numberinput_t::AUTOLINEAR, false );
+	INIT_NUM_NEW( "Water level", sets->get_groundwater(), -20*(ground_desc_t::double_grounds?2:1), 20, gui_numberinput_t::AUTOLINEAR, false );
 	INIT_NUM_NEW( "Mountain height", mountain_height_start, 0, min(1000,100*(11-mountain_roughness_start)), 10, false );
 	INIT_NUM_NEW( "Map roughness", mountain_roughness_start, 0, min(10, 11-((mountain_height_start+99)/100)), gui_numberinput_t::AUTOLINEAR, false );
-	SEPERATOR
-	INIT_LB( "Summer snowline" );
-	summer = new_component<gui_label_buf_t>();
 
-	INIT_NUM( "Winter snowline", sets->get_winter_snowline(), sets->get_groundwater(), 24, gui_numberinput_t::AUTOLINEAR, false );
 	SEPERATOR
-	// other climate borders ...
-	sint16 arctic = 0;
-	for(  int i=desert_climate;  i!=arctic_climate;  i++  ) {
-		INIT_NUM( ground_desc_t::get_climate_name_from_bit((climate)i), sets->get_climate_borders()[i], sets->get_groundwater(), 24, gui_numberinput_t::AUTOLINEAR, false );
-		if(sets->get_climate_borders()[i]>arctic) {
-			arctic = sets->get_climate_borders()[i];
+	INIT_NUM_NEW( "Wind direction", sets->wind_direction, 0, 3, 1, true );
+	// combobox for climate generator
+	climate_generate.clear_elements();
+	for(  uint32 i=0;  i<lengthof(climate_generate_string);  i++  ) {
+		climate_generate.new_component<gui_scrolled_list_t::const_text_scrollitem_t>( climate_generate_string[i], SYSCOL_TEXT ) ;
+	}
+	climate_generate.set_selection( sets->get_climate_generator() );
+	climate_generate.set_focusable( false );
+	add_component( &climate_generate );
+	INIT_LB( "climate generator" );
+
+	add_table(3,0);
+	{
+		// other climate borders ...
+		for(  int i=desert_climate;  i<=arctic_climate;  i++  ) {
+			INIT_NUM( ground_desc_t::get_climate_name_from_bit((climate)i), sets->get_climate_borders(i,0), sets->get_groundwater(), 127, gui_numberinput_t::AUTOLINEAR, false );
+			gui_numberinput_t *ni = new_component<gui_numberinput_t>();
+			ni->init( sets->get_climate_borders(i,1), sets->get_groundwater(), 127, gui_numberinput_t::AUTOLINEAR, false );
+			numinp.append( ni );
 		}
-	}	cbuffer_t buf;
+	}
+	end_table();
+	new_component<gui_empty_t>();
 
-	summer->buf().printf("%s %i", translator::translate( "Summer snowline" ), arctic );
-	summer->update();
+	INIT_NUM_NEW( "climate area percentage", sets->get_patch_size_percentage(), 0, 100, gui_numberinput_t::AUTOLINEAR, false );
+
 	SEPERATOR
-	INIT_BOOL( "lake", sets->get_lake() );
+	INIT_NUM_NEW( "lake_height", sets->get_lakeheight(), 0, 127, gui_numberinput_t::AUTOLINEAR, false );
 	INIT_NUM_NEW( "Number of rivers", sets->get_river_number(), 0, 1024, gui_numberinput_t::AUTOLINEAR, false );
 	INIT_NUM_NEW( "minimum length of rivers", sets->get_min_river_length(), 0, max(16,sets->get_max_river_length())-16, gui_numberinput_t::AUTOLINEAR, false );
 	INIT_NUM_NEW( "maximum length of rivers", sets->get_max_river_length(), sets->get_min_river_length()+16, 8196, gui_numberinput_t::AUTOLINEAR, false );
@@ -523,7 +548,14 @@ void settings_climates_stats_t::init(settings_t* const sets)
 	}
 	// the following are independent and thus need no listener
 	SEPERATOR
-	INIT_BOOL( "no tree", sets->get_no_trees() );
+	// combobox for trees generator
+	tree_generate.clear_elements();
+	for(  uint32 i=0;  i<lengthof(tree_generate_string);  i++  ) {
+		tree_generate.new_component<gui_scrolled_list_t::const_text_scrollitem_t>( tree_generate_string[i], SYSCOL_TEXT ) ;
+	}
+	tree_generate.set_selection( sets->get_tree() );
+	tree_generate.set_focusable( false );
+	add_component( &tree_generate, 2);
 	INIT_NUM_NEW( "forest_base_size", sets->get_forest_base_size(), 10, 255, 1, false );
 	INIT_NUM_NEW( "forest_map_size_divisor", sets->get_forest_map_size_divisor(), 2, 255, 1, false );
 	INIT_NUM_NEW( "forest_count_divisor", sets->get_forest_count_divisor(), 2, 255, 1, false );
@@ -538,33 +570,31 @@ void settings_climates_stats_t::init(settings_t* const sets)
 
 void settings_climates_stats_t::read(settings_t* const sets)
 {
+	sets->climate_generator = (settings_t::climate_generate_t)max( 0, climate_generate.get_selection() );
+	sets->tree = max( 0, tree_generate.get_selection() );
 	READ_INIT
 	READ_NUM_VALUE_NEW( env_t::pak_height_conversion_factor );
 	READ_NUM_VALUE_NEW( sets->groundwater );
 	READ_NUM_VALUE_NEW( sets->max_mountain_height );
+	READ_NUM_VALUE_NEW( sets->wind_direction );
 	double n = 0;
 	READ_NUM_VALUE_NEW( n );
 	if(  new_world  ) {
 		sets->map_roughness = (n+8.0)/20.0;
 	}
-	READ_NUM_VALUE( sets->winter_snowline );
 	// other climate borders ...
-	sint16 arctic = 0;
-	for(  int i=desert_climate;  i!=arctic_climate;  i++  ) {
+	for(  int i=desert_climate;  i<=arctic_climate;  i++  ) {
 		sint16 ch;
 		READ_NUM_VALUE( ch );
-		sets->climate_borders[i] = ch;
-		if(  ch>arctic  ) {
-			arctic = ch;
-		}
+		sets->climate_borders[i][0] = ch;
+		READ_NUM_VALUE( ch );
+		sets->climate_borders[i][1] = ch;
 	}
-	summer->buf().printf("%s %i", translator::translate( "Summer snowline" ), arctic );
-	summer->update();
-	READ_BOOL_VALUE( sets->lake );
+	READ_NUM_VALUE_NEW( sets->patch_size_percentage );
+	READ_NUM_VALUE_NEW( sets->lake_height );
 	READ_NUM_VALUE_NEW( sets->river_number );
 	READ_NUM_VALUE_NEW( sets->min_river_length );
 	READ_NUM_VALUE_NEW( sets->max_river_length );
-	READ_BOOL_VALUE( sets->no_trees );
 	READ_NUM_VALUE_NEW( sets->forest_base_size );
 	READ_NUM_VALUE_NEW( sets->forest_map_size_divisor );
 	READ_NUM_VALUE_NEW( sets->forest_count_divisor );
@@ -572,6 +602,8 @@ void settings_climates_stats_t::read(settings_t* const sets)
 	READ_NUM_VALUE( sets->max_no_of_trees_on_square );
 	READ_NUM_VALUE_NEW( sets->tree_climates );
 	READ_NUM_VALUE_NEW( sets->no_tree_climates );
+
+	(void)booliter; // silence warning
 }
 
 

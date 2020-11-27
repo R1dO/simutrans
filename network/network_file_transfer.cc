@@ -6,7 +6,7 @@
 #include "network_file_transfer.h"
 #include "../simdebug.h"
 #include "../simloadingscreen.h"
-#include "../simsys.h"
+#include "../sys/simsys.h"
 
 #include <string.h>
 #include <errno.h>
@@ -50,7 +50,7 @@ char const* network_receive_file( SOCKET const s, char const* const save_as, sin
 					fd_set fds;
 					FD_ZERO(&fds);
 					FD_SET(s,&fds);
-					struct timeval tv;	// 10 s timeout
+					struct timeval tv; // 10 s timeout
 					tv.tv_sec = 10000 / 1000;
 					tv.tv_usec = (10000 % 1000) * 1000ul;
 					// can we read?
@@ -99,8 +99,6 @@ char const* network_receive_file( SOCKET const s, char const* const save_as, sin
 #include "../simworld.h"
 #include "../utils/simstring.h"
 
-#include "../simsys.h"
-
 
 // connect to address (cp), receive gameinfo, close
 const char *network_gameinfo(const char *cp, gameinfo_t *gi)
@@ -125,7 +123,7 @@ const char *network_gameinfo(const char *cp, gameinfo_t *gi)
 			}
 		}
 		// wait for join command (tolerate some wrong commands)
-		nwc = network_check_activity( NULL, 10000 );	// 10s should be enough for reply ...
+		nwc = network_check_activity( NULL, 10000 ); // 10s should be enough for reply ...
 		if (nwc==NULL) {
 			err = "Server did not respond!";
 			goto end;
@@ -143,16 +141,20 @@ const char *network_gameinfo(const char *cp, gameinfo_t *gi)
 		sprintf( filename, "client%i-network.sve", nwgi->len );
 		err = network_receive_file( my_client_socket, filename, len );
 
-		// now into gameinfo
-		if(  fd.rd_open( filename )  ) {
-			gameinfo_t *pgi = new gameinfo_t( &fd );
-			*gi = *pgi;
-			delete pgi;
-			fd.close();
-		}
-		else {
-			// some more insets, while things may have failed
-			err = fd.get_last_error() == loadsave_t::FILE_ERROR_FUTURE_VERSION ? "Server version too new" : "Server busy";
+		if (err == NULL) {
+			// now into gameinfo
+			const loadsave_t::file_status_t err_code = fd.rd_open( filename );
+
+			if(  err_code == loadsave_t::FILE_STATUS_OK  ) {
+				gameinfo_t *pgi = new gameinfo_t( &fd );
+				*gi = *pgi;
+				delete pgi;
+				fd.close();
+			}
+			else {
+				// some more insets, while things may have failed
+				err = (err_code == loadsave_t::FILE_STATUS_ERR_FUTURE_VERSION) ? "Server version too new" : "Server busy";
+			}
 		}
 		dr_remove( filename );
 end:
@@ -307,10 +309,8 @@ error:
 	return "Client closed connection during transfer";
 }
 
-/*
-  POST a message (poststr) to an HTTP server at the specified address and relative path (name)
-  Optionally: Receive response to file localname
-*/
+/// POST a message (poststr) to an HTTP server at the specified address and relative path (name)
+/// Optionally: Receive response to file localname
 const char *network_http_post( const char *address, const char *name, const char *poststr, const char *localname )
 {
 	DBG_MESSAGE("network_http_post", "");
@@ -347,7 +347,7 @@ const char *network_http_post( const char *address, const char *name, const char
 		unsigned int pos = 0;
 		sint32 length = 0;
 
-		// TODO better handling of error message from listing server		// TODO
+		// TODO better handling of error message from listing server // TODO
 
 		while(1) {
 			// Returns number of bytes received

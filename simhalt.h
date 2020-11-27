@@ -3,14 +3,15 @@
  * (see LICENSE.txt)
  */
 
-#ifndef simhalt_h
-#define simhalt_h
+#ifndef SIMHALT_H
+#define SIMHALT_H
+
 
 #include "convoihandle_t.h"
 #include "linehandle_t.h"
 #include "halthandle_t.h"
 
-#include "simobj.h"
+#include "obj/simobj.h"
 #include "display/simgraph.h"
 #include "simtypes.h"
 
@@ -32,14 +33,14 @@
 #define MAX_HALT_COST   8 // Total number of cost items
 #define MAX_MONTHS     12 // Max history
 #define MAX_HALT_NON_MONEY_TYPES 7 // number of non money types in HALT's financial statistic
-#define HALT_ARRIVED   0 // the amount of ware that arrived here
-#define HALT_DEPARTED 1 // the amount of ware that has departed from here
-#define HALT_WAITING		2 // the amount of ware waiting
-#define HALT_HAPPY		3 // number of happy passengers
-#define HALT_UNHAPPY		4 // number of unhappy passengers
+#define HALT_ARRIVED         0 // the amount of ware that arrived here
+#define HALT_DEPARTED        1 // the amount of ware that has departed from here
+#define HALT_WAITING         2 // the amount of ware waiting
+#define HALT_HAPPY           3 // number of happy passengers
+#define HALT_UNHAPPY         4 // number of unhappy passengers
 #define HALT_NOROUTE         5 // number of no-route passengers
-#define HALT_CONVOIS_ARRIVED             6 // number of convois arrived this month
-#define HALT_WALKED 7 // could walk to destination
+#define HALT_CONVOIS_ARRIVED 6 // number of convois arrived this month
+#define HALT_WALKED          7 // could walk to destination
 
 class cbuffer_t;
 class grund_t;
@@ -65,15 +66,29 @@ template<class T> class bucket_heap_tpl;
 class haltestelle_t
 {
 public:
-	enum station_flags { NOT_ENABLED=0, PAX=1, POST=2, WARE=4};
+	enum station_flags {
+		NOT_ENABLED = 0,
+		PAX         = 1 << 0,
+		POST        = 1 << 1,
+		WARE        = 1 << 2
+	};
 
-	enum stationtyp {invalid=0, loadingbay=1, railstation = 2, dock = 4, busstop = 8, airstop = 16, monorailstop = 32, tramstop = 64, maglevstop=128, narrowgaugestop=256 }; //could be combined with or!
+	// can be combined with or!
+	enum stationtyp {
+		invalid         = 0,
+		loadingbay      = 1 << 0,
+		railstation     = 1 << 1,
+		dock            = 1 << 2,
+		busstop         = 1 << 3,
+		airstop         = 1 << 4,
+		monorailstop    = 1 << 5,
+		tramstop        = 1 << 6,
+		maglevstop      = 1 << 7,
+		narrowgaugestop = 1 << 8
+	};
 
 private:
-	/**
-	 * Manche Methoden müssen auf alle Haltestellen angewandt werden
-	 * deshalb verwaltet die Klasse eine Liste aller Haltestellen
-	 */
+	/// List of all halts in the game.
 	static vector_tpl<halthandle_t> alle_haltestellen;
 
 	/**
@@ -103,12 +118,12 @@ private:
 	uint32 capacity[3]; // passenger, mail, goods
 	uint8 overcrowded[256/8]; ///< bit field for each goods type (max 256)
 
-	static uint8 status_step;	// NONE or SCHEDULING or REROUTING
+	static uint8 status_step; // NONE or SCHEDULING or REROUTING
 
 	slist_tpl<convoihandle_t> loading_here;
 	sint32 last_loading_step;
 
-	koord init_pos;	// for halt without grounds, created during game initialisation
+	koord init_pos; // for halt without grounds, created during game initialisation
 
 	/**
 	 * Handle for ourselves. Can be used like the 'this' pointer
@@ -116,6 +131,10 @@ private:
 	halthandle_t self;
 
 public:
+	/**
+	 * List of convois currently loading at this station.
+	 * May contain invalid handles!
+	 */
 	const slist_tpl<convoihandle_t> &get_loading_convois() const { return loading_here; }
 
 	// add convoi to loading queue
@@ -146,8 +165,8 @@ public:
 
 	/**
 	 * Returns an index to a halt at koord k
-   	 * optionally limit to that owned by player sp
-   	 * by default create a new halt if none found
+	 * optionally limit to that owned by player sp
+	 * by default create a new halt if none found
 	 * Only used during loading.
 	 */
 	static halthandle_t get_halt_koord_index(koord k);
@@ -185,7 +204,7 @@ public:
 	static void destroy_all();
 
 	/**
-	 * Liste aller felder (Grund-Objekte) die zu dieser Haltestelle gehören
+	 * List of all tiles (grund_t) that belong to this halt.
 	 */
 	struct tile_t
 	{
@@ -370,6 +389,15 @@ public:
 	 * Fabrikliste auf.
 	 */
 	void verbinde_fabriken();
+
+	/**
+	 * Connects factory to this halt if not already connected and
+	 * reachability check for oil rigs passed.
+	 * No station coverage checked.
+	 * @returns true if succeeded
+	 */
+	bool connect_factory(fabrik_t *fab);
+
 	void remove_fabriken(fabrik_t *fab);
 
 	/**
@@ -410,6 +438,8 @@ public:
 	 * @return 0 - not connected, 1 - connected, -1 - undecided (call again later...)
 	 */
 	sint8 is_connected(halthandle_t halt, uint8 catg_index) const;
+
+	bool has_available_network( const player_t* player, uint8 catg_index = goods_manager_t::INDEX_NONE ) const;
 
 	const slist_tpl<fabrik_t*>& get_fab_list() const { return fab_list; }
 
@@ -471,7 +501,12 @@ private:
 	static halthandle_t last_search_origin;
 	static uint8        last_search_ware_catg_idx;
 public:
-	enum routing_result_flags { NO_ROUTE=0, ROUTE_OK=1, ROUTE_WALK=2, ROUTE_OVERCROWDED=8 };
+	enum routing_result_flags {
+		NO_ROUTE          = 0,
+		ROUTE_OK          = 1,
+		ROUTE_WALK        = 2,
+		ROUTE_OVERCROWDED = 8
+	};
 
 	/**
 	 * Kann die Ware nicht zum Ziel geroutet werden (keine Route), dann werden
@@ -569,9 +604,7 @@ public:
 	/// true, if this station is overcrowded for this ware
 	bool is_overcrowded( const uint8 idx ) const { return (overcrowded[idx/8] & (1<<(idx%8)))!=0; }
 
-	/**
-	 * gibt Gesamtmenge derware vom typ typ zurück
-	 */
+	/// @returns total amount of the good waiting at this halt.
 	uint32 get_ware_summe(const goods_desc_t *warentyp) const;
 
 	/**
@@ -603,16 +636,19 @@ public:
 	 */
 	void fetch_goods( slist_tpl<ware_t> &load, const goods_desc_t *good_category, uint32 requested_amount, const vector_tpl<halthandle_t>& destination_halts);
 
-	/* liefert ware an. Falls die Ware zu wartender Ware dazugenommen
-	 * werden kann, kann ware_t gelöscht werden! D.h. man darf ware nach
-	 * aufruf dieser Methode nicht mehr referenzieren!
-	 *
-	 * The second version is like the first, but will not recalculate the route
-	 * This is used for inital passenger, since they already know a route
-	 *
-	 * @return angenommene menge
+	/**
+	 * Delivers goods (ware_t) to this halt.
+	 * if no route is found, the good will be removed.
+	 * @returns amount of goods
 	 */
 	uint32 liefere_an(ware_t ware);
+
+	/**
+	 * Delivers goods (ware_t) to this halt.
+	 * Will not recalculate the route
+	 * This is used for inital passenger, since they already know a route
+	 * @returns amount of goods
+	 */
 	uint32 starte_mit_route(ware_t ware);
 
 	const grund_t *find_matching_position(waytype_t wt) const;

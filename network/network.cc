@@ -59,6 +59,8 @@ void clear_command_queue()
 #define RET_ERR_STR { DWORD errnr = WSAGetLastError(); if( errnr!=0 ) FormatMessageA( FORMAT_MESSAGE_FROM_SYSTEM,NULL,errnr,MAKELANGID(LANG_NEUTRAL,SUBLANG_NEUTRAL),err_str,sizeof(err_str),NULL); err = err_str; return INVALID_SOCKET; }
 #else
 #define RET_ERR_STR { err = err_str; return INVALID_SOCKET; }
+
+#include <signal.h>
 #endif
 
 
@@ -131,11 +133,11 @@ SOCKET network_open_address(char const* cp, char const*& err)
 	server_name.sin_family=AF_INET;
 #if USE_WINSOCK
 	bool ok = true;
-	server_name.sin_addr.s_addr = inet_addr(cp);	// for windows we must first try to resolve the number
-	if((int)server_name.sin_addr.s_addr==-1) {// Bad address
+	server_name.sin_addr.s_addr = inet_addr(cp); // for windows we must first try to resolve the number
+	if((int)server_name.sin_addr.s_addr==-1) { // Bad address
 		ok = false;
 		struct hostent *theHost;
-		theHost = gethostbyname( cp );	// ... before resolving a name ...
+		theHost = gethostbyname( cp ); // ... before resolving a name ...
 		if(theHost) {
 			server_name.sin_addr = *(struct in_addr *)theHost->h_addr_list[0];
 			ok = true;
@@ -286,7 +288,7 @@ SOCKET network_open_address(char const* cp, char const*& err)
 			// For each address in remote, try and connect
 			struct addrinfo *walk_remote;
 			for (  walk_remote = remote;  !connected  &&  walk_remote != NULL;  walk_remote = walk_remote->ai_next  ) {
-  				char ipstr_remote[INET6_ADDRSTRLEN];
+				char ipstr_remote[INET6_ADDRSTRLEN];
 
 				// Validate remote address + get string representation for logging
 				if (  (ret = getnameinfo( walk_remote->ai_addr, (socklen_t)walk_remote->ai_addrlen, ipstr_remote, sizeof(ipstr_remote), NULL, 0, NI_NUMERICHOST )) !=0  ) {
@@ -675,6 +677,12 @@ void network_send_server(network_command_t* nwc )
 bool network_send_data( SOCKET dest, const char *buf, const uint16 size, uint16 &count, const int timeout_ms )
 {
 	count = 0;
+
+#if USE_WINSOCK == 0
+	// ignore SIGPIPE sent by send() function.
+	signal(SIGPIPE, SIG_IGN);
+#endif
+
 	while (count < size) {
 		int sent = send(dest, buf+count, size-count, 0);
 		if (sent == -1) {
@@ -711,6 +719,11 @@ bool network_send_data( SOCKET dest, const char *buf, const uint16 size, uint16 
 		count += sent;
 		DBG_DEBUG4("network_send_data", "sent %d bytes to socket[%d]; size=%d, left=%d", count, dest, size, size-count );
 	}
+
+#if USE_WINSOCK == 0
+	signal(SIGPIPE, SIG_DFL);
+#endif
+
 	// we reach here only if data are sent completely
 	return true;
 }
@@ -813,7 +826,7 @@ void network_core_shutdown()
 	network_active = false;
 #ifndef NETTOOL
 	env_t::networkmode = false;
-	network_server_port = 0;	// this also sets ent_t::server to zero
+	network_server_port = 0; // this also sets env_t::server to zero
 #endif
 }
 
@@ -891,7 +904,7 @@ extern "C" {
 
 bool prepare_for_server( char *externalIPAddress, char *externalAltIPAddress, int port )
 {
-	char lanaddr[64] = "unset";	/* my ip address on the LAN */
+	char lanaddr[64] = "unset"; /* my ip address on the LAN */
 	int error = 0;
 	const char *multicastif = 0;
 	const char *minissdpdpath = 0;
@@ -985,7 +998,7 @@ void remove_port_forwarding( int port )
 		return;
 	}
 
-	char lanaddr[64] = "unset";	/* my ip address on the LAN */
+	char lanaddr[64] = "unset"; /* my ip address on the LAN */
 	char externalIPAddress[64];
 	int error = 0;
 	const char *multicastif = 0;

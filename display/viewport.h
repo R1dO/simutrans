@@ -3,8 +3,9 @@
  * (see LICENSE.txt)
  */
 
-#ifndef simviewport_h
-#define simviewport_h
+#ifndef DISPLAY_VIEWPORT_H
+#define DISPLAY_VIEWPORT_H
+
 
 #include "../simtypes.h"
 #include "scr_coord.h"
@@ -83,9 +84,9 @@ private:
 	 * @}
 	 */
 
-	sint16 cached_disp_width;	//!< Cached window width
-	sint16 cached_disp_height;	//!< Cached window height
-	sint16 cached_img_size;		//!< Cached base raster image size
+	sint16 cached_disp_width;  ///< Cached window width
+	sint16 cached_disp_height; ///< Cached window height
+	sint16 cached_img_size;    ///< Cached base raster image size
 
 	/**
 	 * Sets current ij offsets of this viewport, depends of its proportions and the zoom level.

@@ -3,8 +3,9 @@
  * (see LICENSE.txt)
  */
 
-#ifndef TOOL_SELECTOR_H
-#define TOOL_SELECTOR_H
+#ifndef GUI_TOOL_SELECTOR_H
+#define GUI_TOOL_SELECTOR_H
+
 
 #include "gui_frame.h"
 #include "../tpl/vector_tpl.h"
@@ -37,10 +38,12 @@ private:
 	uint16 tool_icon_width;
 	uint16 tool_icon_height;
 
+	scr_coord offset, old_offset;
+
 	uint16 tool_icon_disp_start;
 	uint16 tool_icon_disp_end;
 
-	bool has_prev_next;
+	bool has_prev_next, is_dragging;
 
 	/**
 	 * Window title

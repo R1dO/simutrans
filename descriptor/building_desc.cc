@@ -29,7 +29,7 @@ uint8 building_tile_desc_t::get_layout() const
 koord building_tile_desc_t::get_offset() const
 {
 	const building_desc_t *desc = get_desc();
-	koord size = desc->get_size(get_layout());	// rotate if necessary
+	koord size = desc->get_size(get_layout()); // rotate if necessary
 	return koord( index % size.x, (index / size.x) % size.y );
 }
 
@@ -155,6 +155,7 @@ void building_desc_t::calc_checksum(checksum_t *chk) const
 			}
 		}
 	}
+	chk->input(preservation_year_month);
 }
 
 

@@ -9,7 +9,7 @@
 
 #include "savegame_frame.h"
 #include "../pathes.h"
-#include "../simsys.h"
+#include "../sys/simsys.h"
 #include "../simdebug.h"
 #include "simwin.h"
 #include "../utils/simstring.h"
@@ -25,10 +25,17 @@
  */
 class del_button_t : public button_t
 {
+	scr_coord_val w;
 public:
-	del_button_t() : button_t() { init(button_t::roundbox, "X"); }
-
-	scr_size get_min_size() const OVERRIDE { return scr_size(D_BUTTON_HEIGHT, D_BUTTON_HEIGHT); }
+	del_button_t() : button_t()
+	{
+		init(button_t::roundbox, "X");
+		w = max(D_BUTTON_HEIGHT, display_get_char_width('X') + gui_theme_t::gui_button_text_offset.w + gui_theme_t::gui_button_text_offset_right.x);
+	}
+	scr_size get_min_size() const OVERRIDE
+	{
+		return scr_size(w, D_BUTTON_HEIGHT);
+	}
 };
 
 /**
@@ -153,11 +160,11 @@ void savegame_frame_t::add_section(std::string &name){
 	char *label_text = new char [L_SHORTENED_SIZE+prefix_len+2];
 	char *path_expanded = new char[FILENAME_MAX];
 
-	size_t program_dir_len = strlen(env_t::program_dir);
+	const size_t data_dir_len = strlen(env_t::data_dir);
 
-	if (strncmp(name.c_str(),env_t::program_dir,program_dir_len) == 0) {
-		// starts with program_dir
-		strncpy(path_expanded, name.c_str(), FILENAME_MAX);
+	if(  name[0]=='/'  ||  name[0]=='\\'  ||  name[1]==':'  ||  strncmp(name.c_str(),env_t::data_dir,data_dir_len) == 0  ) {
+		// starts with data_dir or an absolute path
+		tstrncpy(path_expanded, name.c_str(), FILENAME_MAX);
 	}
 	else {
 		// user_dir path
@@ -230,8 +237,8 @@ void savegame_frame_t::fill_list( void )
 	// for each path, we search.
 	FOR(vector_tpl<std::string>, &path, paths){
 
-		const char		*path_c = path.c_str();
-		const size_t	path_c_len = strlen(path_c);
+		const char *path_c      = path.c_str();
+		const size_t path_c_len = strlen(path_c);
 
 		sf.search(path, std::string(suffixnodot), this->only_directories, false);
 
@@ -272,6 +279,7 @@ void savegame_frame_t::list_filled( void )
 	uint cols = (delete_enabled ? 1 : 0) + 1 + (label_enabled ? 1 : 0);
 	button_frame.set_table_layout(1,0);
 	button_frame.add_table(cols,0);
+	button_frame.add_table(cols,0)->set_spacing(scr_size(D_H_SPACE,D_FILELIST_V_SPACE)); // change space between entries to zero to see more on screen
 
 	FOR(slist_tpl<dir_entry_t>, const& i, entries) {
 		button_t*    const delete_button = i.del;

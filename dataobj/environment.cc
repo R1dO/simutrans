@@ -17,7 +17,7 @@ void rdwr_win_settings(loadsave_t *file); // simwin
 
 sint8 env_t::pak_tile_height_step = 16;
 sint8 env_t::pak_height_conversion_factor = 1;
-bool env_t::new_height_map_conversion = false;
+env_t::height_conversion_mode env_t::height_conv_mode = env_t::HEIGHT_CONV_LINEAR;
 
 bool env_t::simple_drawing = false;
 bool env_t::simple_drawing_fast_forward = true;
@@ -25,7 +25,7 @@ sint16 env_t::simple_drawing_normal = 4;
 sint16 env_t::simple_drawing_default = 24;
 uint8 env_t::follow_convoi_underground = 2;
 
-char env_t::program_dir[PATH_MAX];
+char env_t::data_dir[PATH_MAX];
 plainstring env_t::default_theme;
 const char *env_t::user_dir = 0;
 const char *env_t::savegame_version_str = SAVEGAME_VER_NR;
@@ -80,6 +80,8 @@ uint8 env_t::chat_window_transparency = 75;
 bool env_t::hide_rail_return_ticket = true;
 bool env_t::show_delete_buttons = false;
 
+bool env_t::numpad_always_moves_map = true;
+
 // only used internally => do not touch further
 bool env_t::quit_simutrans = false;
 
@@ -122,6 +124,7 @@ plainstring env_t::river_type[10];
 uint8 env_t::river_types;
 sint32 env_t::autosave;
 uint32 env_t::fps;
+uint32 env_t::ff_fps;
 sint16 env_t::max_acceleration;
 uint8 env_t::num_threads;
 bool env_t::show_tooltips;
@@ -129,8 +132,8 @@ uint32 env_t::tooltip_color_rgb;
 PIXVAL env_t::tooltip_color;
 uint32 env_t::tooltip_textcolor_rgb;
 PIXVAL env_t::tooltip_textcolor;
-uint8 env_t::toolbar_max_width;
-uint8 env_t::toolbar_max_height;
+sint8 env_t::toolbar_max_width;
+sint8 env_t::toolbar_max_height;
 uint32 env_t::cursor_overlay_color_rgb;
 PIXVAL env_t::cursor_overlay_color;
 uint32 env_t::background_color_rgb;
@@ -144,6 +147,9 @@ bool env_t::left_to_right_graphs;
 uint32 env_t::tooltip_delay;
 uint32 env_t::tooltip_duration;
 sint8 env_t::show_money_message;
+
+uint8 env_t::gui_player_color_dark = 1;
+uint8 env_t::gui_player_color_bright = 4;
 
 std::string env_t::fontname = FONT_PATH_X "prop.fnt";
 uint8 env_t::fontsize = 11;
@@ -211,8 +217,8 @@ void env_t::init()
 	// debug level (0: only fatal, 1: error, 2: warning, 3: all
 	verbose_debug = 0;
 
-	default_sortmode = 1;	// sort by amount
-	default_mapmode = 0;	// show cities
+	default_sortmode = 1; // sort by amount
+	default_mapmode = 0;  // show cities
 
 	savegame_version_str = SAVEGAME_VER_NR;
 
@@ -226,8 +232,9 @@ void env_t::init()
 	// autosave every x months (0=off)
 	autosave = 0;
 
-	// default: make 25 frames per second (if possible)
-	fps=25;
+	// default: make 25 frames per second (if possible) and 10 for faster fast forward
+	fps = 25;
+	ff_fps = 10;
 
 	// maximum speedup set to 1000 (effectively no limit)
 	max_acceleration=50;
@@ -350,6 +357,9 @@ void env_t::rdwr(loadsave_t *file)
 
 	file->rdwr_long( autosave );
 	file->rdwr_long( fps );
+	if (file->is_version_atleast(121, 1)) {
+		file->rdwr_long(ff_fps);
+	}
 	file->rdwr_short( max_acceleration );
 
 	file->rdwr_bool( road_user_info );
@@ -470,8 +480,20 @@ void env_t::rdwr(loadsave_t *file)
 		file->rdwr_str( default_theme );
 	}
 	if(  file->is_version_atleast(120, 2)  ) {
-		file->rdwr_bool( new_height_map_conversion );
+		if(  file->is_version_atleast(122, 1)) {
+			sint32 conv_mode = height_conv_mode;
+			file->rdwr_long( conv_mode );
+			if (file->is_loading()) {
+				height_conv_mode = (env_t::height_conversion_mode)::clamp(conv_mode, 0, (int)env_t::NUM_HEIGHT_CONV_MODES-1);
+			}
+		}
+		else {
+			bool new_convert = height_conv_mode != env_t::HEIGHT_CONV_LEGACY_SMALL;
+			file->rdwr_bool( new_convert );
+			height_conv_mode = new_convert ? env_t::HEIGHT_CONV_LEGACY_LARGE : env_t::HEIGHT_CONV_LEGACY_SMALL;
+		}
 	}
+
 	if(  file->is_version_atleast(120, 5)  ) {
 		file->rdwr_long( background_color_rgb );
 		file->rdwr_long( tooltip_color_rgb );
@@ -489,7 +511,7 @@ void env_t::rdwr(loadsave_t *file)
 		}
 		file->rdwr_byte( fontsize );
 	}
-	if(  file->is_version_atleast(102, 7)  ) {
+	if(  file->is_version_atleast(120, 7)  ) {
 		file->rdwr_byte(show_money_message);
 	}
 
@@ -503,8 +525,12 @@ void env_t::rdwr(loadsave_t *file)
 
 	if (file->is_version_atleast(121, 1)) {
 		file->rdwr_long(sound_distance_scaling);
+		file->rdwr_byte( gui_player_color_dark );
+		file->rdwr_byte( gui_player_color_bright );
 	}
-	
+	if( file->is_version_atleast( 122, 1 ) ) {
+		file->rdwr_bool( env_t::numpad_always_moves_map );
+	}
 	// server settings are not saved, since they are server specific
 	// and could be different on different servers on the same computers
 }

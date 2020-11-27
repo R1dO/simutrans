@@ -3,14 +3,15 @@
  * (see LICENSE.txt)
  */
 
-#ifndef dataobj_settings_h
-#define dataobj_settings_h
+#ifndef DATAOBJ_SETTINGS_H
+#define DATAOBJ_SETTINGS_H
+
 
 #include <string>
 #include "../simtypes.h"
 #include "../simconst.h"
 
-
+#include "ribi.h"
 
 class player_t;
 class loadsave_t;
@@ -40,6 +41,13 @@ class settings_t
 	friend class climate_gui_t;
 	friend class welt_gui_t;
 
+public:
+	typedef enum {
+		HEIGHT_BASED = 0,
+		HUMIDITY_BASED,
+		MAP_BASED
+	} climate_generate_t;
+
 private:
 	sint32 size_x, size_y;
 	sint32 map_number;
@@ -64,7 +72,7 @@ private:
 	sint32 growthfactor_medium;
 	sint32 growthfactor_large;
 
-	sint16 special_building_distance;	// distance between attraction to factory or other special buildings
+	sint16 special_building_distance; // distance between attraction to factory or other special buildings
 	uint32 minimum_city_distance;
 	uint32 industry_increase;
 
@@ -75,8 +83,8 @@ private:
 	// higher number: passengers are more evenly distributed around the map
 	struct yearly_locality_factor_t
 	{
-		sint16	year;
-		uint32	factor;
+		sint16 year;
+		uint32 factor;
 	};
 	yearly_locality_factor_t locality_factor_per_year[10];
 
@@ -118,10 +126,20 @@ private:
 	 /**
 	 * waterlevel, climate borders, lowest snow in winter
 	 */
-
+	climate_generate_t climate_generator;
 	sint16 groundwater;
-	sint16 climate_borders[MAX_CLIMATES];
 	sint16 winter_snowline;
+	sint16 climate_borders[MAX_CLIMATES][2];
+	sint8 climate_temperature_borders[5];
+	sint8 tropic_humidity;
+	sint8 desert_humidity;
+
+	ribi_t::ribi wind_direction; ///< Wind is coming from this direction. Must be single! (N/W/S/E)
+
+	sint8 patch_size_percentage; // average size of a climate patch, if there are overlapping climates
+
+	sint8 moisture; // how much increase of moisture per tile
+	sint8 moisture_water; // how much increase of moisture per water tile
 
 	double max_mountain_height;
 	double map_roughness;
@@ -139,9 +157,9 @@ private:
 	uint8 max_no_of_trees_on_square;
 	uint16 tree_climates;
 	uint16 no_tree_climates;
-	bool no_trees;
+	uint16 tree;
 
-	bool lake;
+	sint8 lake_height; //relative to sea height
 
 	// game mechanics
 	uint8 allow_player_change;
@@ -258,7 +276,7 @@ private:
 	bool with_private_paks;
 
 	/// what is the minimum clearance required under bridges
-	sint8 way_height_clearance;
+	uint8 way_height_clearance;
 
 	// if true, you can buy obsolete stuff
 	bool allow_buying_obsolete_vehicles;
@@ -266,7 +284,7 @@ private:
 	sint16 used_vehicle_reduction;
 
 	uint32 random_counter;
-	uint32 frames_per_second;	// only used in network mode ...
+	uint32 frames_per_second; // only used in network mode ...
 	uint32 frames_per_step;
 	uint32 server_frames_ahead;
 
@@ -285,7 +303,7 @@ private:
 
 public:
 	/* the big cost section */
-	sint32 maint_building;	// normal building
+	sint32 maint_building; // normal building
 
 	sint64 cst_multiply_dock;
 	sint64 cst_multiply_station;
@@ -328,8 +346,6 @@ public:
 	uint32 way_max_bridge_len;
 	sint32 way_count_leaving_road;
 
-	// true if active
-	bool player_active[MAX_PLAYER_COUNT];
 	// 0 = empty, otherwise some value from simplay
 	uint8 player_type[MAX_PLAYER_COUNT];
 
@@ -428,14 +444,10 @@ public:
 	void set_just_in_time(uint8 b) { just_in_time = b; }
 	uint8 get_just_in_time() const {return just_in_time;}
 
-	void set_default_climates();
-	const sint16 *get_climate_borders() const { return climate_borders; }
-
-	sint16 get_winter_snowline() const {return winter_snowline;}
-
 	void rotate90() {
 		rotation = (rotation+1)&3;
 		set_size( size_y, size_x );
+		wind_direction = ribi_t::rotate90(wind_direction);
 	}
 	uint8 get_rotation() const { return rotation; }
 
@@ -484,14 +496,17 @@ public:
 		language_code_names[2] = 0;
 	}
 
-	void set_player_active(uint8 i, bool b) { player_active[i] = b; }
 	void set_player_type(uint8 i, uint8 t) { player_type[i] = t; }
 	uint8 get_player_type(uint8 i) const { return player_type[i]; }
 
 	bool is_separate_halt_capacities() const { return separate_halt_capacities ; }
 
 	// allowed modes are 0,1,2
-	enum { TO_PREVIOUS=0, TO_TRANSFER, TO_DESTINATION };
+	enum {
+		TO_PREVIOUS = 0,
+		TO_TRANSFER,
+		TO_DESTINATION
+	};
 	uint8 get_pay_for_total_distance_mode() const { return pay_for_total_distance ; }
 
 	// do not take people to overcrowded destinations
@@ -557,11 +572,31 @@ public:
 	uint8 get_max_no_of_trees_on_square() const { return max_no_of_trees_on_square; }
 	uint16 get_tree_climates() const { return tree_climates; }
 	uint16 get_no_tree_climates() const { return no_tree_climates; }
-	bool get_no_trees() const { return no_trees; }
-	void set_no_trees(bool b) { no_trees = b; }
+	uint16 get_tree() const { return tree; }
+	void set_tree(uint16 i) { tree = i; }
 
-	bool get_lake() const { return lake; }
-	void set_lake(bool b) { lake = b; }
+	void set_default_climates();
+	sint8 get_climate_borders( sint8 climate, sint8 start_end ) const { return climate_borders[climate][start_end]; }
+
+	sint8 get_tropic_humidity() const { return tropic_humidity; }
+	sint8 get_desert_humidity() const { return desert_humidity; }
+	sint8 get_climate_temperature_borders( sint8 border ) const { return climate_temperature_borders[border]; }
+
+	climate_generate_t get_climate_generator() const { return climate_generator; }
+	void set_climate_generator(climate_generate_t generator) { climate_generator = generator; }
+
+	sint8 get_moisture() const { return moisture;  }
+	sint8 get_moisture_water() const { return moisture_water;  }
+	sint16 get_winter_snowline() const { return winter_snowline; }
+
+	sint8 get_lakeheight() const { return lake_height; }
+	void set_lakeheight(sint8 h) { lake_height = h; }
+
+	/// Wind is coming from this direction
+	ribi_t::ribi get_wind_dir() const { return wind_direction;  }
+	ribi_t::ribi get_approach_dir() const { return wind_direction | ribi_t::rotate90(wind_direction);  }
+
+	sint8 get_patch_size_percentage() const { return patch_size_percentage; }
 
 	uint32 get_industry_increase_every() const { return industry_increase; }
 	void set_industry_increase_every( uint32 n ) { industry_increase = n; }
@@ -594,8 +629,8 @@ public:
 	uint16 get_remove_dummy_player_months() const { return remove_dummy_player_months; }
 	uint16 get_unprotect_abandoned_player_months() const { return unprotect_abandoned_player_months; }
 
-	sint8 get_way_height_clearance() const { return way_height_clearance; }
-	void set_way_height_clearance( sint8 n ) { way_height_clearance = n; }
+	uint8 get_way_height_clearance() const { return way_height_clearance; }
+	void set_way_height_clearance( uint8 n ) { way_height_clearance = n; }
 
 	uint32 get_default_ai_construction_speed() const { return default_ai_construction_speed; }
 	void set_default_ai_construction_speed( uint32 n ) { default_ai_construction_speed = n; }

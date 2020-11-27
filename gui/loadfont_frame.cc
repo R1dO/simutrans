@@ -1,4 +1,4 @@
-﻿/*
+/*
  * This file is part of the Simutrans project under the Artistic License.
  * (see LICENSE.txt)
  */
@@ -11,7 +11,7 @@
 
 #include "loadfont_frame.h"
 
-#include "../simsys.h"
+#include "../sys/simsys.h"
 #include "../simworld.h"
 #include "../simversion.h"
 #include "../pathes.h"
@@ -172,7 +172,7 @@ bool loadfont_frame_t::check_file(const char *filename, const char *)
 // parses the directory, using freetype lib, in installed
 void loadfont_frame_t::fill_list()
 {
-	add_path( ((std::string)env_t::program_dir+"font/").c_str() );
+	add_path( ((std::string)env_t::data_dir+"font/").c_str() );
 #ifdef USE_FREETYPE
 	// ok, we can handle TTF fonts
 	ft_library = NULL;
@@ -251,7 +251,6 @@ void loadfont_frame_t::rdwr( loadsave_t *file )
 		resize( scr_coord(0,0) );
 	}
 }
-
 
 
 bool loadfont_frame_t::action_triggered(gui_action_creator_t *component, value_t v)

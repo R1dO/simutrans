@@ -3,8 +3,9 @@
  * (see LICENSE.txt)
  */
 
-#ifndef simcolor_h
-#define simcolor_h
+#ifndef SIMCOLOR_H
+#define SIMCOLOR_H
+
 
 #define LIGHT_COUNT         (15)
 #define SPECIAL_COLOR_COUNT (224)
@@ -78,7 +79,7 @@ typedef unsigned int FLAGGED_PIXVAL;
 // Way colours for the map
 #define COL_ROAD            color_idx_to_rgb(COL_GREY1)
 #define COL_RAIL            color_idx_to_rgb(185)
-#define COL_CANAL           color_idx_to_rgb(COL_BLUE)
+#define COL_CANAL           color_idx_to_rgb(23)
 #define COL_MONORAIL        color_idx_to_rgb(COL_ORANGE)
 #define COL_RUNWAY          color_idx_to_rgb(28)
 #define COL_POWERLINE       color_idx_to_rgb(COL_LIGHT_TURQUOISE)
@@ -152,5 +153,9 @@ typedef unsigned int FLAGGED_PIXVAL;
 #define SYSCOL_STATUSBAR_DIVIDER            gui_theme_t::gui_color_statusbar_divider
 #define SYSCOL_HIGHLIGHT                    gui_theme_t::gui_highlight_color
 #define SYSCOL_SHADOW                       gui_theme_t::gui_shadow_color
+#define SYSCOL_LOADINGBAR_INNER             gui_theme_t::gui_color_loadingbar_inner
+#define SYSCOL_LOADINGBAR_PROGRESS          gui_theme_t::gui_color_loadingbar_progress
+#define SYSCOL_OBSOLETE                     gui_theme_t::gui_color_obsolete
+#define SYSCOL_EMPTY                        gui_theme_t::gui_color_empty
 
 #endif

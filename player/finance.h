@@ -3,8 +3,9 @@
  * (see LICENSE.txt)
  */
 
-#ifndef finance_h
-#define finance_h
+#ifndef PLAYER_FINANCE_H
+#define PLAYER_FINANCE_H
+
 
 #include <assert.h>
 
@@ -50,8 +51,8 @@ enum transport_type {
  * - the data are concerning to whole company
  */
 enum accounting_type_common {
-	ATC_CASH = 0,		///< Cash
-	ATC_NETWEALTH,		///< Total Cash + Assets
+	ATC_CASH = 0,           ///< Cash
+	ATC_NETWEALTH,          ///< Total Cash + Assets
 	ATC_ALL_CONVOIS,        ///< Convoy count
 	ATC_SCENARIO_COMPLETED, ///< Scenario success (only useful if there is one ... )
 	ATC_MAX
@@ -63,25 +64,25 @@ enum accounting_type_common {
  * Supersedes COST_ types, that CAN be distinguished by type of transport.
  */
 enum accounting_type_vehicles {
-	ATV_REVENUE_PASSENGER=0, ///< Revenue from passenger transport
-	ATV_REVENUE_MAIL,        ///< Revenue from mail transport
-	ATV_REVENUE_GOOD,        ///< Revenue from good transport
-	ATV_REVENUE_TRANSPORT,	 ///< Operating profit = passenger + mail + goods = was: COST_INCOME
-	ATV_TOLL_RECEIVED,	 ///< Toll paid to you by another player
-	ATV_REVENUE,             ///< Operating profit = revenue_transport + toll = passenger + mail+ goods + toll_received
+	ATV_REVENUE_PASSENGER = 0, ///< Revenue from passenger transport
+	ATV_REVENUE_MAIL,          ///< Revenue from mail transport
+	ATV_REVENUE_GOOD,          ///< Revenue from good transport
+	ATV_REVENUE_TRANSPORT,     ///< Operating profit = passenger + mail + goods = was: COST_INCOME
+	ATV_TOLL_RECEIVED,         ///< Toll paid to you by another player
+	ATV_REVENUE,               ///< Operating profit = revenue_transport + toll = passenger + mail+ goods + toll_received
 
 	ATV_RUNNING_COST,               ///< Distance based running costs, was: COST_VEHICLE_RUN
 	ATV_VEHICLE_MAINTENANCE,        ///< Monthly vehicle maintenance. Unused.
 	ATV_INFRASTRUCTURE_MAINTENANCE, ///< Infrastructure maintenance (roads, railway, ...), was: COST_MAINTENANCE
-	ATV_TOLL_PAID,			  ///< Toll paid by you to another player
-	ATV_EXPENDITURE,		        ///< Total expenditure = RUNNING_COSTS+VEHICLE_MAINTENANCE+INFRACTRUCTURE_MAINTENANCE+TOLL_PAID
-	ATV_OPERATING_PROFIT,		  ///< ATV_REVENUE - ATV_EXPENDITURE, was: COST_OPERATING_PROFIT
-	ATV_NEW_VEHICLE,			  ///< New vehicles
-	ATV_CONSTRUCTION_COST,		  ///< Construction cost, COST_CONSTRUCTION mapped here
-	ATV_PROFIT,			        ///< ATV_OPERATING_PROFIT - (CONSTRUCTION_COST + NEW_VEHICLE), was: COST_PROFIT
-	ATV_WAY_TOLL,			  ///< = ATV_TOLL_PAID + ATV_TOLL_RECEIVED, was: COST_WAY_TOLLS
-	ATV_NON_FINANCIAL_ASSETS,	  ///< Value of vehicles owned by your company, was: COST_ASSETS
-	ATV_PROFIT_MARGIN,		  ///< ATV_OPERATING_PROFIT / ATV_REVENUE, was: COST_MARGIN
+	ATV_TOLL_PAID,                  ///< Toll paid by you to another player
+	ATV_EXPENDITURE,                ///< Total expenditure = RUNNING_COSTS+VEHICLE_MAINTENANCE+INFRACTRUCTURE_MAINTENANCE+TOLL_PAID
+	ATV_OPERATING_PROFIT,           ///< ATV_REVENUE - ATV_EXPENDITURE, was: COST_OPERATING_PROFIT
+	ATV_NEW_VEHICLE,                ///< New vehicles
+	ATV_CONSTRUCTION_COST,          ///< Construction cost, COST_CONSTRUCTION mapped here
+	ATV_PROFIT,                     ///< ATV_OPERATING_PROFIT - (CONSTRUCTION_COST + NEW_VEHICLE), was: COST_PROFIT
+	ATV_WAY_TOLL,                   ///< = ATV_TOLL_PAID + ATV_TOLL_RECEIVED, was: COST_WAY_TOLLS
+	ATV_NON_FINANCIAL_ASSETS,       ///< Value of vehicles owned by your company, was: COST_ASSETS
+	ATV_PROFIT_MARGIN,              ///< ATV_OPERATING_PROFIT / ATV_REVENUE, was: COST_MARGIN
 
 	ATV_TRANSPORTED_PASSENGER, ///< Number of transported passengers
 	ATV_TRANSPORTED_MAIL,      ///< Number of transported mail
@@ -158,18 +159,18 @@ class finance_t {
 
 	/**
 	 * Finance history having relation with particular type of service
- 	 */
+	 */
 	sint64 veh_year[TT_MAX][MAX_PLAYER_HISTORY_YEARS][ATV_MAX];
 	sint64 veh_month[TT_MAX][MAX_PLAYER_HISTORY_MONTHS][ATV_MAX];
 
 	/**
- 	 * Monthly maintenance cost
- 	 */
+	 * Monthly maintenance cost
+	 */
 	sint64 maintenance[TT_MAX];
 
 	/**
 	 * Monthly vehicle maintenance cost per transport type.
- 	 */
+	 */
 	sint64 vehicle_maintenance[TT_MAX];
 
 public:
@@ -183,8 +184,8 @@ public:
 	 */
 	inline void book_construction_costs(const sint64 amount, const waytype_t wt) {
 		transport_type tt = translate_waytype_to_tt(wt);
-		veh_year[tt][0][ATV_CONSTRUCTION_COST] += (sint64) amount;
-		veh_month[tt][0][ATV_CONSTRUCTION_COST] += (sint64) amount;
+		veh_year[tt][0][ATV_CONSTRUCTION_COST] += amount;
+		veh_month[tt][0][ATV_CONSTRUCTION_COST] += amount;
 
 		account_balance += amount;
 	}
@@ -213,17 +214,17 @@ public:
 
 	/**
 	 * Account purchase of new vehicle: Subtracts money, increases assets.
-	 * @param amount money paid for vehicle
+	 * @param amount money paid for vehicle (negative)
 	 * @param wt - waytype of vehicle
 	 */
 	inline void book_new_vehicle(const sint64 amount, const waytype_t wt)
 	{
 		const transport_type tt = translate_waytype_to_tt(wt);
 
-		veh_year[ tt][0][ATV_NEW_VEHICLE] += (sint64) amount;
-		veh_month[tt][0][ATV_NEW_VEHICLE] += (sint64) amount;
-		veh_year[ tt][0][ATV_NON_FINANCIAL_ASSETS] -= (sint64) amount;
-		veh_month[tt][0][ATV_NON_FINANCIAL_ASSETS] -= (sint64) amount;
+		veh_year[ tt][0][ATV_NEW_VEHICLE] += amount;
+		veh_month[tt][0][ATV_NEW_VEHICLE] += amount;
+
+		update_assets(-amount, wt);
 
 		account_balance += amount;
 	}
@@ -240,8 +241,8 @@ public:
 
 		index = ((0 <= index) && (index <= 2)? index : 2);
 
-		veh_year[tt][0][ATV_REVENUE_PASSENGER+index] += (sint64) amount;
-		veh_month[tt][0][ATV_REVENUE_PASSENGER+index] += (sint64) amount;
+		veh_year[tt][0][ATV_REVENUE_PASSENGER+index] += amount;
+		veh_month[tt][0][ATV_REVENUE_PASSENGER+index] += amount;
 
 		account_balance += amount;
 	}
@@ -267,8 +268,8 @@ public:
 	inline void book_toll_paid(const sint64 amount, const waytype_t wt)
 	{
 		const transport_type tt =  translate_waytype_to_tt(wt);
-		veh_year[tt][0][ATV_TOLL_PAID] += (sint64) amount;
-		veh_month[tt][0][ATV_TOLL_PAID] += (sint64) amount;
+		veh_year[tt][0][ATV_TOLL_PAID] += amount;
+		veh_month[tt][0][ATV_TOLL_PAID] += amount;
 		account_balance += amount;
 	}
 
@@ -280,8 +281,8 @@ public:
 	inline void book_toll_received(const sint64 amount, const waytype_t wt)
 	{
 		const transport_type tt = translate_waytype_to_tt(wt);
-		veh_year[tt][0][ATV_TOLL_RECEIVED] += (sint64) amount;
-		veh_month[tt][0][ATV_TOLL_RECEIVED] += (sint64) amount;
+		veh_year[tt][0][ATV_TOLL_RECEIVED] += amount;
+		veh_month[tt][0][ATV_TOLL_RECEIVED] += amount;
 		account_balance += amount;
 	}
 
@@ -459,12 +460,12 @@ public:
 	/**
 	 * Translates building_desc_t to transport_type
 	 * Building can be assigned to transport type using utyp
- 	 */
+	 */
 	static transport_type translate_utyp_to_tt(int utyp);
 
 	/**
- 	 * Translates waytype_t to transport_type
- 	 */
+	 * Translates waytype_t to transport_type
+	 */
 	static transport_type translate_waytype_to_tt(waytype_t wt);
 
 	void update_assets(sint64 delta, waytype_t wt);

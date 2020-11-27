@@ -12,7 +12,7 @@
 
 #include "../simticker.h"
 #include "../simdebug.h"
-#include "../simobj.h"
+#include "../obj/simobj.h"
 #include "../simconst.h"
 #include "../simplan.h"
 #include "../simmenu.h"
@@ -33,15 +33,17 @@ main_view_t::main_view_t(karte_t *welt)
 	assert(welt  &&  viewport);
 }
 
+#if COLOUR_DEPTH != 0
 static const sint8 hours2night[] =
 {
-    4,4,4,4,4,4,4,4,
-    4,4,4,4,3,2,1,0,
-    0,0,0,0,0,0,0,0,
-    0,0,0,0,0,0,0,0,
-    0,0,0,0,0,0,0,1,
-    2,3,4,4,4,4,4,4
+	4,4,4,4,4,4,4,4,
+	4,4,4,4,3,2,1,0,
+	0,0,0,0,0,0,0,0,
+	0,0,0,0,0,0,0,0,
+	0,0,0,0,0,0,0,1,
+	2,3,4,4,4,4,4,4
 };
+#endif
 
 #ifdef MULTI_THREAD
 #include "../utils/simthread.h"
@@ -212,7 +214,7 @@ void main_view_t::display(bool force_dirty)
 		const KOORD_VAL wh_x = disp_width / env_t::num_threads;
 		KOORD_VAL lt_x = 0;
 		for(  int t = 0;  t < env_t::num_threads - 1;  t++  ) {
-		   	ka[t].show_routine = this;
+			ka[t].show_routine = this;
 			ka[t].lt_cl = koord( lt_x, menu_height );
 			ka[t].wh_cl = koord( wh_x, disp_height - menu_height );
 			ka[t].lt = ka[t].lt_cl - koord( IMG_SIZE/2, 0 ); // process tiles IMG_SIZE/2 outside clipping range for correct tree display at thread seams
@@ -320,7 +322,7 @@ void main_view_t::display(bool force_dirty)
 					}
 				}
 				break;
-			
+
 			case 1:
 				// show message of active player
 				int x = welt->get_active_player_nr();

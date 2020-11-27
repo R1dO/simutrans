@@ -3,8 +3,9 @@
  * (see LICENSE.txt)
  */
 
-#ifndef gui_gui_label_h
-#define gui_gui_label_h
+#ifndef GUI_COMPONENTS_GUI_LABEL_H
+#define GUI_COMPONENTS_GUI_LABEL_H
+
 
 #include "gui_component.h"
 #include "../../simcolor.h"
@@ -24,7 +25,7 @@ public:
 		left,
 		centered,
 		right,
-		money_right,
+		money_right
 	};
 
 private:
@@ -38,7 +39,7 @@ private:
 	bool shadowed;
 	PIXVAL color_shadow;
 
-	const char * text;	// only for direct access of non-translatable things. Do not use!
+	const char * text; // only for direct access of non-translatable things. Do not use!
 	const char * tooltip;
 
 protected:

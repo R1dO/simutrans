@@ -8,7 +8,7 @@
 #include <stdio.h>
 
 #include "../simworld.h"
-#include "../simobj.h"
+#include "simobj.h"
 #include "../simhalt.h"
 #include "../boden/grund.h"
 #include "../dataobj/environment.h"
@@ -25,7 +25,7 @@ zeiger_t::zeiger_t(loadsave_t *file) : obj_no_info_t()
 
 
 zeiger_t::zeiger_t(koord3d pos, player_t *player) :
-    obj_no_info_t(pos)
+	obj_no_info_t(pos)
 {
 	set_owner( player );
 	image = IMG_EMPTY;

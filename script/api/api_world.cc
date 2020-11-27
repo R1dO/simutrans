@@ -117,7 +117,7 @@ SQInteger world_get_size(HSQUIRRELVM vm)
 	}
 }
 
-void export_world(HSQUIRRELVM vm)
+void export_world(HSQUIRRELVM vm, bool scenario)
 {
 	/**
 	 * Table with methods to access the world, the universe, and everything.
@@ -144,18 +144,21 @@ void export_world(HSQUIRRELVM vm)
 	 */
 	STATIC register_method(vm, &karte_t::get_season, "get_season");
 
-	/**
-	 * Removes player company: removes all assets. Use with care.
-	 *
-	 * If pl is the first player (nr == 0) it is restarted immediately.
-	 * Public player (nr == 1) cannot be removed.
-	 *
-	 * In network games, there will be a delay between the call to this function and the removal of the player.
-	 *
-	 * @param pl player to be removed
-	 * @returns whether operation was successful
-	 */
-	STATIC register_method(vm, &world_remove_player, "remove_player", true);
+	if (scenario) {
+		/**
+		* Removes player company: removes all assets. Use with care.
+		*
+		* If pl is the first player (nr == 0) it is restarted immediately.
+		* Public player (nr == 1) cannot be removed.
+		*
+		* In network games, there will be a delay between the call to this function and the removal of the player.
+		*
+		* @param pl player to be removed
+		* @ingroup scen_only
+		* @returns whether operation was successful
+		*/
+		STATIC register_method(vm, &world_remove_player, "remove_player", true);
+	}
 	/**
 	 * Returns player number @p pl. If player does not exist, returns null.
 	 * @param pl player number
@@ -170,7 +173,7 @@ void export_world(HSQUIRRELVM vm)
 	 * Get monthly statistics of total number of citizens.
 	 * @returns array, index [0] corresponds to current month
 	 */
-	STATIC register_method_fv(vm, &get_world_stat, "get_citizens",          freevariable2<bool,sint32>(true, karte_t::WORLD_CITICENS), true );
+	STATIC register_method_fv(vm, &get_world_stat, "get_citizens",          freevariable2<bool,sint32>(true, karte_t::WORLD_CITIZENS), true );
 	/**
 	 * Get monthly statistics of total city growth.
 	 * @returns array, index [0] corresponds to current month
@@ -235,7 +238,7 @@ void export_world(HSQUIRRELVM vm)
 	 * Get per year statistics of total number of citizens.
 	 * @returns array, index [0] corresponds to current year
 	 */
-	STATIC register_method_fv(vm, &get_world_stat, "get_year_citizens",          freevariable2<bool,sint32>(false, karte_t::WORLD_CITICENS), true );
+	STATIC register_method_fv(vm, &get_world_stat, "get_year_citizens",          freevariable2<bool,sint32>(false, karte_t::WORLD_CITIZENS), true );
 	/**
 	 * Get per year statistics of total city growth.
 	 * @returns array, index [0] corresponds to current year

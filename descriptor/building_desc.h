@@ -3,8 +3,9 @@
  * (see LICENSE.txt)
  */
 
-#ifndef __BUILDING_DESC_H
-#define __BUILDING_DESC_H
+#ifndef DESCRIPTOR_BUILDING_DESC_H
+#define DESCRIPTOR_BUILDING_DESC_H
+
 
 #include <assert.h>
 #include "image_array.h"
@@ -25,15 +26,15 @@ class checksum_t;
  *   1   Imagelist2D season 0 front
  *   2   Imagelist2D season 1 back
  *   3   Imagelist2D season 1 front
- *	... ...
+ * ... ...
  */
 class building_tile_desc_t : public obj_desc_t {
 	friend class tile_reader_t;
 
-	const building_desc_t	*building;
+	const building_desc_t *building;
 
 	uint8  seasons;
-	uint8  phases;	    ///< number of animation phases
+	uint8  phases;  ///< number of animation phases
 	uint16 index;
 
 public:
@@ -98,12 +99,12 @@ public:
 /**
  * Data for one building, consists of potentially more than one tile.
  *
- *  Child nodes:
- *	0   Name
- *	1   Copyright
- *	2   Tile 1
- *	3   Tile 2
- *	... ...
+ * Child nodes:
+ *  0   Name
+ *  1   Copyright
+ *  2   Tile 1
+ *  3   Tile 2
+ * ... ...
  */
 class building_desc_t : public obj_desc_timelined_t {
 	friend class building_reader_t;
@@ -131,16 +132,16 @@ public:
 			// city buildings
 			city_res          = 37, ///< residential city buildings
 			city_com          = 38, ///< commercial  city buildings
-			city_ind          = 39, ///< industrial  city buildings
+			city_ind          = 39  ///< industrial  city buildings
 		};
 
 
 		enum flag_t {
 			FLAG_NULL        = 0,
-			FLAG_NO_INFO     = 1, ///< do not show info window
-			FLAG_NO_PIT      = 2, ///< do not show construction pit
-			FLAG_NEED_GROUND = 4, ///< needs ground drawn below
-			FLAG_HAS_CURSOR  = 8  ///< there is cursor/icon for this
+			FLAG_NO_INFO     = 1 << 0, ///< do not show info window
+			FLAG_NO_PIT      = 1 << 1, ///< do not show construction pit
+			FLAG_NEED_GROUND = 1 << 2, ///< needs ground drawn below
+			FLAG_HAS_CURSOR  = 1 << 3  ///< there is cursor/icon for this
 		};
 private:
 	/**
@@ -163,11 +164,11 @@ private:
 			monorail_geb      = 22,
 			wartehalle        = 30,
 			mail              = 31,
-			lagerhalle        = 32,
+			lagerhalle        = 32
 		};
 
 	building_desc_t::btype type;
-	uint16 animation_time;	// in ms
+	uint16 animation_time; // in ms
 	uint32 extra_data;
 		// extra data:
 		// minimum population to build for city attractions,
@@ -195,7 +196,7 @@ private:
 #define PRICE_MAGIC (2147483647)
 
 
-	climate_bits	allowed_climates;
+	climate_bits allowed_climates;
 
 	/**
 	 * Whether this building can or must be built underground.
@@ -205,6 +206,8 @@ private:
 	 * 2 = can be built either underground or above ground.
 	 */
 	uint8 allow_underground;
+
+	uint16 preservation_year_month;
 
 	bool is_type(building_desc_t::btype u) const {
 		return type == u;
@@ -242,6 +245,9 @@ public:
 
 	// do not open info for this
 	bool no_info_window() const { return (flags & FLAG_NO_INFO) != 0; }
+
+	// never replace this building for renovation (to create historic city centres)
+	uint16 no_renovation_month() const { return preservation_year_month; }
 
 	building_desc_t::btype get_type() const { return type; }
 

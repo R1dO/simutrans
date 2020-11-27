@@ -3,8 +3,9 @@
  * (see LICENSE.txt)
  */
 
-#ifndef gui_image_list_h
-#define gui_image_list_h
+#ifndef GUI_COMPONENTS_GUI_IMAGE_LIST_H
+#define GUI_COMPONENTS_GUI_IMAGE_LIST_H
+
 
 #include "gui_action_creator.h"
 #include "gui_component.h"
@@ -44,7 +45,9 @@ public:
 	 * size of borders around the whole area (there are no borders around
 	 * individual images)
 	 */
-	enum { BORDER = 4 };
+	enum {
+		BORDER = 4
+	};
 
 private:
 	vector_tpl<image_data_t*> *images;

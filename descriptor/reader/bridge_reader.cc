@@ -154,14 +154,16 @@ obj_desc_t * bridge_reader_t::read_node(FILE *fp, obj_node_info_t &node)
 		desc->intro_date = decode_uint16(p);
 		desc->retire_date = decode_uint16(p);
 		desc->pillars_asymmetric = (decode_uint8(p)!=0);
-		desc->axle_load = decode_uint16(p);	// new
+		desc->axle_load = decode_uint16(p); // new
 		desc->max_height = decode_uint8(p);
 		desc->number_of_seasons = decode_uint8(p);
 
 	}
 	else {
+		if( version ) {
+			dbg->fatal( "bridge_reader_t::read_node()", "Cannot handle too new node version %i", version );
+		}
 		// old node, version 0
-
 		desc->wtyp = (uint8)v;
 		decode_uint16(p);                    // Menupos, no more used
 		desc->price = decode_uint32(p);
@@ -197,5 +199,5 @@ obj_desc_t * bridge_reader_t::read_node(FILE *fp, obj_node_info_t &node)
 		(desc->retire_date%12)+1,
 		desc->retire_date/12);
 
-  return desc;
+	return desc;
 }
