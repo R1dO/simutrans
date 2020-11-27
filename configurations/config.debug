@@ -11,9 +11,6 @@
 BACKEND = mixer_sdl2
 #BACKEND = posix
 
-#COLOUR_DEPTH = 0
-COLOUR_DEPTH = 16
-
 #OSTYPE = amiga
 #OSTYPE = beos
 #OSTYPE = freebsd
